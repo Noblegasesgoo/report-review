@@ -53,9 +53,9 @@
   .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
     border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
   .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
-  .keyfact{display:flex;gap:12px;align-items:flex-start;background:#eef5ff;border-left:4px solid var(--blue);
-    border-radius:0 12px 12px 0;padding:12px 16px;margin:14px 0;font-size:14.5px}
-  .keyfact::before{content:"📌";flex-shrink:0}
+  .keyfact{position:relative;background:#eef5ff;border-left:4px solid var(--blue);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";position:absolute;left:16px;top:12px;line-height:1.8}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
   @media(max-width:760px){.grid2{grid-template-columns:1fr}}
 
@@ -76,7 +76,7 @@
   .hl{color:var(--blue-d);font-weight:700}
 
   /* ===== 动画: MoE 专家餐厅 ===== */
-  .expert-stage{position:relative;height:280px}
+  .expert-stage{position:relative;height:360px}
   .expert{position:absolute;width:34px;height:34px;border-radius:10px;background:#2a3c5f;
     border:1px solid #3a5078;display:flex;align-items:center;justify-content:center;
     font-size:11px;color:#5a7bb5;transition:all .5s}
@@ -106,7 +106,8 @@
   .lib-arrow{position:absolute;left:86%;width:3px;background:var(--amber);opacity:0;transition:opacity .3s}
   .lib-arrow::after{content:"";position:absolute;bottom:-6px;left:-4.5px;border:6px solid transparent;border-top-color:var(--amber)}
   .lib-cur{position:absolute;left:86%;transform:translateX(-50%);background:var(--red);color:#fff;
-    font-size:11px;padding:2px 10px;border-radius:99px;z-index:4}
+    font-size:11px;padding:2px 10px;border-radius:99px;z-index:4;white-space:nowrap;max-width:96%;
+    overflow:hidden;text-overflow:ellipsis}
 
   /* ===== 动画: 量化行李箱 ===== */
   .suitcase-stage{display:flex;gap:30px;align-items:flex-end;justify-content:center;min-height:190px;flex-wrap:wrap}
@@ -119,12 +120,12 @@
   .case.fp4{background:linear-gradient(180deg,#2bc48a,#178a5e)}
 
   /* ===== 动画: 蒸馏 ===== */
-  .distill-stage{position:relative;height:250px}
-  .teacher{position:absolute;width:84px;height:84px;border-radius:50%;background:#2a3c5f;
+  .distill-stage{position:relative;height:300px}
+  .teacher{position:absolute;width:66px;height:66px;border-radius:50%;background:#2a3c5f;
     border:2px solid #3a5078;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    font-size:11px;color:#9db4dd;text-align:center;transition:all .5s;z-index:3}
-  .teacher b{font-size:13px;color:#dfe8ff}
-  .student{position:absolute;left:50%;top:96px;transform:translateX(-50%);width:120px;height:120px;
+    font-size:10px;color:#9db4dd;text-align:center;transition:all .5s;z-index:3;padding:4px;line-height:1.35}
+  .teacher b{font-size:12px;color:#dfe8ff}
+  .student{position:absolute;left:50%;top:180px;transform:translateX(-50%);width:104px;height:104px;
     border-radius:50%;background:linear-gradient(135deg,var(--blue),#6db4ff);display:flex;flex-direction:column;
     align-items:center;justify-content:center;color:#fff;font-weight:800;z-index:3;
     box-shadow:0 0 30px rgba(23,131,255,.5)}
@@ -139,7 +140,8 @@
   .ctx-fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:12px;
     background:linear-gradient(90deg,var(--blue),var(--purple));transition:width 1.8s cubic-bezier(.5,0,.2,1)}
   .ctx-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    color:#fff;font-weight:700;font-size:15px;z-index:2;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+    color:#fff;font-weight:700;font-size:clamp(12px,2.6vw,15px);z-index:2;text-shadow:0 1px 4px rgba(0,0,0,.5);
+    padding:0 14px;text-align:center;line-height:1.5}
   .ctx-marks{display:flex;justify-content:space-between;font-size:11.5px;color:#7f92b8;margin-top:6px}
 
   /* ===== 进度条动画 ===== */
@@ -471,7 +473,7 @@ const ctxScenes=[
   ['📄 一份合同','约 2 千 token',3],
   ['📚 一本长篇小说','约 10 万 token',12],
   ['📚📚 十本长篇小说','约 75 万汉字',78],
-  ['🤯 K3 一次能同时看完：≈ 一个中型图书馆的书架','100 万 token',100]
+  ['🤯 K3 的容量：一次看完整个书架','100 万 token',100]
 ];
 let ctxIdx=0;
 function ctxDemo(){
@@ -490,12 +492,15 @@ function ctxReset(){ctxIdx=0;document.getElementById('ctx-fill').style.width='0'
 const stage=document.getElementById('expert-stage');
 const experts=[];
 (function buildExperts(){
-  const cols=12, rows=8, gw=34+8, gh=34+8;
+  const cols=12, rows=8;
   const W=stage.clientWidth||900;
+  const gw=Math.min(42, Math.floor(W/cols));  // 窄屏自适应列宽
+  const size=gw-8, gh=gw-6;                   // 行距略密，保证 8 行完整显示
   const startX=Math.max(0,(W-cols*gw)/2);
   for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
     const d=document.createElement('div');
     d.className='expert';
+    d.style.width=size+'px';d.style.height=size+'px';
     d.style.left=(startX+c*gw)+'px';
     d.style.top=(70+r*gh)+'px';
     d.textContent='E'+(r*cols+c+1);
@@ -656,23 +661,29 @@ const teachers=[
 const teacherEls=[];
 (function buildTeachers(){
   const W=dStage.clientWidth||900;
-  teachers.forEach((t,i)=>{
-    const el=document.createElement('div');el.className='teacher';
-    const ang=(i/(teachers.length-1))*Math.PI; // 半圆
-    const rx=W/2-60, ry=70;
-    const x=W/2 - rx*Math.cos(ang) - 42;
-    const y=150 - ry*Math.sin(ang) + (i%2)*36 - 30;
-    el.style.left=x+'px';el.style.top=Math.max(0,y)+'px';
-    el.innerHTML='<b>'+t[0]+'</b>教练·'+t[1];
-    dStage.appendChild(el);teacherEls.push(el);
+  const SIZE=66, GAP=14;
+  // 两行布局：上 5 下 4，均匀分布，避免重叠
+  const rows=[teachers.slice(0,5),teachers.slice(5,9)];
+  let idx=0;
+  rows.forEach((row,r)=>{
+    const total=row.length*SIZE+(row.length-1)*GAP;
+    const startX=Math.max(0,(W-total)/2);
+    row.forEach((t,c)=>{
+      const el=document.createElement('div');el.className='teacher';
+      el.style.left=(startX+c*(SIZE+GAP))+'px';
+      el.style.top=(14+r*92)+'px';
+      el.innerHTML='<b>'+t[0]+'</b>教练·'+t[1];
+      dStage.appendChild(el);teacherEls.push(el);
+      idx++;
+    });
   });
 })();
 function distillDemo(){
   distillReset();
   const st=dStage.querySelector('.student');
-  const sx=st.offsetLeft+60, sy=st.offsetTop+40;
+  const sx=st.offsetLeft+52, sy=st.offsetTop+52;
   teacherEls.forEach((el,i)=>{
-    const tx=el.offsetLeft+42, ty=el.offsetTop+42;
+    const tx=el.offsetLeft+33, ty=el.offsetTop+33;
     const b=document.createElement('div');b.className='beam';
     const len=Math.hypot(sx-tx,sy-ty);
     b.style.left=tx+'px';b.style.top=ty+'px';b.style.width=len+'px';
