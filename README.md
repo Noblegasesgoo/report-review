@@ -32,6 +32,6 @@
 
 ## 许可证
 
-[MIT License](LICENSE) © Limin Zhao
+[MIT License](LICENSE) © Noblegasesgoo
 
 页面内容基于各厂商公开发布的技术报告整理，通俗类比仅用于帮助理解，技术细节以原始报告为准。
