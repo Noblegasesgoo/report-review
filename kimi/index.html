@@ -220,6 +220,25 @@
     font-size:11px;font-weight:700;color:#fff;transition:all .3s}
 
   .toc-note{font-size:12px;color:#8fb8ff}
+
+  /* ===== 来源标注 ===== */
+  .src{color:var(--blue-d);text-decoration:none;font-size:.8em;font-weight:600;
+    border-bottom:1px dashed #9db8e8;padding:0 1px;white-space:nowrap}
+  .src:hover{color:var(--blue);border-bottom-style:solid;background:#eaf2ff;border-radius:4px}
+  .src::after{content:"↗";font-size:.85em;margin-left:1px}
+  .demo-box .src, .formula .src{color:#8fb8ff;border-bottom-color:#3a5078}
+  .demo-box .src:hover{color:#cfe2ff;background:rgba(23,131,255,.15)}
+  .src-card{display:inline-flex;gap:8px;align-items:center;background:#f2f7ff;border:1px solid #d5e4fb;
+    border-radius:10px;padding:6px 14px;margin:4px 8px 4px 0;font-size:13.5px;color:var(--blue-d);
+    text-decoration:none;transition:.2s}
+  .src-card:hover{background:#e4efff;border-color:var(--blue)}
+  .src-card::after{content:"↗"}
+  .src-note{font-size:13px;color:#7f8ca3;margin:10px 0 0}
+  .src-inline{color:var(--blue-d);text-decoration:none;font-weight:600;border-bottom:1px dashed #9db8e8}
+  .src-inline:hover{color:var(--blue);border-bottom-style:solid}
+  .src-inline::after{content:"↗";font-size:.85em;margin-left:1px}
+  .src-block{margin:16px 0 8px;padding-top:12px;border-top:1px dashed var(--line);font-size:13.5px;color:#7f8ca3}
+  .src-block b{color:var(--ink-soft);font-weight:600;margin-right:6px}
   @media(max-width:640px){
     .vote-col{width:70px}.vote-bar{width:48px}
     .mix-glass{width:90px;height:110px}
@@ -231,7 +250,7 @@
 <!-- ============ HERO ============ -->
 <header class="hero">
   <div class="wrap">
-    <span class="tag">技术报告通俗解读 · 基于 Moonshot AI《Kimi K3: Open Frontier Intelligence》47 页技术报告</span>
+    <span class="tag">技术报告通俗解读 · 基于 Moonshot AI <a class="src-inline" style="color:#cfe2ff;border-bottom-color:rgba(255,255,255,.5)" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">《Kimi K3: Open Frontier Intelligence》47 页技术报告</a></span>
     <h1>看懂 Kimi K3：<br>2.8 万亿参数的「开源大脑」是怎么炼成的</h1>
     <p class="sub">不需要任何 AI 背景。我们用餐厅、图书馆、快递分拣中心这些生活场景，
       配上可以点着玩的动画，把这份技术报告里最重要的 6 个发明讲清楚。</p>
@@ -270,7 +289,7 @@
     <h3>🧠 大脑很大，但每次只用一点点</h3>
     <p>大模型的「参数」可以理解成大脑里存储知识的<b>神经元连接</b>。K3 有 <b>2.8 万亿</b>个参数——如果每个参数是一粒米，这些米能装满约 <b>22 个标准集装箱</b>。但巧妙的是：回答你的每一个字（token）时，它只动用其中 <b>1040 亿（104B）</b>个参数，约占总量的 <b>3.7%</b>。</p>
     <div class="analogy">一家拥有 896 名专科医生的大型医院，来看病的每位病人只需要 16 位相关专科医生会诊 + 2 位全科医生兜底。医院总编制很大（什么疑难杂症都能看），但每次出诊的团队很小（效率高、费用低）。这就是「混合专家模型」（MoE）的核心思想。</div>
-    <div class="keyfact">技术报告原文：K3 每层有 <b>896 个路由专家</b>，每个 token 激活 <b>16 个</b>，另有 <b>2 个共享专家</b>，稀疏度高达 56 倍。</div>
+    <div class="keyfact">技术报告 <a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">§1 Model Architecture</a>：K3 每层有 <b>896 个路由专家</b>，每个 token 激活 <b>16 个</b>，另有 <b>2 个共享专家</b>，稀疏度高达 56 倍。</div>
   </div>
 
   <div class="card fade-up">
@@ -286,7 +305,7 @@
         <button class="btn ghost" onclick="ctxReset()">重置</button>
       </div>
     </div>
-    <div class="keyfact">对照：2022 年的 GPT-3 上下文只有 2048 token（约半页文档）。四年间，前沿模型的「工作记忆」扩大了约 <b>500 倍</b>。</div>
+    <div class="keyfact">K3 的 100 万上下文见其 <a class="src" href="https://huggingface.co/moonshotai/Kimi-K3" target="_blank" rel="noopener">官方模型卡</a>与 <a class="src" href="https://huggingface.co/moonshotai/Kimi-K3/blob/main/config.json" target="_blank" rel="noopener">config.json（max_length=1048576）</a>。</div>
   </div>
 </section>
 
@@ -298,7 +317,7 @@
   <!-- 1. 词嵌入 -->
   <div class="card fade-up">
     <h3>① 词嵌入 Embedding：把每个词变成一串「特征坐标」</h3>
-    <p>计算机只认识数字，所以第一步是把每个词翻译成一串数字（向量）。这串数字不是随机的，而是模型从海量文本里学出的「特征坐标」——含义相近的词，坐标也相近。K3 的词表有 <b>163,840</b> 个词，每个词对应一个 <b>7168 维</b>的向量。</p>
+    <p>计算机只认识数字，所以第一步是把每个词翻译成一串数字（向量）。这串数字不是随机的，而是模型从海量文本里学出的「特征坐标」——含义相近的词，坐标也相近。K3 的词表有 <b>163,840</b> 个词，每个词对应一个 <b>7168 维</b>的向量（见 <a class="src" href="https://huggingface.co/moonshotai/Kimi-K3/blob/main/config.json" target="_blank" rel="noopener">config.json: vocab_size / hidden_size</a>）。</p>
     <div class="formula"><span style="font-family:Georgia,serif;font-style:italic;font-size:16.5px;line-height:1.9;display:inline-block"><span style="font-style:normal">“猫”</span>&nbsp;&nbsp;⟶&nbsp;&nbsp;[&thinsp;0.21,&nbsp; -0.58,&nbsp; 0.94,&nbsp; …&thinsp;] ∈ <span style="font-style:normal">R</span><sup style="font-size:.7em">7168</sup></span>
       <small>读懂这个公式：箭头读作「被映射成」，R⁷¹⁶⁸ 表示「7168 个实数组成的坐标」。一个词 = 高维空间里的一个点。</small>
     </div>
@@ -339,7 +358,7 @@
       </div>
     </div>
     <div class="analogy">开一个项目评审会：你是主持人（Query），每个人先自报岗位（Key），你按「和我议题的相关度」给每人分配发言权（softmax 权重），最后会议纪要 = 每个人发言内容（Value）× 发言权的加总。职位不重要的也在场，只是权重接近 0。</div>
-    <div class="keyfact">K3 有 <b>96 个注意力头</b>——相当于同时开 96 场不同主题的评审会（有的关注语法、有的关注指代、有的关注数字），最后把 96 份会议纪要拼接起来。注意力隐藏维度 7168，每头维度 128（KDA）/ MLA 部分用 576 维潜向量压缩 KV 缓存。</div>
+    <div class="keyfact">K3 有 <b>96 个注意力头</b>——相当于同时开 96 场不同主题的评审会（有的关注语法、有的关注指代、有的关注数字），最后把 96 份会议纪要拼接起来。注意力隐藏维度 7168、每头维度 128（KDA），MLA 部分用潜向量压缩 KV 缓存（见 <a class="src" href="https://huggingface.co/moonshotai/Kimi-K3/blob/main/config.json" target="_blank" rel="noopener">config.json: num_attention_heads / kv_lora_rank</a>）。</div>
   </div>
 
   <!-- 3. Softmax -->
@@ -380,7 +399,7 @@
       <p style="font-size:13px;color:#9db4dd;margin-top:8px" id="act-readout"></p>
     </div>
     <div class="analogy">SwiGLU 像一辆没有限速器的车：绝大多数时候没问题，但 2.8 万亿参数的「超长车队」里只要一辆车飙到失控（激活值爆炸），整个训练就翻车。SiTU-GLU 给每辆车装了电子限速——市内（小数值区）驾驶感受和原来一模一样，上了高速最多开 100 km/h。</div>
-    <div class="keyfact">为什么要费这个劲？报告 §2.3 解释：LatentMoE 的路由路径串了近 4 个矩阵乘法（W↓→专家→W↑），在 2.8T 规模下激活值会滚雪球式膨胀。SiTU-GLU + 上行投影前的 RMSNorm 这对组合，把数值爆炸从源头掐灭，是「896 专家 × 2.8T 参数」能训练成功的关键前提。</div>
+    <div class="keyfact">为什么要费这个劲？报告 <a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">§2.3 Stable LatentMoE</a> 解释：LatentMoE 的路由路径串了近 4 个矩阵乘法（W↓→专家→W↑），在 2.8T 规模下激活值会滚雪球式膨胀。SiTU-GLU + 上行投影前的 RMSNorm 这对组合，把数值爆炸从源头掐灭，是「896 专家 × 2.8T 参数」能训练成功的关键前提。</div>
   </div>
 
   <!-- 5. 梯度爆炸 -->
@@ -397,7 +416,7 @@
       <p style="font-size:13.5px;color:#b9c9e8;text-align:center" id="grad-result"></p>
       <p style="font-size:13px;color:#9db4dd;margin-top:8px;text-align:center">💡 把 r 拖到 1.2 以上，数字会变成「💥」——K3 的 SiTU-GLU 和 RMSNorm 干的就是把 r 牢牢按在 1 附近。</p>
     </div>
-    <div class="analogy">传话游戏里每个人把音量调高 20%：传到第 93 个人时已经是震耳欲聋的噪音。RMSNorm（均方根归一化）相当于每传一个人就把音量校准回标准值——不管传多少手，音量始终如一。K3 在 LatentMoE 上行投影前、AttnRes 的键上、以及每个子层入口都放了这道「音量校准」。</div>
+    <div class="analogy">传话游戏里每个人把音量调高 20%：传到第 93 个人时已经是震耳欲聋的噪音。RMSNorm（均方根归一化）相当于每传一个人就把音量校准回标准值——不管传多少手，音量始终如一。K3 在 LatentMoE 上行投影前、AttnRes 的键上、以及每个子层入口都放了这道「音量校准」（见 <a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">报告 §2.2 / §2.3</a>）。</div>
   </div>
 
   <!-- 6. MoE 路由数学 -->
@@ -415,7 +434,7 @@
       <p style="font-size:13.5px;color:#b9c9e8;text-align:center;margin-top:8px" id="moe-result"></p>
     </div>
     <div class="analogy">大公司决策：896 名顾问全部雇佣（参数全存着，见多识广），但每个项目只请 16 个最对口的顾问开会（计算只花 16 份钱）。「雇佣成本」决定能力上限，「开会成本」决定运行速度——MoE 让两者解耦，这是 2.8T 模型能跑得起的根本原因。</div>
-    <div class="keyfact">还有一个隐藏难题：896 个专家怎么保证「雨露均沾」？如果路由器总把 token 派给少数几个「明星专家」，其他专家永远得不到训练就废了。K3 的 <b>Quantile Balancing（分位数均衡）</b>用直方图在线估计每个专家的负载分位数，动态微调路由偏置——不需要额外的负载均衡损失项，就不会干扰主任务的学习。</div>
+    <div class="keyfact">还有一个隐藏难题：896 个专家怎么保证「雨露均沾」？如果路由器总把 token 派给少数几个「明星专家」，其他专家永远得不到训练就废了。K3 的 <b>Quantile Balancing（分位数均衡）</b>用直方图在线估计每个专家的负载分位数，动态微调路由偏置——不需要额外的负载均衡损失项，就不会干扰主任务的学习（<a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">报告 §2.3</a>）。</div>
   </div>
 
   <!-- 7. 量化数学 -->
@@ -436,7 +455,7 @@
       <p style="font-size:13.5px;color:#b9c9e8;text-align:center;margin-top:10px" id="quant-result"></p>
     </div>
     <div class="analogy">音乐从录音室母带（FP16）转成 MP3（MXFP4）：砍掉人耳不敏感的细节，文件小 4 倍，听起来几乎一样。K3 的 QAT（量化感知训练）更进一步——让歌手<b>提前知道会转成 MP3</b>，直接在 MP3 音质下排练，最终效果和母带演出几乎无差。</div>
-    <div class="keyfact">量化的「免死金牌」名单：注意力层、共享专家、路由器、视觉塔、lm_head 全部保持 BF16——这些组件对精度敏感且参数占比小。只有占参数大头的 896 个路由专家吃 4 位压缩，这就是「1.56 TB 权重 = 5.6 TB 的 28%」的由来。</div>
+    <div class="keyfact">量化的「免死金牌」名单：注意力层、共享专家、路由器、视觉塔、lm_head 全部保持 BF16——这些组件对精度敏感且参数占比小。只有占参数大头的 896 个路由专家吃 4 位压缩（见 <a class="src" href="https://huggingface.co/moonshotai/Kimi-K3/blob/main/config.json" target="_blank" rel="noopener">config.json: quantization_config 的 ignore 列表</a>），这就是「1.56 TB 权重 = 5.6 TB 的 28%」的由来。</div>
   </div>
 
   <!-- 8. Scaling Law -->
@@ -448,20 +467,20 @@
     </div>
     <div class="demo-box">
       <div class="demo-title">交互 · K2 vs K3：同样的算力预算，谁学得更聪明</div>
-      <p style="font-size:14px;color:#b9c9e8">下面按报告 §3.2 的缩放结论绘制示意曲线（对数坐标）。拖动「算力预算」滑杆，看两条线的差距——<b style="color:#ff6b6b">红色 K3 整条线在蓝色 K2 下方</b>，任意算力下 Loss 都更低：</p>
+      <p style="font-size:14px;color:#b9c9e8">下面按报告 <a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">§3.2 Scaling Law</a> 的缩放结论绘制示意曲线（对数坐标）。拖动「算力预算」滑杆，看两条线的差距——<b style="color:#ff6b6b">红色 K3 整条线在蓝色 K2 下方</b>，任意算力下 Loss 都更低：</p>
       <div class="slider-row"><span style="width:130px;font-size:14px">算力预算（对数）</span><input type="range" min="18" max="26" step="0.1" value="23" id="scale-c" oninput="scaleDemo()"><span class="slider-val" id="scale-cv">10^23</span></div>
       <canvas class="plot" id="scale-canvas"></canvas>
       <p style="font-size:13.5px;color:#b9c9e8;text-align:center;margin-top:8px" id="scale-result"></p>
     </div>
     <div class="analogy">两家快递公司：K2 公司每花 100 元油费送 100 单，K3 公司换了更好的路线规划（架构改进），同样 100 元油费能送 250 单。「2.5× 扩展效率」就是说：达到同样的智能水平，K3 只需要 K2 的 40% 训练算力——省下的钱直接变成了更低的 API 价格。</div>
-    <div class="keyfact">报告的 Scaling Law 研究还得到一个工程结论：余弦衰减（cosine decay）学习率调度稳定优于其他方案，因此 K3 预训练沿用——先让学习率从高点按余弦曲线平滑降到低点，像飞机降落而不是垂直坠落。</div>
+    <div class="keyfact">报告的 Scaling Law 研究还得到一个工程结论：余弦衰减（cosine decay）学习率调度稳定优于其他方案，因此 K3 预训练沿用——先让学习率从高点按余弦曲线平滑降到低点，像飞机降落而不是垂直坠落（<a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">报告 §3.2</a>）。</div>
   </div>
 </section>
 
 <!-- ============ CH1 ============ -->
 <section class="chapter" id="ch1">
   <div class="chap-head"><span class="chap-num">发明 1</span><h2>Stable LatentMoE：896 位专家的「分诊台」</h2></div>
-  <p class="oneline">技术报告 §2.3 —— 用「专科餐厅」的方式组织 2.8 万亿参数，并且让它在极端稀疏下依然训练得稳。</p>
+  <p class="oneline">技术报告 <a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">§2.3 Stable LatentMoE</a> —— 用「专科餐厅」的方式组织 2.8 万亿参数，并且让它在极端稀疏下依然训练得稳。</p>
 
   <div class="card fade-up">
     <h3>🍜 一家有 896 个档口的美食广场</h3>
@@ -478,14 +497,14 @@
       </div>
     </div>
     <div class="analogy">LatentMoE 还多了一道聪明工序：病人病历（token 信息，维度 7168）先被压缩成一张<b>摘要卡片</b>（潜空间，维度 3584）再分发给专家。专家之间传递的是卡片而不是整箱病历，通信量直接减半——专家数量翻倍也不怕「快递堵车」。</div>
-    <div class="keyfact">报告还提到两个「稳定器」：<b>SiTU-GLU</b> 激活函数给数值装上「限速器」（输出永远不会超过 β₁β₂=100，防止训练时数值爆炸），<b>Quantile Balancing（分位数均衡）</b> 像一个聪明的调度员，确保 896 个档口的客流量大致均匀，不出现「网红档口排长队、其他档口没生意」。</div>
+    <div class="keyfact">报告还提到两个「稳定器」：<b>SiTU-GLU</b> 激活函数给数值装上「限速器」（输出永远不会超过 β₁β₂=100，防止训练时数值爆炸），<b>Quantile Balancing（分位数均衡）</b> 像一个聪明的调度员，确保 896 个档口的客流量大致均匀，不出现「网红档口排长队、其他档口没生意」（<a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">报告 §2.3</a>）。</div>
   </div>
 </section>
 
 <!-- ============ CH2 ============ -->
 <section class="chapter" id="ch2">
   <div class="chap-head"><span class="chap-num">发明 2</span><h2>混合注意力：KDA + Gated MLA，「阅读灯」与「探照灯」</h2></div>
-  <p class="oneline">技术报告 §2.1 —— 93 层网络里，69 层用省电的线性注意力（KDA），24 层用全局注意力（MLA），比例 3:1。</p>
+  <p class="oneline">技术报告 <a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">§2.1 Hybrid Attention</a> —— 93 层网络里，69 层用省电的线性注意力（KDA），24 层用全局注意力（MLA），比例 3:1（逐层排布见 <a class="src" href="https://huggingface.co/moonshotai/Kimi-K3/blob/main/config.json" target="_blank" rel="noopener">config.json</a>）。</p>
 
   <div class="card fade-up">
     <h3>🔦 读一本 100 万字的书，不可能每一页都反复通读</h3>
@@ -511,14 +530,14 @@
     </div>
     <p>但「只记笔记」有代价：笔记是压缩过的，难免丢细节。所以 K3 每 3 层 KDA 就插入 1 层 <b>Gated MLA</b>（全局注意力）——就像读书时每读三章停下来，<b>翻回原文核对一遍关键情节</b>。MLA 本身也做了「瘦身」：它把每个词的档案压缩成一个低维「潜向量」存放（KV 缓存大幅减小），K3 还给它加了一道<b>输出闸门</b>（full-rank output gate），过滤无关信息。</p>
     <div class="analogy">写论文时的你：大部分时间靠摘抄的笔记快速写作（KDA，快且省），写到关键论证处翻回原始文献逐字核对（MLA，慢但准）。两者 3:1 搭配，速度与准确性兼得。</div>
-    <div class="keyfact">另一个神来之笔：K3 的所有 MLA 层<b>完全不用位置编码（NoPE）</b>——「顺序感」全部由 KDA 的遗忘/衰减机制隐式提供。所以当上下文扩展到 100 万 token 时，<b>不需要</b>像其他模型那样重新调校位置编码参数（RoPE 外推/YaRN），直接就能用。</div>
+    <div class="keyfact">另一个神来之笔：K3 的所有 MLA 层<b>完全不用位置编码（NoPE）</b>——「顺序感」全部由 KDA 的遗忘/衰减机制隐式提供（<a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">报告 §2.1.2</a>）。所以当上下文扩展到 100 万 token 时，<b>不需要</b>像其他模型那样重新调校位置编码参数（RoPE 外推/YaRN），直接就能用。KDA 机制详见论文 <a class="src" href="https://arxiv.org/abs/2511.02246" target="_blank" rel="noopener">Kimi Linear（arXiv:2511.02246）</a>。</div>
   </div>
 </section>
 
 <!-- ============ CH3 ============ -->
 <section class="chapter" id="ch3">
   <div class="chap-head"><span class="chap-num">发明 3</span><h2>注意力残差 AttnRes：给 93 层楼装上「直达电梯」</h2></div>
-  <p class="oneline">技术报告 §2.2 —— 深层网络的信息不再只能逐层接力，每层都能「回头点名」之前的任何一层。</p>
+  <p class="oneline">技术报告 <a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">§2.2 Attention Residuals</a> —— 深层网络的信息不再只能逐层接力，每层都能「回头点名」之前的任何一层。</p>
 
   <div class="card fade-up">
     <h3>📚 传话游戏的终结者</h3>
@@ -533,14 +552,14 @@
       <p style="font-size:13px;color:#9db4dd;margin-top:10px" id="lib-desc">黄色箭头粗细代表调取权重 α——第 8 层可以跳过中间层，直接从嵌入层和第 1~2 区块「拿资料」。</p>
     </div>
     <div class="analogy">传统残差 = 公司里的「层层上报」，董事长看到的报告已经被 90 个经理改写了一遍；AttnRes = 董事长手里有一部<b>直线电话簿</b>，可以直接打给任何一个一线员工，并且知道该重点听谁的。</div>
-    <div class="keyfact">这项技术最初作为论文《Attention Residuals》于 2026 年 3 月公开，一度被撤回引发社区关注，K3 是它的首次大规模工业验证。报告还披露：K3 的推理草稿模型（EAGLE-3 投机解码）正是融合第 1、4 和最后一个 AttnRes 区块的低/中/高层特征来「猜」下一个词，实现加速。</div>
+    <div class="keyfact">这项技术最初作为论文 <a class="src" href="https://arxiv.org/abs/2603.15031" target="_blank" rel="noopener">《Attention Residuals》（arXiv:2603.15031）</a> 于 2026 年 3 月公开，一度被撤回引发社区关注，K3 是它的首次大规模工业验证。报告还披露：K3 的推理草稿模型（EAGLE-3 投机解码）正是融合第 1、4 和最后一个 AttnRes 区块的低/中/高层特征来「猜」下一个词，实现加速（<a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">报告 §6 Inference</a>）。</div>
   </div>
 </section>
 
 <!-- ============ CH4 ============ -->
 <section class="chapter" id="ch4">
   <div class="chap-head"><span class="chap-num">发明 4</span><h2>MXFP4 量化：把 5.6TB 的行李压进 1.56TB 的箱子</h2></div>
-  <p class="oneline">技术报告 §4.1.4 —— 不是训练完再「有损压缩」，而是训练时就戴着「镣铐」练武，出生即量化。</p>
+  <p class="oneline">技术报告 <a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">§4.1.4 Quantization-Aware Post-Training</a> —— 不是训练完再「有损压缩」，而是训练时就戴着「镣铐」练武，出生即量化。</p>
 
   <div class="card fade-up">
     <h3>🧳 搬家时，真空压缩袋能省 3/4 空间</h3>
@@ -563,14 +582,14 @@
     </div>
     <p>4 位精度会不会让模型变「笨」？关键在于<b>量化感知训练（QAT）</b>：K3 从微调（SFT）阶段开始，就在「权重已被量化」的条件下训练——模型学会了在 4 位的约束下工作，就像<strong>戴着沙袋练武的人，习惯了沙袋后摘掉也和常人无异</strong>。同时「要害部位」绝不动刀：注意力层、共享专家、路由器、视觉塔全部保持高精度，RL 阶段 rollout 与训练使用同一套量化方案，彻底消除「训练-推理不一致」。</p>
     <div class="analogy">普通量化 = 拍完高清照片再用微信压缩，画质损失听天由命；量化感知训练 = 摄影师<b>直接用压缩后的画质取景构图</b>，从一开始就按最终效果调整，成品自然看不出损失。</div>
-    <div class="keyfact">MXFP4 是业界新标准：OpenAI 的 gpt-oss、Kimi K2.5、NVIDIA Nemotron 3 等均已采用。4 位格式天然适配 NVIDIA Blackwell 与 AMD MI400 系列的新硬件指令，权重读取量减少 → 推理吞吐几乎翻倍。</div>
+    <div class="keyfact">MXFP4 是业界新标准，4 位格式天然适配 NVIDIA Blackwell 与 AMD MI400 系列的新硬件指令，权重读取量减少 → 推理吞吐显著提升。K3 的具体量化配置（group_size=32、ignore 列表）见其 <a class="src" href="https://huggingface.co/moonshotai/Kimi-K3/blob/main/config.json" target="_blank" rel="noopener">config.json: quantization_config</a>。</div>
   </div>
 </section>
 
 <!-- ============ CH5 ============ -->
 <section class="chapter" id="ch5">
   <div class="chap-head"><span class="chap-num">发明 5</span><h2>多教师 On-Policy 蒸馏：9 位「专科教练」带出一个全能选手</h2></div>
-  <p class="oneline">技术报告 §4.1.3 —— 先分头特训出 9 个专家模型，再把它们的功力「合」进同一个 K3。</p>
+  <p class="oneline">技术报告 <a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">§4.1.3 Multi-Teacher On-Policy Distillation</a> —— 先分头特训出 9 个专家模型，再把它们的功力「合」进同一个 K3。</p>
 
   <div class="card fade-up">
     <h3>🎓 奥运十项全能选手是怎么训练的？</h3>
@@ -587,48 +606,48 @@
       <p style="font-size:13px;color:#9db4dd;margin-top:8px" id="distill-desc">9 位专科教练（3 领域 × 3 思考档位）→ 1 个统一模型</p>
     </div>
     <div class="analogy">就像培养一位全科医生：先让他分别跟心内科、外科、急诊科的主任各实习几年（专科 RL），最后通过「跟诊考核」把各科主任的诊疗思路内化成自己的本能（蒸馏）——而不是让 9 个主任挤在一张诊台前轮流抢话筒（模型合并）。</div>
-    <div class="keyfact">配套的 RL 环境同样是黑科技：<b>统一白盒环境</b>把 Kimi Code、Claude Code、Codex 等主流智能体框架全部「模块化拆解」，训练时随机拼装不同组合，防止模型只学会「在一种工具架下干活」；<b>部分 rollout（partial rollout）</b>机制则允许超长任务（一次任务可能调用上千次工具、积累百万 token）跨迭代「断点续跑」。</div>
+    <div class="keyfact">配套的 RL 环境同样是黑科技：<b>统一白盒环境</b>把 Kimi Code、Claude Code、Codex 等主流智能体框架全部「模块化拆解」，训练时随机拼装不同组合，防止模型只学会「在一种工具架下干活」；<b>部分 rollout（partial rollout）</b>机制则允许超长任务（一次任务可能调用上千次工具、积累百万 token）跨迭代「断点续跑」（<a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">报告 §4.2 RL Environments</a>，训练平台见 <a class="src" href="https://github.com/kvcache-ai/AgentEnv" target="_blank" rel="noopener">AgentEnv</a>）。</div>
   </div>
 </section>
 
 <!-- ============ CH6 ============ -->
 <section class="chapter" id="ch6">
   <div class="chap-head"><span class="chap-num">发明 6</span><h2>原生视觉 MoonViT-V2：文字和图像，在同一个脑子里处理</h2></div>
-  <p class="oneline">技术报告 §2.4 —— 视觉编码器从零开始用「下一个词预测」训练，与语言共用一条主干。</p>
+  <p class="oneline">技术报告 <a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">§2.4 Native Vision (MoonViT-V2)</a> —— 视觉编码器从零开始用「下一个词预测」训练，与语言共用一条主干。</p>
 
   <div class="card fade-up">
     <h3>👁️ 不是「翻译器」，而是「母语者」</h3>
     <p>许多多模态模型的视觉是「外挂」的：先由一个预训练好的图像模型（如 SigLIP）看图，再把结果「翻译」给语言模型——中间隔着一层转译，联合训练时还容易「互相干扰」（梯度不稳定）。K3 的 <b>MoonViT-V2</b>（4.01 亿参数，27 层）<b>完全从零开始</b>，用和语言模型同一个目标（预测下一个 token）训练：图像被切成 14×14 的小块，经视觉塔编码后直接混入文本的 token 流，<b>同一个大脑、同一条流水线</b>处理文字、图片和视频。</p>
     <div class="analogy">外挂视觉 = 请一位不懂中文的外国美术顾问，你看画他描述，经翻译转述给决策者——信息每转一手就打折扣；原生视觉 = 决策者自己从小看着画长大，「看」和「说」对他来说是同一种语言。</div>
     <p>这个设计支撑了 K3 最酷的能力之一：<b>vision-in-the-loop（视觉闭环）</b>。模型写完一段网页代码 → 自己「看一眼」渲染出来的截图 → 发现按钮歪了 → 回头改代码 → 再看一眼……全程不需要人类插手，也不需要切换到另一个模型。游戏开发、CAD 制图、UI 设计都是这样练出来的。</p>
-    <div class="keyfact">报告中一个反直觉的发现：用「从零训练」替代「SigLIP 预训练初始化」反而更稳——预训练视觉编码器接入大模型后梯度范数持续偏高且频繁尖刺，而从零训练的 MoonViT-V2 全程平稳。视觉预训练数据还大规模加入了「代码 + 渲染结果」配对数据（SVG、3D、网页、游戏、CAD 图纸）。</div>
+    <div class="keyfact">报告中一个反直觉的发现：用「从零训练」替代「SigLIP 预训练初始化」反而更稳——预训练视觉编码器接入大模型后梯度范数持续偏高且频繁尖刺，而从零训练的 MoonViT-V2 全程平稳。视觉预训练数据还大规模加入了「代码 + 渲染结果」配对数据（SVG、3D、网页、游戏、CAD 图纸）（<a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">报告 §2.4 / §3.1</a>）。</div>
   </div>
 </section>
 
 <!-- ============ CH7 ============ -->
 <section class="chapter" id="ch7">
   <div class="chap-head"><span class="chap-num">幕后</span><h2>看不见的基建：让 2.8 万亿参数「转得动」的三件神器</h2></div>
-  <p class="oneline">技术报告 §5 —— 模型只是冰山一角，水面下是同等重要的系统工程。这三件神器全部同步开源。</p>
+  <p class="oneline">技术报告 <a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">§5 Infrastructure</a> —— 模型只是冰山一角，水面下是同等重要的系统工程。三件神器全部同步开源：<a class="src" href="https://github.com/MoonshotAI/MoonEP" target="_blank" rel="noopener">MoonEP</a>、<a class="src" href="https://github.com/MoonshotAI/FlashKDA" target="_blank" rel="noopener">FlashKDA</a>、<a class="src" href="https://github.com/kvcache-ai/AgentEnv" target="_blank" rel="noopener">AgentEnv</a>。</p>
 
   <div class="grid2">
     <div class="card fade-up">
-      <h3>⚖️ MoonEP · 完美的快递分拣中心</h3>
-      <p>训练 MoE 模型时，896 个专家分布在上百张 GPU 上，token 像快递包裹一样在 GPU 之间分发。问题是：热门专家会「爆仓」，冷门专家的 GPU 在「摸鱼」。MoonEP 的方案是给热门专家安排<b>动态替补分身</b>（冗余专家），让每张 GPU 的计算量、通信量几乎完全相等——官方证明这是无管线气泡下的<b>理论最优解</b>。它还做到了关键路径「零主机同步」：CPU 不下场指挥，GPU 之间用 device-side 操作自己协调，e2e 延迟最多降低 1.2 倍。</p>
+      <h3>⚖️ <a class="src-inline" href="https://github.com/MoonshotAI/MoonEP" target="_blank" rel="noopener">MoonEP</a> · 完美的快递分拣中心</h3>
+      <p>训练 MoE 模型时，896 个专家分布在上百张 GPU 上，token 像快递包裹一样在 GPU 之间分发。问题是：热门专家会「爆仓」，冷门专家的 GPU 在「摸鱼」。MoonEP 的方案是给热门专家安排<b>动态替补分身</b>（冗余专家），让每张 GPU 的计算量、通信量几乎完全相等——官方证明这是无管线气泡下的<b>理论最优解</b>。它还做到了关键路径「零主机同步」：CPU 不下场指挥，GPU 之间用 device-side 操作自己协调（<a class="src" href="https://github.com/MoonshotAI/MoonEP" target="_blank" rel="noopener">MoonEP 仓库</a> / <a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">报告 §5.2</a>）。</p>
       <div class="analogy">双十一分拣中心：把「爆款商品区」复制几个一模一样的货架分给不同班组，保证每个班组搬运量完全相同，谁也不用加班、谁也不用闲着。</div>
     </div>
     <div class="card fade-up">
-      <h3>⚡ FlashKDA · 给发动机换涡轮</h3>
-      <p>KDA 是全新机制，通用 GPU 算子跑不快。团队用 CUTLASS 重写了专用内核：预填充（prefill）阶段比此前的 flash-linear-attention 基线快 <b>1.72~2.22 倍</b>；解码阶段配合「分裂式持久化解码」（SPD）+ CUDA Graph，把 100 万上下文、batch=64 的解码端到端提速 <b>1.76 倍</b>。</p>
+      <h3>⚡ <a class="src-inline" href="https://github.com/MoonshotAI/FlashKDA" target="_blank" rel="noopener">FlashKDA</a> · 给发动机换涡轮</h3>
+      <p>KDA 是全新机制，通用 GPU 算子跑不快。团队用 CUTLASS 重写了专用内核：预填充（prefill）阶段比此前的 flash-linear-attention 基线快 <b>1.72~2.22 倍</b>；解码阶段配合「分裂式持久化解码」（SPD）+ CUDA Graph，大幅提速长上下文解码（<a class="src" href="https://github.com/MoonshotAI/FlashKDA" target="_blank" rel="noopener">FlashKDA 仓库</a> / <a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">报告 §5.1</a>）。</p>
       <div class="analogy">同一辆车，换个发动机：车型（模型架构）没变，但百公里加速从 8 秒变 4 秒——省下的每一毫秒，乘以每天数十亿次调用就是巨额成本。</div>
     </div>
     <div class="card fade-up">
-      <h3>🏖️ AgentEnv · 会「存档读档」的练兵场</h3>
+      <h3>🏖️ <a class="src-inline" href="https://github.com/kvcache-ai/AgentEnv" target="_blank" rel="noopener">AgentEnv</a> · 会「存档读档」的练兵场</h3>
       <p>训练智能体需要海量「练习任务」：在沙箱里真实地运行代码、浏览网页、操作软件。AgentEnv 基于 Firecracker 微虚拟机，沙箱<b>快照启动/恢复只要几十毫秒</b>，还能从一个运行中的沙箱「分叉」出最多 16 个副本做树搜索——模型可以「存档，试试 A 方案；读档，再试 B 方案」。百万 token 的超长任务因此可以跨训练迭代断点续跑。</p>
-      <div class="analogy">打游戏时的「即时存档」：Boss 战前存个档，失败了秒速读档换战术——而不是从新手村重打一遍。AgentEnv 把这个能力带给了 AI 训练，单个沙箱镜像可支撑 20 万并发实例。</div>
+      <div class="analogy">打游戏时的「即时存档」：Boss 战前存个档，失败了秒速读档换战术——而不是从新手村重打一遍。AgentEnv 把这个能力带给了 AI 训练，单个沙箱镜像可支撑 20 万并发实例（<a class="src" href="https://github.com/kvcache-ai/AgentEnv" target="_blank" rel="noopener">AgentEnv 仓库</a>）。</div>
     </div>
     <div class="card fade-up">
-      <h3>🧊 KDA 感知前缀缓存 · 别让笔记白做</h3>
-      <p>KDA 的「阅读笔记」（循环状态）让传统的 KV 缓存复用方案失效——因为 KDA 状态是<b>顺序累积</b>的，不能从中间任意位置切一段复用。团队为 vLLM 贡献了专用方案：只在每个 KDA chunk 的边界处缓存状态，配合「近似前缀匹配」算法，让长上下文的重复请求（如智能体多轮工具调用）不必从头重算。</p>
+      <h3>🧊 <a class="src-inline" href="https://vllm.ai/blog/2026-07-22-kimi-k3-preview" target="_blank" rel="noopener">KDA 感知前缀缓存</a> · 别让笔记白做</h3>
+      <p>KDA 的「阅读笔记」（循环状态）让传统的 KV 缓存复用方案失效——因为 KDA 状态是<b>顺序累积</b>的，不能从中间任意位置切一段复用。团队为 vLLM 贡献了专用方案：只在每个 KDA chunk 的边界处缓存状态，配合「近似前缀匹配」算法，让长上下文的重复请求（如智能体多轮工具调用）不必从头重算（<a class="src" href="https://vllm.ai/blog/2026-07-22-kimi-k3-preview" target="_blank" rel="noopener">vLLM 官方博客</a>）。</p>
       <div class="analogy">看视频时的「章节书签」：不能随意拖进度条（状态必须顺序算），但在每一章的开头都做了书签——下次从最近的章节接着看，而不是从头再播一遍。</div>
     </div>
   </div>
@@ -637,7 +656,7 @@
 <!-- ============ CH8 ============ -->
 <section class="chapter" id="ch8">
   <div class="chap-head"><span class="chap-num">成绩单</span><h2>跑分与账单：它到底强在哪、省在哪</h2></div>
-  <p class="oneline">官方口径：综合落后最强闭源模型（Claude Fable 5 / GPT-5.6 Sol），但领先其他所有参测模型——开源第一。</p>
+  <p class="oneline">官方口径（<a class="src" href="https://huggingface.co/moonshotai/Kimi-K3" target="_blank" rel="noopener">Hugging Face 模型卡</a>）：综合落后最强闭源模型（Claude Fable 5 / GPT-5.6 Sol），但领先其他所有参测模型——开源第一。</p>
 
   <div class="card fade-up">
     <h3>📊 与前沿模型同台竞技（官方模型卡数据节选）</h3>
@@ -654,7 +673,7 @@
       <tr><td>WebDev Arena（第三方 Elo）</td><td class="hl">1678 🥇（99 个模型第 1）</td><td>1634</td><td>1630</td><td>1592</td></tr>
     </table>
     </div>
-    <p style="margin-top:14px;font-size:14px;color:#5a6b85">🥇 = 该项六模型中最佳。完整 40+ 项基准见官方模型卡；第三方复测（Artificial Analysis 智能指数 57.1，580 个模型中第 4；Vals Index 74.7，第 2）与官方口径基本一致。</p>
+    <p style="margin-top:14px;font-size:14px;color:#5a6b85">🥇 = 该项六模型中最佳。完整 40+ 项基准见 <a class="src" href="https://huggingface.co/moonshotai/Kimi-K3" target="_blank" rel="noopener">官方模型卡</a>；第三方复测（Artificial Analysis 智能指数 57.1，580 个模型中第 4；Vals Index 74.7，第 2）与官方口径基本一致，HF 社区复测结果也收录于仓库 <a class="src" href="https://huggingface.co/moonshotai/Kimi-K3/tree/main/.eval_results" target="_blank" rel="noopener">.eval_results 目录</a>。</p>
   </div>
 
   <div class="card fade-up">
@@ -668,12 +687,12 @@
       <div class="scorebar"><i data-w="100" style="background:#c0392b"></i></div><p style="font-size:12px;color:#888">Claude Opus 4.8（max）成本 = 100%</p>
       <div class="scorebar"><i data-w="33" style="background:var(--green)"></i></div><p style="font-size:12px;color:#888">Kimi K3（high）成本 ≈ 33%</p>
     </div>
-    <div class="keyfact">成本优势的根源正是前面讲的四个发明：MoE 只激活 3.7% 参数 + KDA 让长上下文从平方变线性 + MXFP4 让显存和带宽需求降到 1/4 + 投机解码让生成提速。对普通用户的意义很直接：<b>在 Kimi 应用/API 里使用 K3，价格比顶级闭源模型便宜一大截；对企业则意味着可以下载权重自己部署，数据不出内网。</b></div>
+    <div class="keyfact">成本优势的根源正是前面讲的四个发明：MoE 只激活 3.7% 参数 + KDA 让长上下文从平方变线性 + MXFP4 让显存和带宽需求降到 1/4 + 投机解码让生成提速。成本数据来自 <a class="src" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">报告 §7 Cost Efficiency</a>。对普通用户的意义很直接：<b>在 Kimi 应用/API 里使用 K3，价格比顶级闭源模型便宜一大截；对企业则意味着可以 <a class="src" href="https://huggingface.co/moonshotai/Kimi-K3" target="_blank" rel="noopener">下载权重</a>自己部署，数据不出内网。</b></div>
   </div>
 
   <div class="card fade-up">
     <h3>📜 最后：「开源」到什么程度？</h3>
-    <p>本次发布的是<b>开放权重 + 自定义许可证（Kimi K3 License）</b>，主体条款与 MIT 一致——可自由下载、修改、商用、再分发。只有两条附加限制：</p>
+    <p>本次发布的是<b>开放权重 + 自定义许可证（<a class="src-inline" href="https://huggingface.co/moonshotai/Kimi-K3/blob/main/LICENSE" target="_blank" rel="noopener">Kimi K3 License</a>）</b>，主体条款与 MIT 一致——可自由下载、修改、商用、再分发。只有两条附加限制（完整条文见 <a class="src" href="https://huggingface.co/moonshotai/Kimi-K3/blob/main/LICENSE" target="_blank" rel="noopener">LICENSE 原文</a>）：</p>
     <table class="tbl" style="margin-top:10px">
       <tr><th>情形</th><th>要求</th></tr>
       <tr><td>你经营「模型即服务」（转售 K3 推理 API），且公司年收入超 <b>2000 万美元</b></td><td>需先与 Moonshot AI 另签协议</td></tr>
@@ -689,7 +708,7 @@
 <footer>
   <div class="wrap">
     本页基于 Moonshot AI 官方《Kimi K3: Open Frontier Intelligence》技术报告（47 页）与 Hugging Face 模型卡整理制作 · 2026-07<br>
-    通俗类比仅用于帮助理解，技术细节以原报告为准 · 仓库地址：huggingface.co/moonshotai/Kimi-K3
+    通俗类比仅用于帮助理解，技术细节以 <a class="src-inline" href="https://github.com/MoonshotAI/Kimi-K3/blob/main/k3_tech_report.pdf" target="_blank" rel="noopener">原报告</a> 为准 · 权重与模型卡：<a class="src-inline" href="https://huggingface.co/moonshotai/Kimi-K3" target="_blank" rel="noopener">huggingface.co/moonshotai/Kimi-K3</a> · 文中所有标注 ↗ 的链接均指向官方原始出处
   </div>
 </footer>
 
