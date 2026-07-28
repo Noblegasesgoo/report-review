@@ -8,6 +8,9 @@
 |---|---|---|
 | 📑 技术报告 | 看懂 Kimi K3：2.8 万亿参数的开源模型是怎么炼成的 | [在线阅读](https://noblegasesgoo.github.io/report-review/reports/kimi-k3/) |
 | 📄 论文 | 看懂 D-Score：一次前向传播，从大模型「心声」里听出幻觉 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/d-score/) |
+| 📄 论文 | 看懂「规划物理学」：解剖智能体的长程规划能力如何长出、塑形、合体 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/agentic-distillation/) |
+| 📄 论文 | 看懂奖励模型的「记性」：反事实记忆解剖 RLHF 考官的三大病灶 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/reward-model-memory/) |
+| 📄 论文 | 看懂 PIVOT：一排 query 拼一次单，稀疏注意力索引提速 4.8× 而精度不掉 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/pivot-sparse-attention/) |
 
 ## 目录结构
 
@@ -18,8 +21,14 @@
 │   └── kimi-k3/
 │       └── index.html           # Kimi K3 技术报告交互解读（单文件，零依赖）
 ├── papers/                      # 学术论文解读
-│   └── d-score/
-│       └── index.html           # D-Score 幻觉检测论文交互解读（单文件，零依赖）
+│   ├── d-score/
+│   │   └── index.html           # D-Score 幻觉检测论文交互解读（单文件，零依赖）
+│   ├── agentic-distillation/
+│   │   └── index.html           # 长程规划「物理学」论文交互解读（单文件，零依赖）
+│   ├── reward-model-memory/
+│   │   └── index.html           # 奖励模型记忆机制论文交互解读（单文件，零依赖）
+│   └── pivot-sparse-attention/
+│       └── index.html           # PIVOT 稀疏注意力索引论文交互解读（单文件，零依赖）
 ├── README.md
 └── LICENSE                      # MIT
 ```
@@ -45,6 +54,33 @@
 - **核心方法 × 2 组交互动画**：正常 vs 幻觉文本的谱对比与 D-Score 实时计算（τ 滑杆 + 冲突方向演示）、判定阈值 D̄ 的松紧权衡（混淆计数实时更新）
 - **实验结果**：FAVA-Annotation 与 RAGTruth 完整结果表（表 1–2）、AUROC 亮点条形图、子集分析（表 3–4）与参数鲁棒性（附录 C）
 - **局限与意义**：白盒限制、内部可见幻觉、长度影响与校准建议，所有关键结论均挂 ↗ 原文出处
+
+### 长程规划「物理学」论文解读（`papers/agentic-distillation/index.html`）
+
+基于 arXiv 论文《The Physics of Multi-Turn Long-Horizon Planning: From Pre-training to Post-training via Single- and Multi-Teacher On-Policy Agentic Distillation》（arXiv:2607.24720，中科院自动化所）制作的单文件交互页面，内容包括：
+
+- **概念基础**：可控合成环境 Planning Gym（炼金/养殖/装配三域）、规划模式 vs 规划知识、GRPO vs OPD
+- **预训练三发现 × 3 组交互动画**：世界模型 CoT vs 直接作答对比演示、数据配比滑杆（pass@8 跳变真实数字）、误差复利曲线
+- **后训练三区域**：RL 不必要/有效/不支持三区域交互网格（GRPO/OPD 切换）
+- **多教师蒸馏**：MOPD 共享/部分共享/冲突三种模式的规划分布 morph 动画
+
+### 奖励模型记忆机制论文解读（`papers/reward-model-memory/index.html`）
+
+基于 arXiv 论文《What do Reward Models Memorize?》（arXiv:2607.24484，阿姆斯特丹大学 ILLC + Google DeepMind）制作的单文件交互页面，内容包括：
+
+- **概念基础 × 2 组交互动画**：Bradley-Terry 偏好概率滑杆、反事实记忆 CM 计算五步流程演示
+- **核心方法**：TM×TG 记忆地图语义散点图（SAE 特征区域联动解读）、84 维特征 + SHAP 归因
+- **三大病灶**：记忆错配（背简单题不背难题）、数据集捷径（模型身份/招募波次）、启发式过度泛化（更长=更好/顺从=更好）
+- **局限与意义**：判别式 RM 的偏置结论与三味「药方」
+
+### PIVOT 稀疏注意力索引论文解读（`papers/pivot-sparse-attention/index.html`）
+
+基于 arXiv 论文《PIVOT: Efficient Query-Group Indexing for Token-Level Sparse Attention》（arXiv:2607.24593，腾讯）制作的单文件交互页面，内容包括：
+
+- **三个观察 × 1 组交互动画**：相邻 query top-k 高度重叠、组大小 vs top-k 并集滑杆（论文实测数据）
+- **核心方法 × 1 组对比动画**：DSA 逐 query 扫描 / PIVOT-Reuse / PIVOT-Refine 三模式扫描计数对比
+- **实验结果 × 1 组滑杆动画**：上下文 4K–256K 索引器加速比（图 4 全部 28 个实测数据点）、RULER 128K 精度对照
+- **局限与意义**：免训练即插即用替换 DSA 索引器，索引提速约 4.8× 而精度不掉
 
 ## 许可证
 

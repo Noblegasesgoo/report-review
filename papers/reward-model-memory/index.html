@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>看懂奖励模型的「记性」：它背下来的，恰恰是不该背的</title>
+<style>
+  :root{
+    --blue:#1783ff; --blue-d:#0b5cc4; --red:#ff6b6b; --amber:#f7b731;
+    --purple:#a55eea; --green:#2bc48a; --ink:#1b2430; --ink-soft:#48566a;
+    --bg:#f6f8fc; --card:#ffffff; --line:#e4eaf3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.8}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+
+  /* ===== Hero ===== */
+  .hero{background:linear-gradient(160deg,#0a1a3f 0%,#103a8c 55%,#1783ff 100%);
+    color:#fff;padding:72px 0 56px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+    padding:4px 14px;border-radius:99px;font-size:13px;letter-spacing:1px;margin-bottom:18px}
+  .hero h1{font-size:clamp(26px,4.6vw,44px);line-height:1.3;margin-bottom:14px}
+  .hero p.sub{font-size:clamp(14px,1.8vw,18px);opacity:.88;max-width:860px}
+  .hero .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);
+    border-radius:16px;padding:14px 22px;min-width:150px}
+  .stat b{display:block;font-size:26px;font-weight:800}
+  .stat span{font-size:13px;opacity:.85}
+
+  /* ===== Nav ===== */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  nav.toc .inner{display:flex;gap:6px;overflow-x:auto;padding:10px 22px;max-width:1060px;margin:0 auto}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--ink-soft);text-decoration:none;
+    padding:6px 12px;border-radius:99px;transition:.2s}
+  nav.toc a:hover{background:#eaf2ff;color:var(--blue-d)}
+
+  /* ===== Sections ===== */
+  section.chapter{padding:56px 0 8px}
+  .chap-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  .chap-num{font-size:14px;font-weight:800;color:#fff;background:var(--blue);
+    border-radius:10px;padding:3px 12px;letter-spacing:1px}
+  .chap-head h2{font-size:clamp(21px,3vw,30px)}
+  .oneline{color:var(--blue-d);font-weight:600;margin:4px 0 22px;font-size:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:0 2px 14px rgba(20,50,110,.05)}
+  .card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card p{margin-bottom:12px;color:#2c3a4e}
+  .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
+    border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
+  .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
+  .keyfact{position:relative;background:#eef5ff;border-left:4px solid var(--blue);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";position:absolute;left:16px;top:12px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .demo-box{background:#0e1830;border-radius:18px;padding:22px;margin:16px 0;color:#dfe8ff;
+    position:relative;overflow:hidden}
+  .demo-title{color:#8fb8ff;font-size:13px;letter-spacing:2px;font-weight:700;margin-bottom:14px;text-transform:uppercase}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:99px;padding:9px 22px;font-size:14px;
+    cursor:pointer;font-weight:600;transition:.2s;box-shadow:0 4px 14px rgba(23,131,255,.35)}
+  .btn:hover{background:var(--blue-d);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);box-shadow:none;color:#dfe8ff}
+  .btn.ghost.active{background:rgba(23,131,255,.22);border-color:#6db4ff;color:#fff}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border-radius:12px;overflow:hidden}
+  table.tbl th{background:#103a8c;color:#fff;padding:10px 12px;text-align:left;font-weight:600}
+  table.tbl td{padding:10px 12px;border-bottom:1px solid var(--line)}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl tr:nth-child(even) td{background:#f7faff}
+  .hl{color:var(--blue-d);font-weight:700}
+
+  /* ===== 公式（纯 HTML/CSS，无 MathJax）===== */
+  .formula{background:#0e1830;border-radius:14px;padding:20px 22px;margin:14px 0;color:#eaf1ff;
+    font-size:clamp(15px,2.2vw,19px);text-align:center;overflow-x:auto;line-height:2;
+    font-family:"STIX Two Math","Cambria Math",Georgia,serif}
+  .formula .op{color:#8fb8ff}
+  .formula .cond{font-size:.82em;color:#9db4dd}
+  .frac{display:inline-flex;flex-direction:column;vertical-align:middle;margin:0 2px;line-height:1.4}
+  .frac .num{border-bottom:1.5px solid currentColor;padding:0 7px}
+  .frac .den{padding:0 7px}
+  .fnote{font-size:13px;color:#7f92b8;margin-top:10px;text-align:center;line-height:1.7;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  .formula var{font-style:italic}
+
+  /* ===== 滑杆 ===== */
+  .slider-row{display:flex;align-items:center;gap:14px;margin:14px 0 6px;flex-wrap:wrap}
+  .slider-row label{font-size:14px;color:#9db4dd;white-space:nowrap}
+  .slider-row input[type=range]{flex:1;min-width:180px;accent-color:var(--amber)}
+  .slider-row output{color:#ffd97a;font-weight:700;min-width:56px;text-align:right;font-variant-numeric:tabular-nums}
+  canvas.chart{width:100%;height:240px;display:block;border-radius:10px;background:#0a1326}
+  .demo-readout{margin-top:14px;font-size:14.5px;line-height:1.8}
+  .caption{font-size:12.5px;color:#7f92b8;margin-top:8px;line-height:1.6}
+
+  /* ===== 流程动画（反事实记忆）===== */
+  .flow-steps{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:16px 0}
+  @media(max-width:760px){.flow-steps{grid-template-columns:1fr 1fr}}
+  .flow-step{background:#0a1326;border:1px solid #22345c;border-radius:12px;padding:12px 12px;
+    font-size:13px;line-height:1.6;color:#8ea3cc;transition:.3s;min-height:96px}
+  .flow-step b{display:block;color:#c9dbff;margin-bottom:4px;font-size:13.5px}
+  .flow-step.on{border-color:var(--amber);background:#16223f;color:#e8f0ff;
+    box-shadow:0 0 0 1px var(--amber),0 6px 18px rgba(247,183,49,.18)}
+  .flow-step.done{border-color:#2f6b52;color:#9fd8c0}
+  .chip-row{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0 4px}
+  .chip{width:30px;height:30px;border-radius:8px;background:#22345c;display:flex;align-items:center;
+    justify-content:center;font-size:11px;color:#7f92b8;transition:.4s;font-variant-numeric:tabular-nums}
+  .chip.train{background:var(--blue);color:#fff;transform:scale(1.08)}
+  .chip.hold{background:#3a2b3f;border:1px dashed var(--red);color:#ffb3b3}
+
+  /* ===== 记忆地图 ===== */
+  .map-region{font-size:13px}
+  #map-readout{margin-top:14px;font-size:14.5px;line-height:1.8;min-height:56px}
+
+  /* ===== 来源标注 ===== */
+  .src{color:var(--blue-d);text-decoration:none;font-size:.8em;font-weight:600;
+    border-bottom:1px dashed #9db8e8;padding:0 1px;white-space:nowrap}
+  .src:hover{color:var(--blue);border-bottom-style:solid;background:#eaf2ff;border-radius:4px}
+  .src::after{content:"↗";font-size:.85em;margin-left:1px}
+  .demo-box .src, .formula .src{color:#8fb8ff;border-bottom-color:#3a5078}
+  .demo-box .src:hover{color:#cfe2ff;background:rgba(23,131,255,.15)}
+
+  footer{margin-top:64px;padding:34px 0 46px;color:#7f8ca3;font-size:13px;text-align:center;
+    border-top:1px solid var(--line);line-height:2}
+  .fade-up{opacity:0;transform:translateY(26px);transition:all .7s cubic-bezier(.3,.7,.3,1)}
+  .fade-up.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">arXiv 论文交互解读 · RLHF / 奖励模型</span>
+    <h1>看懂奖励模型的「记性」：它背下来的，恰恰是不该背的</h1>
+    <p class="sub">阿姆斯特丹大学 & Google DeepMind 团队把「反事实记忆」搬进奖励模型研究：同一批偏好对，分别让 RM「见过 20 次」和「从没见过」，两份答对率一减，就得到每道题被「死记硬背」的程度。结果发现：RM 把记忆配额浪费在简单题上，背下了数据集特有的「捷径」，还把「长就是好」这类粗暴启发式过度泛化到没见过的场景。</p>
+    <div class="stats">
+      <div class="stat"><b>2 个</b><span>人类偏好数据集：PRISM 5.79 万对 + COMMUNITY 13.7 万对</span></div>
+      <div class="stat"><b>25 次</b><span>重训同一 RM：每对样本 20 次「见过」、5 次「藏起」</span></div>
+      <div class="stat"><b>84 维</b><span>逐条回复的特征标注 + SHAP 归因分析</span></div>
+      <div class="stat"><b>3 大</b><span>记忆病灶：错配记忆 · 数据集捷径 · 启发式过度泛化</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="toc"><div class="inner">
+  <a href="#ch0">🎭 热身：RM 与奖励黑客</a>
+  <a href="#ch1">🧮 概念基础</a>
+  <a href="#ch2">🗺️ 核心方法：记忆地图</a>
+  <a href="#ch3">🔬 三大发现</a>
+  <a href="#ch4">⚖️ 局限与意义</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ============ CH0 热身 ============ -->
+<section class="chapter" id="ch0">
+  <div class="chap-head"><span class="chap-num">第 0 章</span><h2>热身：奖励模型，和它的「应试教育」</h2></div>
+  <p class="oneline">RLHF 聊天模型的「考官」是奖励模型——可如果这位考官自己就是个只会刷题背答案的应试选手呢？</p>
+
+  <div class="card fade-up">
+    <h3>🧑‍🏫 奖励模型（RM）：人类偏好的「替身裁判」</h3>
+    <p>把通用大模型变成「听话的聊天助手」，主流做法是 <b>RLHF</b>（基于人类反馈的强化学习，<a class="src" href="https://arxiv.org/abs/2203.02155" target="_blank" rel="noopener">Ouyang et al. 2022</a>）。真正的人类偏好模糊、不一致、还很难随时请到，于是流水线里放一个<b>奖励模型（Reward Model, RM）</b>当替身：给它一段用户提问 x 和一条模型回复 y，它吐出一个标量分数，代表「人多大概率会喜欢这条回复」。这个分数可以是显式的（如 PPO，<a class="src" href="https://arxiv.org/abs/1707.06347" target="_blank" rel="noopener">Schulman et al. 2017</a>），也可以是隐式的（如 DPO，<a class="src" href="https://arxiv.org/abs/2305.18290" target="_blank" rel="noopener">Rafailov et al. 2023</a>）（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §1</a>）。</p>
+    <p>风险在于：如果 RM 本身就「学歪了」——比如它只是背下了训练数据里那些<b>和人类偏好相关、但并不导致偏好</b>的表面特征——那么 RLHF 阶段模型就会对着这个歪靶子猛练，出现<b>奖励黑客（reward hacking）</b>：RM 分数一路走高，用户真实体验却原地踏步（<a class="src" href="https://arxiv.org/abs/2205.14143" target="_blank" rel="noopener">Skalse et al. 2022</a>、<a class="src" href="https://arxiv.org/abs/2210.10760" target="_blank" rel="noopener">Gao et al. 2023</a>）。</p>
+    <div class="analogy">RM 就像高考阅卷的「替身老师」：真人教授没空改卷，请了个助教按「标准答案」代改。如果助教其实只记住了「字多的作文分高」「某某笔迹的学生是重点班的」，那学生们很快就会学会拼命凑字数、模仿笔迹——分数涨了，水平没涨。</div>
+    <div class="keyfact">学界已观察到大量「奖励黑客」症状：回复越来越啰嗦（verbosity）、一味附和用户（sycophancy）、空泛套路化、依赖刻板印象、过度排版（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §1</a>、<a class="src" href="https://arxiv.org/abs/2410.05375" target="_blank" rel="noopener">Singhal et al. 2024</a>）。但这些毛病的<b>源头</b>——RM 到底从数据里记住了什么——一直没人系统量过。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>❓ 本文的问题：RM 的「记性」里装了些什么？</h3>
+    <p>这篇论文第一次把<b>反事实记忆（counterfactual memorization）</b>这把手术刀对准奖励模型：逐条偏好对测量「这题你是靠理解答对的，还是靠背答案答对的」，再把结果和 84 个候选特征做归因，最终归纳出 RM 的三种记忆模式（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §1、§6</a>）：</p>
+    <table class="tbl">
+      <tr><th style="width:56px">编号</th><th>记忆模式</th><th>一句话概括</th></tr>
+      <tr><td><b>1</b></td><td>错配的记忆（misallocated）</td><td>把宝贵的记忆容量花在「简单、偏好差距大」的题上，真正难判的题反而不背</td></tr>
+      <tr><td><b>2</b></td><td>数据集捷径（dataset artifacts）</td><td>背下「哪条回复是哪个模型写的」「这个用户是哪批招募的」这类与偏好无因果关系的标签</td></tr>
+      <tr><td><b>3</b></td><td>启发式过度泛化（overgeneralization）</td><td>面对没见过的偏好对，无脑套用「更长=更好」「顺从=更好」等粗暴规则</td></tr>
+    </table>
+    <div class="keyfact">结论很直接：基于人类偏好数据<b>判别式训练</b>出的 RM 是「有偏的」，还不足以在<b>依赖上下文</b>的场景里判断回复质量（<a class="src" href="https://arxiv.org/abs/2607.24484" target="_blank" rel="noopener">论文摘要</a>）。代码与产物开源：<a class="src" href="https://github.com/ioverho/rm-shortcuts" target="_blank" rel="noopener">GitHub: rm-shortcuts</a>。</div>
+  </div>
+</section>
+
+<!-- ============ CH1 概念基础 ============ -->
+<section class="chapter" id="ch1">
+  <div class="chap-head"><span class="chap-num">第 1 章</span><h2>概念基础：偏好怎么打分，记忆怎么量化</h2></div>
+  <p class="oneline">三件道具：Bradley-Terry 偏好概率、反事实记忆公式 CM = TM − TG、两个人类偏好数据集。</p>
+
+  <!-- 1. Bradley-Terry -->
+  <div class="card fade-up">
+    <h3>① Bradley-Terry 模型：把「更喜欢哪条」变成一道概率题</h3>
+    <p>判别式 RM 的训练目标几乎都来自 1952 年的 <b>Bradley-Terry 模型</b>：一对回复里，「被偏好那条 y⁺ 胜过 y⁻」的概率，等于两条回复 RM 得分之差过一个 sigmoid（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §3 式 (1)</a>）：</p>
+    <div class="formula">
+      <var>p</var>(<var>y</var><sup>+</sup> ≻ <var>y</var><sup>−</sup>) <span class="op">=</span> σ( rm(<var>y</var><sup>+</sup>|<var>x</var>) <span class="op">−</span> rm(<var>y</var><sup>−</sup>|<var>x</var>) )
+      <div class="fnote">σ 是 sigmoid 函数。两条回复的分差越大，RM 越「确信」y⁺ 更好；分差为 0 时概率恰好 50%（掷硬币）。训练 RM 就是让这些概率尽可能贴合人类标注。</div>
+    </div>
+    <div class="analogy">这就是棋类比赛的 <b>Elo 积分</b>思路：不用管绝对水平，只看「分差」。分差 0 时胜负五五开；分差拉大，胜率沿一条 S 形曲线滑向 100%——但永远不会真正到达。</div>
+    <p>拖动滑杆改变两条回复的「分差」，直观感受这条 S 形曲线：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 分差 → 偏好概率（教学示意）</div>
+      <canvas class="chart" id="bt-canvas"></canvas>
+      <div class="slider-row">
+        <label>分差 Δr = rm(y⁺|x) − rm(y⁻|x)</label>
+        <input type="range" id="bt-d" min="-6" max="6" step="0.1" value="1.5">
+        <output id="bt-dv">+1.5</output>
+      </div>
+      <div class="demo-readout" id="bt-result"></div>
+      <div class="caption">演示规则：p = 1 / (1 + e<sup>−Δr</sup>)，即论文式 (1) 的 sigmoid。注意 Δr 从 2 加到 4，概率只从 88% 涨到 98%——这解释了后文「RM 在简单题上拉开分差很容易、却对泛化没帮助」的现象。本演示为教学示意，非论文实验数据。</div>
+    </div>
+    <div class="keyfact">实验设置：同一个骨干 <b>Llama-3.2-1B</b>（<a class="src" href="https://arxiv.org/abs/2407.21783" target="_blank" rel="noopener">Llama 3 Team 2024</a>），走标准 LM → SFT → RM 流水线（<a class="src" href="https://arxiv.org/abs/1909.08593" target="_blank" rel="noopener">Ziegler et al. 2019</a>），用 <a class="src" href="https://arxiv.org/abs/2106.09685" target="_blank" rel="noopener">LoRA</a> 在预算内完成训练（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §3、附录 C/D</a>）。</div>
+  </div>
+
+  <!-- 2. 反事实记忆 -->
+  <div class="card fade-up">
+    <h3>② 反事实记忆：同一道题，「见过」和「没见过」各考一次</h3>
+    <p>怎么知道 RM 对某条偏好对是「理解」还是「背诵」？<b>反事实记忆</b>（<a class="src" href="https://arxiv.org/abs/1812.03337" target="_blank" rel="noopener">Feldman 2020</a>、<a class="src" href="https://arxiv.org/abs/2205.12506" target="_blank" rel="noopener">Zhang et al. 2023</a>）给出了一个可操作的定义：把数据集随机切成 25 个子集，<b>每条偏好对出现在其中 20 个子集、缺席另外 5 个</b>；每个子集都完整训练一个 RM。对同一条偏好对，把「见过它」的 20 个模型的平均答对概率记作 <b>TM</b>（训练记忆），「没见过它」的 5 个模型的平均答对概率记作 <b>TG</b>（测试泛化），两者相减就是 <b>CM</b>（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §3 式 (2)</a>）：</p>
+    <div class="formula">
+      CM <span class="op">=</span>
+      <span class="frac"><span class="num">𝔼[ <var>p</var>(<var>y</var><sup>+</sup> ≻ <var>y</var><sup>−</sup>) <span class="op">|</span> <var>y</var><sup>+</sup>,<var>y</var><sup>−</sup> ∈ 𝒟<sub>train</sub> ]</span><span class="den"><span class="cond">TM：见过这题时答对的概率</span></span></span>
+      <span class="op">−</span>
+      <span class="frac"><span class="num">𝔼[ <var>p</var>(<var>y</var><sup>+</sup> ≻ <var>y</var><sup>−</sup>) <span class="op">|</span> <var>y</var><sup>+</sup>,<var>y</var><sup>−</sup> ∉ 𝒟<sub>train</sub> ]</span><span class="den"><span class="cond">TG：没见过这题时答对的概率</span></span></span>
+      <div class="fnote">CM ≈ 0：见没见过都一样，说明是靠「会」；CM 很大：见过才会、没见过就不会，说明是靠「背」。切分在<b>用户级</b>进行，防止同一用户的偏好风格泄漏进训练集。</div>
+    </div>
+    <div class="analogy">想知道医学生是「会看病」还是「背了病例」？安排两场考试：一场考<b>习题册里出现过的病例</b>（TM），一场考<b>从没见过的新病例</b>（TG）。两场都高分 = 真会；只前一场高分 = 背的答案。CM 就是这两场考试的「分差」。</div>
+    <p>点下面的按钮，一步步看这 25 次「对照实验」如何算出一条偏好对的 CM：</p>
+    <div class="demo-box">
+      <div class="demo-title">流程演示 · 一条偏好对的 CM 诞生记（教学示意）</div>
+      <div class="flow-steps" id="flow-steps">
+        <div class="flow-step"><b>1. 切数据</b>把数据集随机切成 25 个子集；每条偏好对进 20 个、缺席 5 个</div>
+        <div class="flow-step"><b>2. 训模型</b>每个子集都从同一骨干完整训练一个 RM，共 25 个</div>
+        <div class="flow-step"><b>3. 算 TM</b>对目标偏好对，取「见过它」的 20 个 RM 的平均答对概率</div>
+        <div class="flow-step"><b>4. 算 TG</b>取「没见过它」的 5 个 RM 的平均答对概率</div>
+        <div class="flow-step"><b>5. 相减</b>CM = TM − TG，即为这条偏好对的反事实记忆</div>
+      </div>
+      <div class="chip-row" id="flow-chips"></div>
+      <div class="demo-readout" id="flow-readout">点击「下一步」开始演示 👆</div>
+      <div class="btn-row">
+        <button class="btn" id="flow-next">▶ 下一步</button>
+        <button class="btn ghost" id="flow-reset">↺ 重置</button>
+      </div>
+      <div class="caption">示意数据：假设这条偏好对「见过多半答对、没见过一半答对」。论文真实设置：25 个子集、每对 20 次在训练集 / 5 次留出、用户级切分（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §3、附录 B</a>）。</div>
+    </div>
+  </div>
+
+  <!-- 3. 数据集 -->
+  <div class="card fade-up">
+    <h3>③ 两块「试验田」：PRISM 与 COMMUNITY</h3>
+    <p>实验在两个人类偏好数据集上进行，两者都是<b>多轮对话 + 逐轮用户偏好标注</b>，但构造方式差异很大——这个差异后面会成为重要线索（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §3、附录 A</a>）：</p>
+    <table class="tbl">
+      <tr><th></th><th><a class="src" href="https://arxiv.org/abs/2404.16019" target="_blank" rel="noopener" style="color:#fff;border-bottom-color:#6d9fe8">PRISM</a></th><th><a class="src" href="https://arxiv.org/abs/2507.09650" target="_blank" rel="noopener" style="color:#fff;border-bottom-color:#6d9fe8">COMMUNITY</a>（英文平衡子集）</th></tr>
+      <tr><td>用户数</td><td>1.40 × 10³</td><td>0.77 × 10³</td></tr>
+      <tr><td>对话数 / 轮数</td><td>8.00 × 10³ / 27.2 × 10³</td><td>17.8 × 10³ / 45.8 × 10³</td></tr>
+      <tr><td>每轮候选回复</td><td>首轮平均 3.75 条、来自 <b>21 个不同模型</b>；后续轮 2 条同模型</td><td>每轮 4 条、<b>全部来自同一模型</b></td></tr>
+      <tr><td>偏好对总数</td><td>57.9 × 10³</td><td>137 × 10³</td></tr>
+      <tr><td>元数据</td><td>用户级 77 项、对话级 10 项、轮级 1 项、回复级 3 项</td><td>用户级 28 项</td></tr>
+    </table>
+    <div class="analogy">两块田种的是同一种庄稼（人类偏好），但土壤不同：PRISM 是「混养田」——同一题由 21 个不同模型作答，<b>回复出自谁手</b>本身就成了显著特征；COMMUNITY 是「单品种田」——回复全出自同一模型，差异更微妙，但<b>用户是哪批招来的</b>留下了痕迹。后文会看到，RM 把这两种「土壤信息」都背了下来。</div>
+  </div>
+</section>
+
+<!-- ============ CH2 核心方法 ============ -->
+<section class="chapter" id="ch2">
+  <div class="chap-head"><span class="chap-num">第 2 章</span><h2>核心方法：给每道题在「记忆地图」上钉一个坐标</h2></div>
+  <p class="oneline">横轴 TM、纵轴 TG，每条偏好对都是一个点；再用特征归因找出「什么特征把点推向了地图的哪个角落」。</p>
+
+  <!-- 4. 记忆地图 -->
+  <div class="card fade-up">
+    <h3>④ 记忆地图：右下角是「纯背诵区」</h3>
+    <p>把每条偏好对的 (TM, TG) 当成坐标画出来，就得到一张<b>记忆地图（memorization map）</b>（方法沿袭机器翻译领域的 Memorisation Cartography，<a class="src" href="https://aclanthology.org/2023.emnlp-main.516/" target="_blank" rel="noopener">Dankers et al. 2023</a>）。对角线代表「见没见过都一样」（CM = 0）；越往<b>右下角</b>——TM 高、TG 低——CM 越大，背诵成分越重（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §3 图 1、图 2</a>）。</p>
+    <div class="analogy">这是一张「班级成绩单地图」：横轴是「做过原题时的得分」，纵轴是「换新题时的得分」。右上角的学霸怎么考都会；右下角的考生原题满分、换题就懵——地图的右下角就是「死记硬背重灾区」。</div>
+    <p>下面的交互地图还原了论文图 2 的结构。点击四个区域按钮，看看论文用稀疏自编码器（SAE）在各区域里「挖」出了什么特征：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互地图 · TM × TG 记忆地图（结构示意）</div>
+      <canvas class="chart" id="map-canvas" style="height:340px"></canvas>
+      <div class="btn-row">
+        <button class="btn ghost map-region active" data-r="all">全部</button>
+        <button class="btn ghost map-region" data-r="hh">右上 · 高TM/高TG</button>
+        <button class="btn ghost map-region" data-r="hl">右下 · 高TM/低TG（CM 最大）</button>
+        <button class="btn ghost map-region" data-r="mm">中部 · 中/中</button>
+        <button class="btn ghost map-region" data-r="ll">左下 · 低/低</button>
+      </div>
+      <div id="map-readout">整张地图上，绝大多数偏好对挤在右上角附近：训练后大部分题已被「见过就会」，CM 高的题很稀少但确实存在（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §3 图 2</a>）。点上方按钮逐区查看。</div>
+      <div class="caption">散点为教学模拟（非论文原始数据），仅还原论文图 2 的密度结构：多数点聚在 (1,1) 附近、落在对角线下方，高 CM 点集中在右下角。区域颜色 = CM 分箱（蓝 → 红对应 CM 0 → 1）。各区域的特征描述来自论文 §5 图 6 的 SAE 分析结果。</div>
+    </div>
+    <div class="keyfact">论文观察：训练后大部分偏好对已被记住（地图右侧密集）；高 TG 的也很多，所以最密的簇在 (1,1) 附近；少量 CM &lt; 0 的点可归为噪声（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §3</a>）。</div>
+  </div>
+
+  <!-- 5. 特征归因 -->
+  <div class="card fade-up">
+    <h3>⑤ 给「记忆」找元凶：84 维特征 + SHAP 归因</h3>
+    <p>地图只告诉我们「哪道题被背了」，还没说「为什么」。论文给<b>每条回复</b>标注了 <b>84 个特征</b>，分成 7 组：拟人化（1）、复杂度含长度（9）、对话行为（23）、情感（28）、礼貌（4）、规则型奖励如「是否顺从/拒答」（16）、谄媚（3）；再配上数据集的元数据。组成偏好对后，每个特征取「被选回复 − 被拒回复」的<b>差值</b>（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §4.1、附录 E</a>）。</p>
+    <p>然后用一个小型 3 层 MLP 回归模型，以这些特征差预测 TM / TG / CM，并用 <b>SHAP</b>（<a class="src" href="https://arxiv.org/abs/1705.07874" target="_blank" rel="noopener">Lundberg &amp; Lee 2017</a>）分解每个特征对预测的贡献。两个汇总指标：<b>MAV</b>（SHAP 值绝对值的平均，衡量「有多重要」）和 <b>HMR</b>（调和平均排名，衡量「相对其他特征排多前」，越小越重要）（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §4.2–4.3、附录 F</a>）。</p>
+    <div class="analogy">SHAP 就像球队赛后「分功劳」：这场胜利（预测）里，每个队员（特征）该记几成功劳？MAV 看功劳的绝对大小，HMR 看你在全队贡献榜上的座次。</div>
+    <div class="keyfact">回归解释力 R²：TM 0.56 / 0.63，TG 0.52 / 0.38，CM 0.39 / 0.33（PRISM / COMMUNITY）——RM 的表现<b>在很大程度上能被这一小撮特征解释</b>，这本身就是「RM 靠简单特征吃饭」的证据（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §4.3</a>）。</div>
+    <p>另一条路是<b>数据驱动</b>：不预设特征，直接在「被选 − 被拒回复」的嵌入差上训练 Matryoshka Batch Top-k <b>稀疏自编码器（SAE）</b>（最多 32 个潜变量、平均每样本激活 4 个，复现 <a class="src" href="https://arxiv.org/abs/2510.26202" target="_blank" rel="noopener">Movva et al. 2025</a> 的方法，基座见 <a class="src" href="https://arxiv.org/abs/2412.06410" target="_blank" rel="noopener">BatchTopK</a> / <a class="src" href="https://arxiv.org/abs/2503.17547" target="_blank" rel="noopener">Matryoshka SAE</a>），再让 gpt-5 给每个潜变量写文字描述、gpt-5-mini 独立验证（Bonferroni 校正后 0.05 显著才保留）（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §5</a>）。</p>
+  </div>
+</section>
+
+<!-- ============ CH3 三大发现 ============ -->
+<section class="chapter" id="ch3">
+  <div class="chap-head"><span class="chap-num">第 3 章</span><h2>三大发现：RM 的记忆里到底装了什么</h2></div>
+  <p class="oneline">记忆错配给简单题、背下数据集「出厂痕迹」、把粗暴启发式当成普世真理。</p>
+
+  <!-- 6. 发现一 -->
+  <div class="card fade-up">
+    <h3>🔍 发现一 · 记忆错配：越简单的题，背得越牢</h3>
+    <p><b>用户偏好间隔（preference margin）</b>——人类标注里「被选回复领先多少」——在两个数据集中都是 <b>TM 的最强预测因子</b>：间隔越大，训练数据里见过的题答得越准。但它对 TG 的预测力明显更弱，于是净效果是高 CM（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §4.3 User Preference Margin</a>）。</p>
+    <p>问题在于，这恰恰是<b>最不需要背的题</b>。理想的 RM 应该把记忆容量留给「低间隔、难判断」的偏好对（差异微妙、或涉及争议话题的题），用记忆补足泛化的短板；现实正好相反——RM 在简单题上疯狂拉大 RM 分差来压低训练损失，测试表现却毫无长进（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §6.1</a>）。</p>
+    <div class="analogy">学渣的复习策略：已经滚瓜烂熟的乘法口诀表，每天再背十遍（因为「背这个最不费劲、还显得努力」）；真正不会做的大题，一道都不碰。考试成绩单上，「背诵量」很高，「能力值」没动。PRISM 里间隔特征直接进了训练目标、COMMUNITY 中间隔只是隐式的，但两个数据集都出现了同样的错配——说明这是判别式训练的<b>系统性倾向</b>，不是某个目标函数的偶然。</div>
+    <div class="keyfact">论文措辞：RM「学会识别训练数据里的简单样本，并在这些样本上最大化 RM 间隔」，但对留出的同样样本却认不出来——「这看起来是记忆容量的错配」（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §4.3</a>）。</div>
+  </div>
+
+  <!-- 7. 发现二 -->
+  <div class="card fade-up">
+    <h3>🔍 发现二 · 数据集捷径：背「谁写的」「谁问的」，而不是「好不好」</h3>
+    <p>除偏好间隔外，对记忆影响最清晰的特征，全都关乎<b>数据集是怎么造出来的</b>（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §4.3、§6.2</a>）：</p>
+    <table class="tbl">
+      <tr><th style="width:130px">数据集</th><th>被背下的捷径</th><th>证据</th></tr>
+      <tr><td><b>PRISM</b></td><td><b>回复模型的身份</b>（21 个候选模型各自的风格癖性）</td><td>模型身份是最强决定因子：RM 对特定模型有强烈偏好（与人类偏好正相关），当「更好的模型被拒」且题又没在训练集出现过时，性能显著崩塌 → 高 CM；当两条候选出自同一模型（身份线索消失），训练表现大幅下滑（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §4.3 图 4</a>）</td></tr>
+      <tr><td><b>COMMUNITY</b></td><td><b>用户的招募批次</b>（「最多完成中学教育」组几乎全来自为提升低教育比例而设的<b>第二波招募</b>）</td><td>用户特征块的 CM 重要性排第二：该组用户产生的偏好对，留出时 RM 性能大幅下降 → 高 CM；而这些用户在英语熟练度、话题分布上与其他用户并无差异，差别只在「怎么被招来的」（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §4.3 User、附录 F 表 6</a>）</td></tr>
+    </table>
+    <div class="analogy">阅卷老师号称「只看答案不看人」，实则靠<b>笔迹认学生</b>：「这字是重点班小王的，先加十分。」换成匿名卷（同一模型作答）、或转学生插班（新招募批次的用户），老师立刻慌了神。笔迹和「答案对不对」没有因果关系——但它太好用了，老师不知不觉就背了下来。</div>
+    <div class="keyfact">这类特征对「广义上的人类偏好」几乎没有信息量，却会被 RM 记住，导致 RM <b>一旦离开训练分布就失灵</b>——比如评测时遇到没见过的模型或没见过的用户群（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §6.2</a>）。</div>
+  </div>
+
+  <!-- 8. 发现三 -->
+  <div class="card fade-up">
+    <h3>🔍 发现三 · 启发式过度泛化：没见过的新题，一律「长就是好」</h3>
+    <p>大部分标注特征对 <b>TG 的贡献大于 TM</b>——RM 在没见过的偏好对上<b>更依赖</b>这些简单特征，在见过的题上反而学会抑制它们。典型代表是<b>长度/复杂度</b>：被选回复更长更复杂时，RM 答对如探囊取物（SHAP 大幅为正、CM 为负）；被选回复更短时，RM 就犯难，只能靠训练时硬背（CM 为正）（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §4.3 Heuristics、附录 H 图 13</a>）。</p>
+    <p>「顺从」也一样：<b>完全/部分顺从</b>的特征差让 TM 和 TG 都大涨——RM 天然就会泛化「顺从的回复更好」；而<b>拒答（non-compliance）</b>出现在被选回复里时性能显著变差，Disclaimer、Meta-Commentary 这类「拒答味」特征在 PRISM 里带来大量 CM——<b>顺从不用背，拒答必须背</b>。谄媚类特征整体贡献很小，但「无条件接受用户框架」（Framing）单独带来高 CM（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §4.3 图 5</a>）。</p>
+    <p>SAE 的数据驱动分析给出了相互印证的画面（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §5 图 6</a>）：</p>
+    <table class="tbl">
+      <tr><th style="width:170px">地图区域</th><th>SAE 挖出的典型特征（PRISM）</th><th>解读</th></tr>
+      <tr><td>高 TM / 高 TG</td><td>「给出详细事实背景」「使用结构化列表」「正式、稳重的语气」</td><td>又长又中立、完全顺从——<b>符合启发式的常规题</b>，不用背</td></tr>
+      <tr><td>高 TM / 低 TG（CM 最大）</td><td>「只给一个词的肯定」「简短、不做展开的回复」「避免详细的用餐推荐」</td><td>被选回复反而<b>更短</b>——违背长度启发式，只能靠背</td></tr>
+      <tr><td>中 / 中</td><td>「对敏感议题表明确定立场」「避免给出政治观点或分析」</td><td>争议话题，<b>用户间偏好本身冲突</b>，换个用户答案就翻</td></tr>
+    </table>
+    <div class="analogy">一个偷懒的阅卷老师总结出「潜规则」：<b>字多 = 好作文，顺着题意写 = 好作文</b>。见过的卷子里，凡违背潜规则的（短小却精辟的答案）他都单独背了下来；可一旦拿到全新试卷，他又自动退回潜规则——遇到分布外的回复，默认奖励表面差异。这正是奖励黑客的温床：RLHF 阶段模型只要学会「写长、顺从」，就能空刷 RM 分数（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §6.3</a>）。</div>
+    <div class="keyfact">一句话总结三个发现的关系：<b>符合启发式的题不用背（高/高区），违背启发式的题靠背（高/低区），用户之间吵翻天的题谁也拿不准（中/中区）</b>（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §5</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH4 局限与意义 ============ -->
+<section class="chapter" id="ch4">
+  <div class="chap-head"><span class="chap-num">第 4 章</span><h2>局限与意义：这位「替身裁判」还能救吗？</h2></div>
+  <p class="oneline">三个记忆病灶各自指向一条改进路线，但本文的测量本身也有边界。</p>
+
+  <!-- 9. 意义 -->
+  <div class="card fade-up">
+    <h3>🧭 意义：三味药方，和一条评测纪律</h3>
+    <p>记忆并不天生是坏事——对某些任务（如长尾知识）记忆甚至是泛化的必要条件。但本文测到的不是「良性记忆」，而是三种需要对症下药的模式（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §6、§7</a>）：</p>
+    <table class="tbl">
+      <tr><th style="width:180px">病灶</th><th>论文指出的方向</th></tr>
+      <tr><td>错配记忆（只背简单题）</td><td>优先分析 <b>Bradley-Terry 目标</b>在错配记忆中的角色；设计显式鼓励「背低间隔难题」的 RM 目标；这也可能解释近期课程学习（curriculum learning）在 RM/RLHF 中的有效性</td></tr>
+      <tr><td>数据集捷径（背出厂痕迹）</td><td>评测基准必须<b>控制捷径变量</b>：留出整个用户群、整个回复模型来测试。RewardBench 2 已印证——滤掉与微调语料相似的 prompt 后，RM 表现显著下降（<a class="src" href="https://arxiv.org/abs/2506.01937" target="_blank" rel="noopener">Malik et al. 2025</a>）</td></tr>
+      <tr><td>启发式过度泛化（长度/顺从）</td><td>仍是开放问题；最有希望的方向是<b>因果启发的训练</b>：鼓励依赖因果相关特征、抑制对伪相关特征的依赖</td></tr>
+    </table>
+    <div class="analogy">治好了「只背简单题」的复习策略、没收了「认笔迹」的歪门邪道、再纠正「字多=好」的阅卷潜规则——这位替身裁判才有可能在换了考场、换了考生之后，依然给出公正的分数。</div>
+    <div class="keyfact">最终结论：在这三种记忆模式被解决之前，判别式训练的 RM 难以支撑「更安全、更公平、依赖上下文判断」的聊天模型开发（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §2、§6</a>）。</div>
+  </div>
+
+  <!-- 10. 局限 -->
+  <div class="card fade-up">
+    <h3>⚠️ 局限：三次权衡与一个「非因果」声明</h3>
+    <p>反事实记忆的计算代价极高（每条样本要训练数十个模型），论文因此做了几处妥协，读结论时应当一并记住（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §8</a>）：</p>
+    <table class="tbl">
+      <tr><th style="width:200px">局限</th><th>影响与作者的缓解论证</th></tr>
+      <tr><td>CM 在用户级而非偏好对级计算</td><td>减少留出排列数、防止用户偏好泄漏，但可能混淆「题目差异」与「用户差异」；作者指出用户内 CM 方差远大于用户间方差，风险可控</td></tr>
+      <tr><td>每条偏好对仅留出 5 次</td><td>TG（进而 CM）估计方差偏大；这可能本身就解释了 §4 回归模型 R² 偏低</td></tr>
+      <tr><td>SHAP/SAE 结果是关联而非因果</td><td>要确立「数据属性 → RM 记忆」的因果链，需要对模型内部表示做受控干预（editing），本文未做</td></tr>
+    </table>
+    <div class="keyfact">伦理与开放：论文使用开源/开放研究产物并遵守其许可；作者承诺公开逐条回复的特征标注与记忆度量，鼓励后续分析（<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 §9</a>、<a class="src" href="https://github.com/ioverho/rm-shortcuts" target="_blank" rel="noopener">代码仓库</a>）。</div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    本页为 arXiv 论文 <a class="src" href="https://arxiv.org/abs/2607.24484" target="_blank" rel="noopener">《What do Reward Models Memorize?》</a>（Verhoeven, Mishra &amp; Shutova，阿姆斯特丹大学 ILLC / Google DeepMind，2026-07-27）的非官方中文交互解读。<br>
+    所有实验数字与结论均出自论文原文（章节号随文标注：<a class="src" href="https://arxiv.org/pdf/2607.24484" target="_blank" rel="noopener">论文 PDF</a>）；页面中的交互动画为教学示意，非论文原始实验数据。<br>
+    论文代码与数据产物：<a class="src" href="https://github.com/ioverho/rm-shortcuts" target="_blank" rel="noopener">github.com/ioverho/rm-shortcuts</a> ・ 数据集：<a class="src" href="https://arxiv.org/abs/2404.16019" target="_blank" rel="noopener">PRISM</a> / <a class="src" href="https://arxiv.org/abs/2507.09650" target="_blank" rel="noopener">COMMUNITY</a>
+  </div>
+</footer>
+
+<script>
+/* ================= 工具 ================= */
+function setupCanvas(id){
+  var c = document.getElementById(id);
+  var dpr = window.devicePixelRatio || 1;
+  var w = c.clientWidth, h = c.clientHeight;
+  c.width = w * dpr; c.height = h * dpr;
+  var ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return {c:c, ctx:ctx, w:w, h:h};
+}
+/* 可复现伪随机数（LCG） */
+function makeRng(seed){
+  var s = seed >>> 0;
+  return function(){
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+/* ================= 动画 A：Bradley-Terry sigmoid ================= */
+(function(){
+  var cv = setupCanvas('bt-canvas');
+  var slider = document.getElementById('bt-d');
+  var out = document.getElementById('bt-dv');
+  var readout = document.getElementById('bt-result');
+  var X0 = -6, X1 = 6;
+  function sig(x){ return 1 / (1 + Math.exp(-x)); }
+  function draw(){
+    var ctx = cv.ctx, w = cv.w, h = cv.h;
+    ctx.clearRect(0, 0, w, h);
+    var pad = 34, pw = w - pad * 2, ph = h - pad * 2;
+    function px(x){ return pad + (x - X0) / (X1 - X0) * pw; }
+    function py(p){ return pad + (1 - p) * ph; }
+    /* 网格与坐标轴 */
+    ctx.strokeStyle = '#22345c'; ctx.lineWidth = 1;
+    [0, 0.25, 0.5, 0.75, 1].forEach(function(p){
+      ctx.beginPath(); ctx.moveTo(pad, py(p)); ctx.lineTo(w - pad, py(p)); ctx.stroke();
+      ctx.fillStyle = '#7f92b8'; ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
+      ctx.fillText(Math.round(p * 100) + '%', pad - 6, py(p) + 4);
+    });
+    ctx.textAlign = 'center';
+    [-6, -3, 0, 3, 6].forEach(function(x){
+      ctx.fillText((x > 0 ? '+' : '') + x, px(x), h - pad + 16);
+    });
+    ctx.fillStyle = '#7f92b8';
+    ctx.fillText('分差 Δr →', w / 2, h - 6);
+    /* 50% 虚线 */
+    ctx.setLineDash([5, 5]); ctx.strokeStyle = '#3a5078';
+    ctx.beginPath(); ctx.moveTo(pad, py(0.5)); ctx.lineTo(w - pad, py(0.5)); ctx.stroke();
+    ctx.setLineDash([]);
+    /* sigmoid 曲线 */
+    ctx.beginPath(); ctx.strokeStyle = '#1783ff'; ctx.lineWidth = 2.5;
+    for (var i = 0; i <= 200; i++){
+      var x = X0 + (X1 - X0) * i / 200;
+      var y = sig(x);
+      if (i === 0) ctx.moveTo(px(x), py(y)); else ctx.lineTo(px(x), py(y));
+    }
+    ctx.stroke();
+    /* 当前分差标记 */
+    var d = parseFloat(slider.value), p = sig(d);
+    ctx.setLineDash([4, 4]); ctx.strokeStyle = '#f7b731'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(px(d), py(0)); ctx.lineTo(px(d), py(p)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px(d), py(p)); ctx.lineTo(pad, py(p)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(px(d), py(p), 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#f7b731'; ctx.fill();
+    ctx.strokeStyle = '#0e1830'; ctx.lineWidth = 2; ctx.stroke();
+    out.textContent = (d >= 0 ? '+' : '') + d.toFixed(1);
+    var verdict;
+    if (p >= 0.9) verdict = 'RM 几乎「确信」——但注意：这么大的分差多半是在<b>背</b>这道简单题';
+    else if (p >= 0.6) verdict = 'RM 倾向认为 y⁺ 更好';
+    else if (p >= 0.4) verdict = '难以区分——这正是论文说的「低间隔难题」，理想 RM 应该把记忆花在这里';
+    else if (p >= 0.1) verdict = 'RM 倾向认为 y⁻ 更好（被判反了）';
+    else verdict = 'RM 强烈判反——对简单题来说，这种「翻车」样本正是高 CM 的来源';
+    readout.innerHTML = '分差 Δr = <b style="color:#ffd97a">' + (d >= 0 ? '+' : '') + d.toFixed(1) +
+      '</b> → 判对概率 p(y⁺≻y⁻) = <b style="color:#ffd97a">' + (p * 100).toFixed(1) + '%</b><br>' + verdict;
+  }
+  slider.addEventListener('input', draw);
+  window.addEventListener('resize', function(){ cv = setupCanvas('bt-canvas'); draw(); });
+  draw();
+})();
+
+/* ================= 动画 B：反事实记忆流程 ================= */
+(function(){
+  var chipsBox = document.getElementById('flow-chips');
+  var steps = document.querySelectorAll('#flow-steps .flow-step');
+  var readout = document.getElementById('flow-readout');
+  var btnNext = document.getElementById('flow-next');
+  var btnReset = document.getElementById('flow-reset');
+  var chips = [];
+  var rng = makeRng(20260727);
+  /* 25 个子集：随机挑 5 个作为「留出」 */
+  var holdSet = {};
+  while (Object.keys(holdSet).length < 5) holdSet[Math.floor(rng() * 25)] = true;
+  for (var i = 0; i < 25; i++){
+    var el = document.createElement('div');
+    el.className = 'chip';
+    el.textContent = i + 1;
+    chipsBox.appendChild(el);
+    chips.push({el:el, hold:!!holdSet[i]});
+  }
+  /* 示意数据：见过的 20 个模型答对概率均值 0.88，没见过的 5 个均值 0.52 */
+  var TM = 0.88, TG = 0.52;
+  var stage = 0;
+  function render(){
+    steps.forEach(function(s, idx){
+      s.classList.toggle('on', idx === stage - 1);
+      s.classList.toggle('done', idx < stage - 1);
+    });
+    chips.forEach(function(ch){
+      ch.el.classList.remove('train', 'hold');
+      if (stage >= 3 && !ch.hold) ch.el.classList.add('train');
+      if (stage >= 4 && ch.hold) ch.el.classList.add('hold');
+    });
+    var msgs = [
+      '点击「下一步」开始演示 👆',
+      '① 数据集切成 25 个子集，目标偏好对只进其中 20 个（用户级切分，防泄漏）。',
+      '② 25 个子集各自完整训练一个 RM——这是本方法最贵的部分，也是局限之一。',
+      '③ 蓝色 = 「见过这题」的 20 个 RM，平均答对概率 TM ≈ <b style="color:#ffd97a">0.88</b>（示意）。',
+      '④ 红框 = 「没见过这题」的 5 个 RM，平均答对概率 TG ≈ <b style="color:#ffd97a">0.52</b>（示意）。',
+      '⑤ CM = TM − TG ≈ 0.88 − 0.52 = <b style="color:#ffd97a">0.36</b>：这条偏好对有相当重的「背诵」成分。论文中每条偏好对都这样钉上 (TM, TG) 坐标，汇成下一节的记忆地图。'
+    ];
+    readout.innerHTML = msgs[stage];
+    btnNext.textContent = stage >= 5 ? '✔ 演示完成' : '▶ 下一步（第 ' + (stage + 1) + ' 步）';
+  }
+  btnNext.addEventListener('click', function(){
+    if (stage < 5){ stage++; render(); }
+  });
+  btnReset.addEventListener('click', function(){
+    stage = 0; render();
+  });
+  render();
+})();
+
+/* ================= 动画 C：记忆地图 ================= */
+(function(){
+  var cv = setupCanvas('map-canvas');
+  var readout = document.getElementById('map-readout');
+  var buttons = document.querySelectorAll('.map-region');
+  var rng = makeRng(42);
+  var pts = [];
+  function addPt(tm, tg){
+    tm = Math.min(0.995, Math.max(0.005, tm));
+    tg = Math.min(0.995, Math.max(0.005, tg));
+    pts.push({tm:tm, tg:tg, cm:tm - tg});
+  }
+  var i;
+  /* 55%：右上角密集簇（已记住且能泛化，CM 小） */
+  for (i = 0; i < 240; i++){
+    var tm = 0.86 + rng() * 0.13;
+    addPt(tm, tm - rng() * 0.14);
+  }
+  /* 15%：右下角高 CM 区（靠背） */
+  for (i = 0; i < 65; i++) addPt(0.62 + rng() * 0.36, 0.05 + rng() * 0.38);
+  /* 12%：中部偏好冲突区 */
+  for (i = 0; i < 50; i++) addPt(0.38 + rng() * 0.26, 0.34 + rng() * 0.26);
+  /* 10%：左下双低区 */
+  for (i = 0; i < 45; i++) addPt(0.05 + rng() * 0.3, 0.05 + rng() * 0.3);
+  /* 8%：散布（对角线下方为主） */
+  for (i = 0; i < 35; i++){
+    var t = rng();
+    addPt(t, Math.min(t, rng()));
+  }
+  function cmColor(cm){
+    if (cm < 0) return '#5b6b8c';
+    if (cm < 0.2) return '#3d7ddb';
+    if (cm < 0.4) return '#2bc48a';
+    if (cm < 0.6) return '#f7b731';
+    if (cm < 0.8) return '#f78c31';
+    return '#ff5252';
+  }
+  function regionOf(p){
+    if (p.tm >= 0.66 && p.tg >= 0.66) return 'hh';
+    if (p.tm >= 0.6 && p.tg <= 0.45) return 'hl';
+    if (p.tm >= 0.35 && p.tm < 0.66 && p.tg >= 0.35 && p.tg < 0.66) return 'mm';
+    if (p.tm < 0.35 && p.tg < 0.35) return 'll';
+    return 'other';
+  }
+  var regionInfo = {
+    all: '整张地图上，绝大多数偏好对挤在右上角附近：训练后大部分题已被「见过就会」，CM 高的题很稀少但确实存在。点上方按钮逐区查看。',
+    hh: '<b style="color:#ffd97a">右上 · 高 TM / 高 TG</b>：SAE 挖出的特征是「详细事实背景」「结构化列表」「正式稳重的语气」——<b>又长又中立、完全顺从</b>的回复。这类题符合启发式，见没见过都会做，不需要背（论文 §5 图 6）。',
+    hl: '<b style="color:#ffd97a">右下 · 高 TM / 低 TG = CM 最大区</b>：这里的被选回复反而<b>更短</b>——「只给一个词的肯定」「简短不展开」。违背了「长就是好」的启发式，RM 只能靠训练时硬背（论文 §5 图 6、§4.3）。',
+    mm: '<b style="color:#ffd97a">中部 · 中 / 中</b>：「对敏感议题表明立场」「避免给出政治观点」——争议话题上<b>用户之间的偏好本身就冲突</b>，换个用户答案就翻，RM 怎么学都只有中等把握（论文 §5 图 6）。',
+    ll: '<b style="color:#ffd97a">左下 · 低 / 低</b>：见没见过都不会做。COMMUNITY 中此区「提供参考资料（references）」类特征尤其集中；回复话题也是区分此区与其他区的信号（论文 §5 图 6）。'
+  };
+  var active = 'all';
+  function draw(){
+    var ctx = cv.ctx, w = cv.w, h = cv.h;
+    ctx.clearRect(0, 0, w, h);
+    var padL = 44, padR = 20, padT = 16, padB = 40;
+    var pw = w - padL - padR, ph = h - padT - padB;
+    function px(tm){ return padL + tm * pw; }
+    function py(tg){ return padT + (1 - tg) * ph; }
+    /* 背景网格 */
+    ctx.strokeStyle = '#1a2647'; ctx.lineWidth = 1;
+    [0, 0.25, 0.5, 0.75, 1].forEach(function(v){
+      ctx.beginPath(); ctx.moveTo(px(v), padT); ctx.lineTo(px(v), h - padB); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(padL, py(v)); ctx.lineTo(w - padR, py(v)); ctx.stroke();
+      ctx.fillStyle = '#7f92b8'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(v.toFixed(2).replace('0.', '.'), px(v), h - padB + 16);
+      ctx.textAlign = 'right';
+      ctx.fillText(v.toFixed(2).replace('0.', '.'), padL - 8, py(v) + 4);
+    });
+    ctx.fillStyle = '#7f92b8'; ctx.textAlign = 'center';
+    ctx.fillText('训练记忆 TM →', padL + pw / 2, h - 8);
+    ctx.save();
+    ctx.translate(12, padT + ph / 2); ctx.rotate(-Math.PI / 2);
+    ctx.fillText('测试泛化 TG →', 0, 0);
+    ctx.restore();
+    /* 对角线 CM=0 */
+    ctx.setLineDash([6, 5]); ctx.strokeStyle = '#3a5078'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(px(0), py(0)); ctx.lineTo(px(1), py(1)); ctx.stroke();
+    ctx.setLineDash([]);
+    /* CM 增大方向箭头（朝右下角） */
+    ctx.strokeStyle = '#ff6b6b'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(px(0.62), py(0.52)); ctx.lineTo(px(0.94), py(0.16)); ctx.stroke();
+    ctx.beginPath();
+    var ax = px(0.94), ay = py(0.16);
+    ctx.moveTo(ax, ay); ctx.lineTo(ax - 12, ay + 2); ctx.lineTo(ax - 4, ay + 12); ctx.closePath();
+    ctx.fillStyle = '#ff6b6b'; ctx.fill();
+    ctx.font = '12px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('CM 增大（靠背）', px(0.60), py(0.60));
+    /* 散点 */
+    pts.forEach(function(p){
+      var inRegion = active === 'all' || regionOf(p) === active;
+      ctx.globalAlpha = inRegion ? 0.85 : 0.07;
+      ctx.beginPath();
+      ctx.arc(px(p.tm), py(p.tg), inRegion && active !== 'all' ? 4 : 3, 0, Math.PI * 2);
+      ctx.fillStyle = cmColor(p.cm);
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    /* 图例 */
+    var legend = [['CM<0', '#5b6b8c'], ['0–0.2', '#3d7ddb'], ['0.2–0.4', '#2bc48a'],
+      ['0.4–0.6', '#f7b731'], ['0.6–0.8', '#f78c31'], ['0.8–1.0', '#ff5252']];
+    ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
+    legend.forEach(function(item, idx){
+      var lx = padL + 8 + idx * 78, ly = padT + 8;
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI * 2);
+      ctx.fillStyle = item[1]; ctx.fill();
+      ctx.fillStyle = '#9db4dd';
+      ctx.fillText(item[0], lx + 8, ly + 4);
+    });
+    ctx.globalAlpha = 1;
+  }
+  buttons.forEach(function(b){
+    b.addEventListener('click', function(){
+      buttons.forEach(function(x){ x.classList.remove('active'); });
+      b.classList.add('active');
+      active = b.getAttribute('data-r');
+      readout.innerHTML = regionInfo[active];
+      draw();
+    });
+  });
+  window.addEventListener('resize', function(){ cv = setupCanvas('map-canvas'); draw(); });
+  draw();
+})();
+
+/* ================= 入场动画 ================= */
+(function(){
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if (e.isIntersecting){
+        e.target.classList.add('show');
+        io.unobserve(e.target);
+      }
+    });
+  }, {threshold: 0.12});
+  document.querySelectorAll('.fade-up').forEach(function(el){ io.observe(el); });
+})();
+</script>
+</body>
+</html>

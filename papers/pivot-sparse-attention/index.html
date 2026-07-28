@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>看懂 PIVOT · 一排 query 拼一次单，稀疏注意力的「索引员」不再重复跑腿</title>
+<style>
+  :root{
+    --blue:#1783ff; --blue-d:#0b5cc4; --red:#ff6b6b; --amber:#f7b731;
+    --purple:#a55eea; --green:#2bc48a; --ink:#1b2430; --ink-soft:#48566a;
+    --bg:#f6f8fc; --card:#ffffff; --line:#e4eaf3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.8}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+
+  /* ===== Hero ===== */
+  .hero{background:linear-gradient(160deg,#0a1a3f 0%,#103a8c 55%,#1783ff 100%);
+    color:#fff;padding:72px 0 56px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+    padding:4px 14px;border-radius:99px;font-size:13px;letter-spacing:1px;margin-bottom:18px}
+  .hero h1{font-size:clamp(26px,4.6vw,44px);line-height:1.3;margin-bottom:14px}
+  .hero p.sub{font-size:clamp(14px,1.8vw,18px);opacity:.88;max-width:820px}
+  .hero .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);
+    border-radius:16px;padding:14px 22px;min-width:150px}
+  .stat b{display:block;font-size:26px;font-weight:800}
+  .stat span{font-size:13px;opacity:.85}
+
+  /* ===== Nav ===== */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  nav.toc .inner{display:flex;gap:6px;overflow-x:auto;padding:10px 22px;max-width:1060px;margin:0 auto}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--ink-soft);text-decoration:none;
+    padding:6px 12px;border-radius:99px;transition:.2s}
+  nav.toc a:hover{background:#eaf2ff;color:var(--blue-d)}
+
+  /* ===== Sections ===== */
+  section.chapter{padding:56px 0 8px}
+  .chap-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  .chap-num{font-size:14px;font-weight:800;color:#fff;background:var(--blue);
+    border-radius:10px;padding:3px 12px;letter-spacing:1px}
+  .chap-head h2{font-size:clamp(21px,3vw,30px)}
+  .oneline{color:var(--blue-d);font-weight:600;margin:4px 0 22px;font-size:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:0 2px 14px rgba(20,50,110,.05)}
+  .card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card p{margin-bottom:12px;color:#2c3a4e}
+  .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
+    border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
+  .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
+  .keyfact{position:relative;background:#eef5ff;border-left:4px solid var(--blue);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";position:absolute;left:16px;top:12px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .demo-box{background:#0e1830;border-radius:18px;padding:22px;margin:16px 0;color:#dfe8ff;
+    position:relative;overflow:hidden}
+  .demo-title{color:#8fb8ff;font-size:13px;letter-spacing:2px;font-weight:700;margin-bottom:14px;text-transform:uppercase}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:99px;padding:9px 22px;font-size:14px;
+    cursor:pointer;font-weight:600;transition:.2s;box-shadow:0 4px 14px rgba(23,131,255,.35)}
+  .btn:hover{background:var(--blue-d);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);box-shadow:none;color:#dfe8ff}
+  .btn.ghost.active{background:rgba(23,131,255,.22);border-color:#6db4ff;color:#fff}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border-radius:12px;overflow:hidden}
+  table.tbl th{background:#103a8c;color:#fff;padding:10px 12px;text-align:left;font-weight:600}
+  table.tbl td{padding:10px 12px;border-bottom:1px solid var(--line)}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl tr:nth-child(even) td{background:#f7faff}
+  .hl{color:var(--blue-d);font-weight:700}
+
+  /* ===== 公式（纯 HTML/CSS，无 MathJax）===== */
+  .formula{background:#0e1830;border-radius:14px;padding:20px 22px;margin:14px 0;color:#eaf1ff;
+    font-size:clamp(15px,2.2vw,19px);text-align:center;overflow-x:auto;line-height:2;
+    font-family:"STIX Two Math","Cambria Math",Georgia,serif}
+  .formula .op{color:#8fb8ff}
+  .formula .cond{font-size:.82em;color:#9db4dd}
+  .frac{display:inline-flex;flex-direction:column;vertical-align:middle;margin:0 2px;line-height:1.4}
+  .frac .num{border-bottom:1.5px solid currentColor;padding:0 7px}
+  .frac .den{padding:0 7px}
+  .fnote{font-size:13px;color:#7f92b8;margin-top:10px;text-align:center;line-height:1.7;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  .formula var{font-style:italic}
+
+  /* ===== 结果条形图 ===== */
+  .scorebar{height:10px;border-radius:99px;background:#e7edf6;overflow:hidden;margin:4px 0 12px}
+  .scorebar i{display:block;height:100%;border-radius:99px;width:0;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+  .bar-row{display:grid;grid-template-columns:170px 1fr 64px;gap:12px;align-items:center;margin-bottom:10px;font-size:14px}
+  @media(max-width:640px){.bar-row{grid-template-columns:110px 1fr 56px}}
+  .bar-row b{text-align:right;font-variant-numeric:tabular-nums}
+
+  /* ===== 滑杆 ===== */
+  .slider-row{display:flex;align-items:center;gap:14px;margin:14px 0 6px;flex-wrap:wrap}
+  .slider-row label{font-size:14px;color:#9db4dd;white-space:nowrap}
+  .slider-row input[type=range]{flex:1;min-width:180px;accent-color:var(--amber)}
+  .slider-row output{color:#ffd97a;font-weight:700;min-width:56px;text-align:right;font-variant-numeric:tabular-nums}
+  canvas.chart{width:100%;height:240px;display:block;border-radius:10px;background:#0a1326}
+  canvas.tall{height:300px}
+  .demo-readout{margin-top:14px;font-size:14.5px;line-height:1.8}
+  .caption{font-size:12.5px;color:#7f92b8;margin-top:8px;line-height:1.6}
+
+  /* ===== 来源标注 ===== */
+  .src{color:var(--blue-d);text-decoration:none;font-size:.8em;font-weight:600;
+    border-bottom:1px dashed #9db8e8;padding:0 1px;white-space:nowrap}
+  .src:hover{color:var(--blue);border-bottom-style:solid;background:#eaf2ff;border-radius:4px}
+  .src::after{content:"↗";font-size:.85em;margin-left:1px}
+  .demo-box .src, .formula .src{color:#8fb8ff;border-bottom-color:#3a5078}
+  .demo-box .src:hover{color:#cfe2ff;background:rgba(23,131,255,.15)}
+  .src-inline{color:inherit;border-bottom:1px dashed #9db8e8;text-decoration:none}
+  .src-inline:hover{color:var(--blue)}
+
+  footer{margin-top:64px;padding:34px 0 46px;color:#7f8ca3;font-size:13px;text-align:center;
+    border-top:1px solid var(--line);line-height:2}
+  .fade-up{opacity:0;transform:translateY(26px);transition:all .7s cubic-bezier(.3,.7,.3,1)}
+  .fade-up.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">arXiv 论文交互解读 · 长上下文推理加速</span>
+    <h1>看懂 PIVOT：一排 query 拼一次单，稀疏注意力的「索引员」不再重复跑腿</h1>
+    <p class="sub">腾讯团队发现：DeepSeek Sparse Attention（DSA）把主注意力算快了，瓶颈却转移到了「给每个 query 挑 top-k token」的索引器上——而相邻 query 挑出的 top-k 其实高度重叠。PIVOT 让一排相邻 query 拼成一个「代理 query」，只扫一遍前缀，免训练、即插即用，索引器最高提速约 4.8 倍，精度与稠密索引器持平。</p>
+    <div class="stats">
+      <div class="stat"><b>免训练</b><span>即插即用替换 DSA 索引器，下游算子不变</span></div>
+      <div class="stat"><b>≈ 4.8×</b><span>索引器 kernel 最高加速（256K 上下文）</span></div>
+      <div class="stat"><b>1.6×</b><span>长上下文端到端延迟最高加速</span></div>
+      <div class="stat"><b>94.24 vs 94.30</b><span>RULER 平均分：PIVOT-Refine 对稠密 DSA，基本持平</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="toc"><div class="inner">
+  <a href="#ch0">🎭 热身：瓶颈转移</a>
+  <a href="#ch1">🔍 三个观察</a>
+  <a href="#ch2">⚙️ 核心方法：PIVOT</a>
+  <a href="#ch3">📊 实验结果</a>
+  <a href="#ch4">⚖️ 局限与意义</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ============ CH0 热身 ============ -->
+<section class="chapter" id="ch0">
+  <div class="chap-head"><span class="chap-num">第 0 章</span><h2>热身：稀疏注意力把账算省了，却把账单转给了「索引员」</h2></div>
+  <p class="oneline">上下文冲向百万 token 的时代，全注意力的 O(L²) 算不起了；DSA 让每个 query 只看 top-k 个 token——但「挑哪 k 个」这件事本身，还得把整段前缀翻一遍。</p>
+
+  <div class="card fade-up">
+    <h3>📚 先回顾：DSA 的「索引器 + 稀疏注意力」两段式</h3>
+    <p>全注意力里，每个 query（当前正在处理的 token）都要和前面所有 token 算注意力，序列长 <var>L</var> 时代价是 O(<var>L</var>²)。<a class="src" href="https://arxiv.org/abs/2512.02556" target="_blank" rel="noopener">DeepSeek Sparse Attention（DSA）</a>的做法是加一个很轻的<b>索引器（lightning indexer）</b>：对位置 <var>t</var> 的 query，给它前面每个 token <var>s</var> 打一个相关性分数（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 Preliminary §Background，式 (1)</a>）：</p>
+    <div class="formula">
+      <var>I</var><sub><var>t</var>,<var>s</var></sub> = <span style="font-size:1.3em">∑</span><sub><var>j</var>=1</sub><sup><var>H</var><sub><var>I</var></sub></sup> <var>w</var><sup><var>I</var></sup><sub><var>t</var>,<var>j</var></sub> · ReLU<span class="op">(</span> <var>q</var><sup><var>I</var></sup><sub><var>t</var>,<var>j</var></sub> · <var>k</var><sup><var>I</var></sup><sub><var>s</var></sub> <span class="op">)</span>
+      <div class="fnote">白话翻译：索引器有 H<sub>I</sub> 个轻量「头」，每个头算一次点积、过一道 ReLU（负数清零），再按权重 w 相加。分数最高的 k 个 token 入选集合 T<sub>t</sub>，下游的 Sparse MLA 只对这 k 个 token 算注意力。</div>
+    </div>
+    <p>这样一来，主注意力的代价从 O(<var>L</var>²) 降到 O(<var>Lk</var>)（k ≪ L，论文实验中 k = 2048）。这套设计支撑了 DeepSeek-V3.2、GLM-5.1 这样的生产级模型（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Introduction</a>）。</p>
+    <div class="analogy">DSA 像一家大型图书馆请了一位「索引员」：读者（query）不用亲自翻遍所有书架（全注意力），索引员先挑出 k 本最相关的书，读者只精读这 k 本。读者的阅读时间大大缩短——<b>但索引员自己，仍然为每位读者把整座图书馆从头到尾走了一遍</b>。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>💸 瓶颈转移：索引器从「小前菜」变成「主菜」</h3>
+    <p>问题恰恰出在索引员身上：它给<b>每个 query</b>都要对<b>整个前缀</b>打分。整段序列加起来，每层的索引代价仍是 O(<var>L</var>²)（prefill 阶段），decode 阶段每步 O(<var>L</var>)（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 Preliminary §Cost</a>）。上下文越长，这份账单越刺眼：</p>
+    <table class="tbl">
+      <tr><th>阶段</th><th>索引器占端到端延迟比例（200K token 时）</th></tr>
+      <tr><td>Prefill（预填充）</td><td class="hl">约 81%</td></tr>
+      <tr><td>Decode（逐字生成）</td><td class="hl">约 41%</td></tr>
+    </table>
+    <p style="margin-top:12px;font-size:13.5px;color:#7f8ca3">数据引自 IndexCache（<a class="src" href="https://arxiv.org/abs/2603.12201" target="_blank" rel="noopener">Bai et al. 2026</a>），转引自<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">本文 §Introduction / §Preliminary</a>。</p>
+    <p>已有的加速工作各砍一刀：<a class="src" href="https://arxiv.org/abs/2603.28458" target="_blank" rel="noopener">HISA</a> 砍 <b>token 轴</b>（先筛块再筛 token）、MISA 砍 <b>头轴</b>（只激活部分索引头）、<a class="src" href="https://arxiv.org/abs/2603.12201" target="_blank" rel="noopener">IndexCache</a> 砍 <b>层轴</b>（相邻层复用 top-k）。但它们都没碰 <b>query 轴</b>——索引器仍然为每个 query 单独跑一遍全前缀扫描（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Introduction、§Related Work</a>）。</p>
+    <div class="keyfact"><b>PIVOT 的核心主张：索引器在 query 轴上存在大量重复劳动。</b>相邻 query 挑出的 top-k 高度重叠，完全可以一排 query 共享一次前缀扫描——这是与前三个轴正交的「第四条加速轴」（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Introduction 贡献 1</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH1 三个观察 ============ -->
+<section class="chapter" id="ch1">
+  <div class="chap-head"><span class="chap-num">第 1 章</span><h2>三个观察：为什么「拼单」是安全的</h2></div>
+  <p class="oneline">作者在 DeepSeek-V3.2、RULER-QA 128K 上解剖了索引器的行为（k=2048），发现三条性质：O1 让共享成为可能，O2 让共享足够便宜，O3 让共享不掉精度。</p>
+
+  <div class="card fade-up">
+    <h3>🔎 O1：相邻 query 的 top-k 高度重叠</h3>
+    <p>把任意两个 query 的 top-k 集合求交集、画出热力图，会看到一条明亮的<b>对角线带</b>：相邻 query 选中的 token 几乎一样。相邻位置的重叠率达 <b>0.8–0.9</b>；即便把 4 个连续 query 合成一组，它们共同选中的比例（中位数）从浅层到深层也有 <b>65%–78%</b>（L3/L30/L58 三层均如此）（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Observations O1，图 2a</a>）。</p>
+    <p>原因很直觉：相邻 query 共享几乎相同的前缀、隐藏状态也相近，所以它们眼中「重要的 token」只会缓慢漂移，不会突变。附录 C 进一步验证：这条亮带在浅、中、深层都存在，且随 query 距离优雅衰减——局部性强，但不会延伸到任意远，所以「小组共享」合理、「全局共享」不行（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文附录 C，图 5</a>）。</p>
+    <div class="analogy">同一节车厢里坐前后排的四个读者，读同一本书时划的重点段落八九不离十——让他们各自把整本书重翻一遍找重点，纯属浪费。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🧺 O2：一整组 query 的 top-k 并集，远比想象的小</h3>
+    <p>一组 <var>g</var> 个 query 的 top-k 并集，理论上最小 k（大家选得完全一样）、最大 <var>g·k</var>（完全不重叠）。实测它紧贴下限：<var>g</var>=4 时并集只有 <b>1.3–1.5 × k</b>，而且随 <var>g</var> 亚线性增长，<var>g</var>=16 也才 <b>1.7–2.4 × k</b>，远低于最坏情况的 16 × k（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Observations O2，图 2b</a>）。拖动滑杆看实测数字：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 组大小 g vs top-k 并集（论文图 2b 实测数据）</div>
+      <canvas class="chart" id="union-canvas"></canvas>
+      <div class="slider-row">
+        <label>组大小 g（prefill 连续分组）</label>
+        <input type="range" id="union-g" min="0" max="2" step="1" value="0">
+        <output id="union-gv">g = 4</output>
+      </div>
+      <div class="demo-readout" id="union-result"></div>
+      <div class="caption">实心柱为三个层（L3 浅 / L30 中 / L58 深）实测的「组 top-k 并集 ÷ k」，虚线为最坏情况 g·k（完全不重叠）。数据摘自论文图 2b（DeepSeek-V3.2，RULER-QA 128K，k=2048）。PIVOT 默认候选预算 c = 2k，刚好盖住 g=4 时的并集。</div>
+    </div>
+    <div class="keyfact">这组数字直接决定了 PIVOT 的候选预算：既然 g=4 的并集只有约 1.5 × k，那么一个 <b>c = 2k = 4096</b> 的共享候选集就足以「装下」全组需要的 token（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Method、§Experimental Settings</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📉 O3：索引分数是长尾的——少数 key 拿走绝大部分分数</h3>
+    <p>把索引分数沿 key 轴排序画出累计质量曲线：曲线先陡升、迅速变平——<b>一小部分 key 就携带了绝大部分分数质量</b>，远不到 k/2、3k/4 就已饱和。成因就在式 (1) 的 ReLU：点积接近零均值，ReLU 把负贡献清零，只有在许多头上都「正对齐」的 key 才能累积出高分（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Observations O3，图 2c</a>）。</p>
+    <div class="analogy">像搜索引擎的结果分布：真正相关的网页集中在第一页，后面几亿条「匹配结果」的得分几乎为零。所以只要候选集覆盖「第一页」，在里面重新精排，结果和翻遍全网几乎一样。</div>
+    <p>这条性质是 PIVOT-Refine 不掉精度的关键：每个 query 真正高分的 token 几乎都在共享候选集 C 里，在 C 上重新打分选 top-k，就逼近了全前缀扫描的结果（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Method PIVOT-Refine</a>）。</p>
+    <div class="keyfact"><b>三条性质的分工</b>：O1 让一个「代理 query」能代表全组（能共享）；O2 让候选集预算可以很小（共享得起，k &lt; c ≪ L）；O3 让候选集内重排足够准（共享不掉精度）（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Observations 末段</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH2 核心方法 ============ -->
+<section class="chapter" id="ch2">
+  <div class="chap-head"><span class="chap-num">第 2 章</span><h2>核心方法：PIVOT 怎么「拼单」</h2></div>
+  <p class="oneline">全称 Proxy Indexing Via One full-prefix Traversal——「一次全前缀遍历的代理索引」。把一组合成一个代理 query，扫一遍前缀，然后每个 query 从共享结果里取自己的 top-k。</p>
+
+  <!-- 总览 + 对比动画 -->
+  <div class="card fade-up">
+    <h3>🎬 一眼看懂：g 次全扫描 → 1 次共享扫描</h3>
+    <p>DSA 里，一组 <var>g</var> 个 query 各自独立扫描全部前缀，代价 O(<var>gL</var>)；PIVOT 把全组聚成一个<b>代理 query（proxy query）</b>，只扫一次，然后两个变体二选一：<b>PIVOT-Reuse</b> 直接把代理的 top-k 发给全组（最快）；<b>PIVOT-Refine</b> 保留代理的 top-c 候选集，每个 query 用自己的索引器在候选集内重新打分、各选各的 top-k（更准）（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Method，图 3</a>）。点下面的按钮，直观对比三种流程的「打分次数」：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · DSA vs PIVOT 两种变体的扫描流程（示意）</div>
+      <div class="btn-row" style="margin-top:0;margin-bottom:14px">
+        <button class="btn" id="scan-dsa">▶ DSA：逐 query 扫描</button>
+        <button class="btn" id="scan-reuse">▶ PIVOT-Reuse</button>
+        <button class="btn" id="scan-refine">▶ PIVOT-Refine</button>
+      </div>
+      <canvas class="chart tall" id="scan-canvas"></canvas>
+      <div class="demo-readout" id="scan-result">点击上方按钮，观看三种流程分别要计算多少次「query 对 key 的打分」。</div>
+      <div class="caption">示意参数：前缀 L = 120 格、g = 4 个 query、k = 12、候选预算 c = 2k = 24——比例与论文默认（k = 2048、c = 4096、g = 4）一致。蓝格 = 全前缀扫描，橙格 = 候选集内重打分，绿格 = 最终 top-k。真实场景 L 可达 25.6 万格，差距随之急剧放大（见第 3 章实测）。</div>
+    </div>
+    <div class="analogy">DSA 像四位邻居各自开车去同一个批发市场采购；PIVOT-Reuse 是派一位代表集中采购、四家分一样的货；PIVOT-Refine 是代表先拉回一车「候选商品」，每家再按自己的清单挑一遍——多花几分钟，但每家的货更合身。</div>
+  </div>
+
+  <!-- 分组 -->
+  <div class="card fade-up">
+    <h3>👥 第一步：分组——两个阶段，两套「拼单」方式</h3>
+    <p>PIVOT 只把「同一时刻可得」的 query 编成组，一步之内摊销一次代理扫描，不跨步留状态（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Method Grouping</a>）：</p>
+    <table class="tbl">
+      <tr><th>阶段</th><th>怎么分组</th><th>组大小 g</th></tr>
+      <tr><td>Prefill（预填充）</td><td>所有位置同时可得，按位置连续切成固定大小的组：G = { q<sub>t</sub>, q<sub>t+1</sub>, …, q<sub>t+g−1</sub> }</td><td>默认 g = 4</td></tr>
+      <tr><td>Decode（逐字生成）</td><td>直接搭 MTP（多 token 预测）的便车：当前 token + 同一步产出的 d 个草稿 token 天然成组</td><td>g = d + 1 = 4（d = 3）</td></tr>
+    </table>
+    <p style="margin-top:12px">Decode 阶段本来一次只生成一个 token、没有天然的组，而 DeepSeek-V3.2 与 GLM-5.1 在生产中都开了 MTP——同一步里这些 query 反正都要算，PIVOT 零成本蹭上现成的组，<b>与 MTP 的加速互相叠加而非竞争</b>（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Method Grouping，式 (2)(3)</a>）。</p>
+    <div class="analogy">Decode 阶段像每站只上一位乘客的公交，凑不成团；MTP 本来就在每一站「预售」了后面 3 张票，PIVOT 直接把这一站连人带预售票共 4 位拼成一车。</div>
+  </div>
+
+  <!-- 代理扫描 -->
+  <div class="card fade-up">
+    <h3>🤖 第二步：代理 query = 全组的「逐头平均」</h3>
+    <p>把组内所有成员的索引 query 和门控权重按头做平均，得到一个代理 query（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §The Shared Proxy Scan，式 (4)(5)</a>）：</p>
+    <div class="formula">
+      <var>q̄</var><sup><var>I</var></sup><sub><var>j</var></sub> =
+      <span class="frac"><span class="num">1</span><span class="den"><var>g</var></span></span>
+      <span style="font-size:1.3em">∑</span><sub><var>t′</var>∈<var>G</var></sub> <var>q</var><sup><var>I</var></sup><sub><var>t′</var>,<var>j</var></sub>，&nbsp;&nbsp;
+      <var>w̄</var><sup><var>I</var></sup><sub><var>j</var></sub> =
+      <span class="frac"><span class="num">1</span><span class="den"><var>g</var></span></span>
+      <span style="font-size:1.3em">∑</span><sub><var>t′</var>∈<var>G</var></sub> <var>w</var><sup><var>I</var></sup><sub><var>t′</var>,<var>j</var></sub>
+      <div class="fnote">白话：每组请一位「平均脸」代表。它用式 (1) 的同一个索引器对整个前缀只扫一遍，打分截止在组内第一个位置，保证对全组成员都满足因果性。消融实验（表 2）表明均值聚合明显优于「派第一个/最后一个 query 当代表」。</div>
+    </div>
+    <p>这一次扫描的代价是 O(<var>L</var>)，由全组共享；之后不再碰完整前缀。</p>
+  </div>
+
+  <!-- 两个变体 -->
+  <div class="card fade-up">
+    <h3>🔀 第三步：两个变体，一道「速度—精度」选择题</h3>
+    <div class="grid2">
+      <div>
+        <p><b>PIVOT-Reuse（更快）</b>：跳过精修，直接把代理分数的 top-k 分配给组内每个 query（式 6）：</p>
+        <div class="formula" style="font-size:15px">
+          <var>T</var><sub><var>t</var></sub> = TopK<span class="op">(</span>{ <var>Ī</var><sub><var>s</var></sub> | <var>s</var> ≤ <var>t</var> }, <var>k</var><span class="op">)</span>，∀<var>t</var> ∈ <var>G</var>
+          <div class="fnote">全组共用同一份 top-k。零逐 query 打分，整组代价 O(L)。</div>
+        </div>
+      </div>
+      <div>
+        <p><b>PIVOT-Refine（更准，默认）</b>：先取代理分数的 top-c 作共享候选集 C（c = 2k），每个 query 用自己的索引器在 C 内重新打分、各选 top-k（式 7–9）：</p>
+        <div class="formula" style="font-size:15px">
+          <var>C</var> = TopK<span class="op">(</span>{ <var>Ī</var><sub><var>s</var></sub> }, <var>c</var><span class="op">)</span>，&nbsp;
+          <var>T</var><sub><var>t</var></sub> = TopK<span class="op">(</span>{ <var>I</var><sub><var>t</var>,<var>s</var></sub> | <var>s</var> ∈ <var>C</var> }, <var>k</var><span class="op">)</span>
+          <div class="fnote">精确打分只发生在 c 个候选上，每组多花 O(gc)，总代价 O(L + gc)。</div>
+        </div>
+      </div>
+    </div>
+    <table class="tbl" style="margin-top:14px">
+      <tr><th>方案</th><th>每组索引代价</th><th>特点</th></tr>
+      <tr><td>DSA（稠密索引器）</td><td>O(g·L)</td><td>每个 query 都扫全前缀</td></tr>
+      <tr><td class="hl">PIVOT-Reuse</td><td class="hl">O(L)</td><td>最快；极端长上下文会损失少量召回</td></tr>
+      <tr><td class="hl">PIVOT-Refine</td><td class="hl">O(L + g·c)</td><td>默认；精度追平稠密，代价介于两者之间（c ≪ L）</td></tr>
+    </table>
+    <p style="margin-top:12px">工程上还有两个细节：每个 query 会额外并入一个<b>局部窗口</b>（最近的 W = 4 个 token），因为「离自己最近的 token」恰恰是代理最难代表的（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文附录 B</a>）；另外设有<b>短序列护栏</b>——组起始位置小于 c 时直接回退稠密扫描，保证 PIVOT 在部署中永远不会比 DSA 慢（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文附录 E，Algorithm 1</a>）。</p>
+    <div class="keyfact"><b>接口零改动</b>：索引器与下游 Sparse MLA 之间只通过索引集合 T<sub>t</sub> 通信，PIVOT 只改变 T<sub>t</sub> 的产生方式——Sparse MLA 算子、k 的大小、KV cache 全部原样不动；把 g 设为 1 就精确退化为原始索引器（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Method、附录 A</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH3 实验结果 ============ -->
+<section class="chapter" id="ch3">
+  <div class="chap-head"><span class="chap-num">第 3 章</span><h2>实验结果：精度持平，速度随上下文越拉越开</h2></div>
+  <p class="oneline">两个生产级模型（DeepSeek-V3.2、GLM-5.1）× 两套长上下文基准（LongBench、RULER），PIVOT-Refine 全程贴着稠密 DSA 的精度，索引器 kernel 最高提速约 4.8×，端到端最高 1.61×。</p>
+
+  <!-- 设置 -->
+  <div class="card fade-up">
+    <h3>🧪 实验怎么搭的</h3>
+    <p><b>模型</b>：<a class="src" href="https://arxiv.org/abs/2512.02556" target="_blank" rel="noopener">DeepSeek-V3.2</a> 与 <a class="src" href="https://arxiv.org/abs/2602.15763" target="_blank" rel="noopener">GLM-5.1</a>——两个都采用 DSA 索引器的生产级模型，均开 MTP（深度 d = 3，decode 组大小 g = 4）。<b>基准</b>：<a class="src" href="https://arxiv.org/abs/2404.06654" target="_blank" rel="noopener">RULER</a>（4K–128K 合成检索/推理）与 <a class="src" href="https://arxiv.org/abs/2308.14508" target="_blank" rel="noopener">LongBench</a>（真实长文档任务）。<b>基线</b>：稠密 DSA 索引器，以及两条正交加速轴的代表 HISA（token 轴）、IndexCache（层轴）。<b>实现</b>：<a class="src" href="https://arxiv.org/abs/2309.06180" target="_blank" rel="noopener">vLLM</a> + NVIDIA H20；k = 2048，c = 2k = 4096，prefill g = 4，代理用均值池化（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Experimental Settings</a>）。</p>
+  </div>
+
+  <!-- 精度 -->
+  <div class="card fade-up">
+    <h3>🎯 精度：RULER 128K 拉开差距的地方，Refine 贴住稠密基线</h3>
+    <p>在 LongBench 的中等长度上，所有稀疏方法都在稠密基线 ±0.5 分以内，拉不开差距；真正的试炼在 RULER 的 64K–128K。看 DeepSeek-V3.2 在 RULER <b>128K</b> 的得分（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文表 1</a>）：</p>
+    <div class="bar-row"><span>DSA（稠密基线）</span><div class="scorebar"><i data-w="90.45" style="background:#48566a"></i></div><b>90.45</b></div>
+    <div class="bar-row"><span>HISA（token 轴）</span><div class="scorebar"><i data-w="62.46" style="background:#9db4dd"></i></div><b>62.46</b></div>
+    <div class="bar-row"><span>MISA（头轴）</span><div class="scorebar"><i data-w="84.91" style="background:#5a7bb5"></i></div><b>84.91</b></div>
+    <div class="bar-row"><span>IndexCache（层轴）</span><div class="scorebar"><i data-w="88.67" style="background:#5a7bb5"></i></div><b>88.67</b></div>
+    <div class="bar-row"><span class="hl">PIVOT-Reuse</span><div class="scorebar"><i data-w="86.46" style="background:linear-gradient(90deg,#a55eea,#c58fff)"></i></div><b class="hl">86.46</b></div>
+    <div class="bar-row"><span class="hl">PIVOT-Refine</span><div class="scorebar"><i data-w="90.63" style="background:linear-gradient(90deg,#1783ff,#a55eea)"></i></div><b class="hl">90.63</b></div>
+    <div class="keyfact">HISA 在 128K 比稠密基线低 19–28 分（块级剪枝把后面 query 需要的 token 剪掉了），MISA 低 6–18 分；而 <b>PIVOT-Refine 全长度贴着稠密基线</b>（128K 还略高 0.18 分）。Reuse 与 Refine 的差距随上下文拉长而扩大——这正说明「候选集内逐 query 重打分」这一步在长上下文越来越关键（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Accuracy Results</a>）。</div>
+    <table class="tbl" style="margin-top:14px">
+      <tr><th>模型</th><th>基准</th><th>DSA</th><th>PIVOT-Reuse</th><th>PIVOT-Refine</th></tr>
+      <tr><td rowspan="2">DeepSeek-V3.2</td><td>LongBench AVG</td><td>55.95</td><td>56.08</td><td class="hl">56.18</td></tr>
+      <tr><td>RULER AVG（4K–128K）</td><td>94.30</td><td>93.22</td><td class="hl">94.24</td></tr>
+      <tr><td rowspan="2">GLM-5.1</td><td>LongBench AVG</td><td>56.79</td><td>56.62</td><td class="hl">56.95</td></tr>
+      <tr><td>RULER AVG（4K–128K）</td><td>95.19</td><td>94.15</td><td class="hl">95.17</td></tr>
+    </table>
+    <p style="margin-top:12px;font-size:13.5px;color:#7f8ca3">数值均为百分点，摘自<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文表 1</a>。子任务规律：PIVOT 在查询局部性强的任务（代码补全、Few-Shot）上还有增益，在证据分散的多文档 QA 上略弱——因为组级代理对「四处取证」的 query 代表性稍差。PIVOT 与 IndexCache 可组合（+IC），中长上下文无损、最长上下文只让出小幅精度换额外速度。</p>
+  </div>
+
+  <!-- 速度 -->
+  <div class="card fade-up">
+    <h3>🚀 速度：上下文越长，加速越狠</h3>
+    <p>PIVOT 省掉的正是随前缀变长而占主导的那一项，所以加速比随上下文长度一路走高。拖动滑杆，看论文实测的索引器 kernel 加速比（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文图 4</a>）：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 索引器 kernel 加速比（论文图 4 实测数据，DeepSeek-V3.2）</div>
+      <div class="btn-row" style="margin-top:0;margin-bottom:6px">
+        <button class="btn ghost active" id="spd-prefill">Prefill 阶段</button>
+        <button class="btn ghost" id="spd-decode">Decode 阶段</button>
+      </div>
+      <canvas class="chart" id="spd-canvas"></canvas>
+      <div class="slider-row">
+        <label>上下文长度</label>
+        <input type="range" id="spd-ctx" min="0" max="6" step="1" value="4">
+        <output id="spd-ctxv">64K</output>
+      </div>
+      <div class="demo-readout" id="spd-result"></div>
+      <div class="caption">柱高为相对稠密 DSA 索引器（= 1×，虚线）的 kernel 加速比。注意 Refine 在 8K 时为 0.55×——短上下文跑不赢稠密，这正是「短序列护栏」存在的原因；4K 处 Refine 已回退为 DSA（1×）。端到端加速（图 4c）：128K 时 Reuse 1.61×、Refine 1.45×。</div>
+    </div>
+    <div class="analogy">拼单省的是「每人跑一趟批发市场」的路费：市场就在楼下（短上下文）时，拼单的组织成本反而亏；市场在一千公里外（长上下文）时，拼一单省的路费极其可观。</div>
+    <div class="keyfact">端到端口径：短上下文时索引器占比小，PIVOT 与基线基本持平；长上下文时索引器成为大头，两个变体端到端最高达约 <b>1.6×</b>（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Efficiency Results，图 4c</a>）。kernel 拆解（附录 D）还显示：随上下文变长，Refine 的开销大头从「逐 query 重打分」转移到「代理扫描」本身——重打分被逐渐摊薄。</div>
+  </div>
+
+  <!-- 消融 -->
+  <div class="card fade-up">
+    <h3>🧭 消融：四个默认选择都有观察撑腰</h3>
+    <table class="tbl">
+      <tr><th>设计选择</th><th>结论（RULER，DeepSeek-V3.2）</th><th>出处</th></tr>
+      <tr><td>代理聚合方式</td><td>均值池化全面占优：Refine AVG 93.75 vs 派首 query 88.53 / 派尾 query 89.29；128K 时「首 query 代表」比均值低超 10 分</td><td><a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">表 2</a></td></tr>
+      <tr><td>组大小 g</td><td>g 越大越掉点且集中在长上下文（Refine AVG：g=4 93.75 → g=16 87.47；Reuse g=16 在 128K 仅 65.16）——正是 O2 预言的「预算盖不住并集」</td><td><a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">表 3</a></td></tr>
+      <tr><td>候选预算 c</td><td>精度在 c 上很快饱和：c=4096 已 93.75，加大到 8192 仅 93.88；过小（3072）开始掉点——O3 长尾的「膝盖」就在这里</td><td><a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">表 4</a></td></tr>
+      <tr><td>用在哪个阶段</td><td>只 prefill / 只 decode / 两者都开，精度都几乎无损（AVG 93.75 / 93.84 / 93.81，8K–128K 口径下稠密为 93.87）</td><td><a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">表 5</a></td></tr>
+    </table>
+    <p style="margin-top:12px">默认配置因此定为：g = 4、c = 2k = 4096、均值池化、局部窗口 W = 4（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Ablation Studies、§Experimental Settings</a>）。</p>
+  </div>
+</section>
+
+<!-- ============ CH4 局限与意义 ============ -->
+<section class="chapter" id="ch4">
+  <div class="chap-head"><span class="chap-num">第 4 章</span><h2>局限与意义</h2></div>
+  <p class="oneline">PIVOT 不是让索引「免费」，而是承认「相邻 query 想要的基本相同」之后，不再为每个 query 重复跑腿。</p>
+
+  <div class="card fade-up">
+    <h3>⚠️ 需要知道的边界</h3>
+    <table class="tbl">
+      <tr><th>边界</th><th>说明</th></tr>
+      <tr><td>短上下文不划算</td><td>Refine 在 8K prefill 只有 0.55×（比重跑稠密还慢），加速收益集中在长上下文；论文用短序列护栏（回退稠密）兜住这个区间</td></tr>
+      <tr><td>组不能贪大</td><td>g=16 时 Reuse 在 128K 掉到 65.16——共享选择盖不住越来越分散的组内需求（O2 的边界）</td></tr>
+      <tr><td>Reuse 在极端长度掉精度</td><td>128K 时 Reuse 比稠密低约 4 分（86.46 vs 90.45）；要精度请用 Refine，代价是加速比略低</td></tr>
+      <tr><td>验证范围有限</td><td>目前只在两个 DSA 系模型（DeepSeek-V3.2、GLM-5.1）上验证；decode 分组依赖 MTP，没开 MTP 的模型享受不到 decode 侧收益</td></tr>
+      <tr><td>证据分散的任务略弱</td><td>多文档 QA 这类「四处取证」的任务上 PIVOT 略低于稠密基线，组级代理对这类 query 的代表性较差</td></tr>
+    </table>
+    <p style="margin-top:12px;font-size:13.5px;color:#7f8ca3">以上各点均可对照<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Experiments、表 1/表 3、图 4 与 §Conclusion</a>。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🌟 为什么这项工作值得读</h3>
+    <p>它的贡献不在于又发明了一个更复杂的索引器，而在于<b>指出了一条被所有人忽略的加速轴</b>：此前的工作把 token 轴、头轴、层轴都砍了一遍，唯独每个 query 仍然各扫一遍全前缀。PIVOT 用三张观测图（O1 重叠、O2 小并集、O3 长尾）证明 query 轴上存在系统性冗余，并给出一个免训练、不动下游算子、prefill/decode 通吃的极简方案（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Introduction、§Conclusion</a>）。</p>
+    <div class="keyfact"><b>四条轴可以叠加</b>：PIVOT 与 IndexCache 组合（+IC）已验证可行；作者把「query 轴 × token/头/层轴的组合」与「推广到更多模型家族」列为未来方向（<a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">论文 §Conclusion</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📎 原文与延伸阅读</h3>
+    <p>
+      📄 论文：<a class="src" href="https://arxiv.org/abs/2607.24593" target="_blank" rel="noopener">PIVOT: Efficient Query-Group Indexing for Token-Level Sparse Attention（arXiv:2607.24593）</a>
+      · <a class="src" href="https://arxiv.org/pdf/2607.24593" target="_blank" rel="noopener">PDF 全文</a><br>
+      🏢 作者团队：Tencent（Hong Liu、Yuan Cheng、Lin Niu 等，通讯作者 Guanghua Yu）<br>
+      📚 相关工作：<a class="src" href="https://arxiv.org/abs/2512.02556" target="_blank" rel="noopener">DeepSeek-V3.2（DSA）</a> · <a class="src" href="https://arxiv.org/abs/2603.28458" target="_blank" rel="noopener">HISA</a> · <a class="src" href="https://arxiv.org/abs/2603.12201" target="_blank" rel="noopener">IndexCache</a> · <a class="src" href="https://arxiv.org/abs/2602.15763" target="_blank" rel="noopener">GLM-5</a> · <a class="src" href="https://arxiv.org/abs/2404.06654" target="_blank" rel="noopener">RULER</a> · <a class="src" href="https://arxiv.org/abs/2308.14508" target="_blank" rel="noopener">LongBench</a> · <a class="src" href="https://arxiv.org/abs/2309.06180" target="_blank" rel="noopener">vLLM</a>
+    </p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    本页基于 arXiv 论文《PIVOT: Efficient Query-Group Indexing for Token-Level Sparse Attention》（arXiv:2607.24593v1，2026-07-27）整理制作 · 2026-07<br>
+    通俗类比与演示动画仅用于帮助理解，扫描流程演示为示意参数；所有实验数字均直接摘自论文表 1–5 与图 2/图 4，技术细节以
+    <a class="src-inline" href="https://arxiv.org/abs/2607.24593" target="_blank" rel="noopener">原文</a> 为准 · 文中所有标注 ↗ 的链接均指向原始出处
+  </div>
+</footer>
+
+<script>
+/* ============ 入场动画 ============ */
+const io = new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('show');
+    e.target.querySelectorAll('.scorebar i').forEach(b=>b.style.width=b.dataset.w+'%');
+  }
+}),{threshold:.15});
+document.querySelectorAll('.fade-up').forEach(el=>io.observe(el));
+
+/* ============ 工具：高清 canvas ============ */
+function setupCanvas(id){
+  const cv=document.getElementById(id);
+  const dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx:ctx,W:W,H:H};
+}
+
+/* ============ CH1: O2 组大小 vs top-k 并集（论文图 2b 实测） ============ */
+const UNION_G=[4,8,16];
+const UNION_DATA={L3:[1.32,1.51,1.72],L30:[1.49,1.87,2.40],L58:[1.30,1.55,1.89]};
+const UNION_COLORS={L3:'#4d9fff',L30:'#a55eea',L58:'#f7b731'};
+function unionDemo(){
+  const gi=parseInt(document.getElementById('union-g').value);
+  const g=UNION_G[gi];
+  document.getElementById('union-gv').textContent='g = '+g;
+  const o=setupCanvas('union-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=44,padR=16,padT=22,padB=34,yMax=Math.max(4,g);
+  const px=v=>padL+(W-padL-padR)*v/3;      // 3 组柱
+  const py=v=>(H-padB)-v/yMax*(H-padB-padT);
+  // 最坏情况虚线 g·k
+  ctx.setLineDash([6,5]);ctx.strokeStyle='#ff6b6b';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(padL,py(g));ctx.lineTo(W-padR,py(g));ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#ff6b6b';ctx.font='11px sans-serif';ctx.textAlign='right';
+  ctx.fillText('最坏情况 g·k = '+g+'k（完全不重叠）',W-padR-4,Math.max(12,py(g)-5));
+  // 坐标轴
+  ctx.strokeStyle='#3a5078';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(padL,padT-4);ctx.lineTo(padL,H-padB);ctx.lineTo(W-padR,H-padB);ctx.stroke();
+  ctx.fillStyle='#7f92b8';ctx.font='10px sans-serif';ctx.textAlign='right';
+  [1,2,4,8,16].forEach(v=>{if(v<=yMax)ctx.fillText(v+'k',padL-6,py(v)+3);});
+  // 三层柱
+  const layers=['L3','L30','L58'],names={L3:'L3 浅层',L30:'L30 中层',L58:'L58 深层'};
+  layers.forEach((l,i)=>{
+    const v=UNION_DATA[l][gi];
+    const cx=px(i+0.5),bw=52;
+    ctx.fillStyle=UNION_COLORS[l];
+    ctx.fillRect(cx-bw/2,py(v),bw,(H-padB)-py(v));
+    ctx.fillStyle='#eaf1ff';ctx.font='bold 12px sans-serif';ctx.textAlign='center';
+    ctx.fillText(v.toFixed(2)+'k',cx,py(v)-6);
+    ctx.fillStyle='#7f92b8';ctx.font='11px sans-serif';
+    ctx.fillText(names[l],cx,H-padB+16);
+  });
+  const avg=((UNION_DATA.L3[gi]+UNION_DATA.L30[gi]+UNION_DATA.L58[gi])/3).toFixed(2);
+  document.getElementById('union-result').innerHTML=
+    'g = '+g+' 时，三层平均并集 ≈ <b style="color:#ffd97a">'+avg+' × k</b>，'+
+    '只有最坏情况（'+g+' × k）的 <b style="color:#ffd97a">'+Math.round(avg/g*100)+'%</b>。'+
+    (g===4?' 候选预算 c = 2k 轻松盖住全组所需 token ✅':
+     g===8?' 并集涨到约 1.5–1.9k，c = 2k 开始变紧 ⚠️':
+     ' 并集达 1.7–2.4k，已超出 c = 2k——这就是 g=16 时精度明显下滑的原因（见表 3）⚠️');
+}
+document.getElementById('union-g').addEventListener('input',unionDemo);
+unionDemo();
+
+/* ============ CH2: DSA vs PIVOT 扫描流程对比动画（示意） ============ */
+const SC_L=120,SC_G=4,SC_K=12,SC_C=24,SC_COLS=24;
+let scanAnim=null;
+// 每个 query 的 top-k（示意：全组共享一个核心 + 各自偏移）
+function scTopk(qi){
+  const set=[];
+  for(let i=0;i<SC_K-2;i++)set.push((i*7+11)%SC_L);          // 共享核心
+  set.push((qi*3+2)%SC_L,(qi*5+7)%SC_L);                     // 各自特有
+  return set;
+}
+const SC_CAND=(function(){const s={};scTopk(0).concat(scTopk(1),scTopk(2),scTopk(3)).forEach(v=>s[v]=1);
+  const arr=Object.keys(s).map(Number);while(arr.length<SC_C)arr.push((arr.length*13+29)%SC_L);
+  return arr.slice(0,SC_C);})();
+function scCellPos(i,W){
+  const cw=(W-24)/SC_COLS;
+  return {x:12+(i%SC_COLS)*cw,y:14+Math.floor(i/SC_COLS)*22,cw:cw};
+}
+function drawScan(state){
+  const o=setupCanvas('scan-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const swept=state.swept,cand=state.cand||[],picked=state.picked||[];
+  for(let i=0;i<SC_L;i++){
+    const p=scCellPos(i,W);
+    let col='#1c2b47';
+    if(swept.has(i))col='#2f4a7d';
+    if(state.cursor===i)col='#6db4ff';
+    if(cand.indexOf(i)>=0)col='#7a5c1e';
+    if(cand.indexOf(i)>=0&&state.cursor===i)col='#f7b731';
+    if(picked.indexOf(i)>=0)col='#2bc48a';
+    ctx.fillStyle=col;
+    ctx.fillRect(p.x+1.5,p.y+1.5,p.cw-3,19);
+  }
+  // query 行
+  const qy=14+Math.ceil(SC_L/SC_COLS)*22+16;
+  ctx.font='11px sans-serif';ctx.textAlign='center';
+  if(state.mode==='dsa'){
+    for(let q=0;q<SC_G;q++){
+      const x=30+q*((W-60)/3);
+      const active=state.curQ===q,done=state.curQ>q;
+      ctx.fillStyle=active?'#1783ff':(done?'#2bc48a':'#2a3c5f');
+      ctx.beginPath();ctx.roundRect(x-26,qy,52,24,6);ctx.fill();
+      ctx.fillStyle='#fff';ctx.fillText('q'+(q+1),x,qy+16);
+    }
+  }else{
+    const pxm=W/2;
+    ctx.fillStyle=state.phase==='scan'?'#f7b731':'#2bc48a';
+    ctx.beginPath();ctx.roundRect(pxm-40,qy,80,24,6);ctx.fill();
+    ctx.fillStyle='#0e1830';ctx.font='bold 11px sans-serif';
+    ctx.fillText('代理 q̄',pxm,qy+16);
+    if(state.mode==='refine'&&state.phase==='refine'){
+      for(let q=0;q<SC_G;q++){
+        const x=30+q*((W-60)/3);
+        const active=state.curQ===q,done=state.curQ>q;
+        ctx.fillStyle=active?'#f7b731':(done?'#2bc48a':'#2a3c5f');
+        ctx.beginPath();ctx.roundRect(x-26,qy+34,52,22,6);ctx.fill();
+        ctx.fillStyle='#fff';ctx.fillText('q'+(q+1),x,qy+50);
+      }
+    }else if(state.mode==='reuse'&&state.phase==='done'){
+      for(let q=0;q<SC_G;q++){
+        const x=30+q*((W-60)/3);
+        ctx.fillStyle='#2bc48a';
+        ctx.beginPath();ctx.roundRect(x-26,qy+34,52,22,6);ctx.fill();
+        ctx.fillStyle='#fff';ctx.font='11px sans-serif';ctx.fillText('q'+(q+1),x,qy+50);
+      }
+    }
+  }
+}
+function runScan(mode){
+  if(scanAnim){cancelAnimationFrame(scanAnim);scanAnim=null;}
+  const swept=new Set();
+  const state={mode:mode,swept:swept,cand:[],picked:[],cursor:-1,curQ:-1,phase:'scan'};
+  let counter=0;
+  const t0=performance.now();
+  // 生成步骤序列：{cells:[...], q:idx, phase:str}
+  const steps=[];
+  if(mode==='dsa'){
+    for(let q=0;q<SC_G;q++)steps.push({cells:rangeArr(SC_L),q:q,phase:'scan',pick:scTopk(q)});
+  }else{
+    steps.push({cells:rangeArr(SC_L),q:-1,phase:'scan'});
+    if(mode==='reuse')steps.push({cells:[],q:-1,phase:'pick',pick:scTopk(0)});
+    else{
+      steps.push({cells:[],q:-1,phase:'cand'});
+      for(let q=0;q<SC_G;q++)steps.push({cells:SC_CAND.slice(),q:q,phase:'refine',pick:scTopk(q)});
+    }
+  }
+  const totalCells=steps.reduce((a,s)=>a+s.cells.length,0);
+  const perFrame=Math.max(2,Math.round(totalCells/140));
+  let si=0,ci=0;
+  function frame(){
+    for(let n=0;n<perFrame;n++){
+      if(si>=steps.length)break;
+      const st=steps[si];
+      state.curQ=st.q;state.phase=st.phase;
+      if(st.phase==='cand'){state.cand=SC_CAND.slice();si++;continue;}
+      if(st.phase==='pick'){state.picked=st.pick;si++;continue;}
+      if(ci<st.cells.length){
+        const cell=st.cells[ci];
+        swept.add(cell);state.cursor=cell;counter++;
+        if(st.phase==='refine'&&state.cand.indexOf(cell)<0)state.cand.push(cell);
+        ci++;
+      }else{
+        if(st.pick&&mode!=='dsa')state.picked=st.pick;
+        if(st.pick&&mode==='dsa'){/* DSA 每 query 结束也亮一下 top-k */}
+        si++;ci=0;
+      }
+    }
+    drawScan(state);
+    const el=document.getElementById('scan-result');
+    if(si>=steps.length){
+      state.phase='done';state.cursor=-1;drawScan(state);
+      const dense=SC_G*SC_L;
+      let msg;
+      if(mode==='dsa')msg='DSA：4 个 query 各扫一遍 120 格前缀，共 <b style="color:#ff6b6b">'+counter+'</b> 次打分。每个 query 都要等自己的完整扫描跑完。';
+      else if(mode==='reuse')msg='PIVOT-Reuse：代理 q̄ 扫一遍（'+SC_L+' 次），top-k 直接发全组，共 <b style="color:#2bc48a">'+counter+'</b> 次打分——只有 DSA（'+dense+' 次）的 <b style="color:#ffd97a">'+Math.round(counter/dense*100)+'%</b>。';
+      else msg='PIVOT-Refine：代理扫一遍（'+SC_L+' 次）取 top-c='+SC_C+' 候选（橙格），4 个 query 各在候选内重打分（'+SC_G+'×'+SC_C+'='+(SC_G*SC_C)+' 次），共 <b style="color:#2bc48a">'+counter+'</b> 次——为 DSA（'+dense+' 次）的 <b style="color:#ffd97a">'+Math.round(counter/dense*100)+'%</b>，但每个 query 拿到了自己的 top-k（绿格）。';
+      el.innerHTML=msg;
+      scanAnim=null;return;
+    }
+    el.innerHTML='已计算打分：<b style="color:#ffd97a">'+counter+'</b> 次'+(mode!=='dsa'?'（DSA 需要 '+SC_G*SC_L+' 次）':'');
+    scanAnim=requestAnimationFrame(frame);
+  }
+  scanAnim=requestAnimationFrame(frame);
+}
+function rangeArr(n){const a=[];for(let i=0;i<n;i++)a.push(i);return a;}
+document.getElementById('scan-dsa').addEventListener('click',()=>runScan('dsa'));
+document.getElementById('scan-reuse').addEventListener('click',()=>runScan('reuse'));
+document.getElementById('scan-refine').addEventListener('click',()=>runScan('refine'));
+drawScan({mode:'dsa',swept:new Set(),cand:[],picked:[],cursor:-1,curQ:-1,phase:'idle'});
+
+/* ============ CH3: 索引器 kernel 加速比（论文图 4 实测） ============ */
+const SPD_CTX=['4K','8K','16K','32K','64K','128K','256K'];
+const SPD_DATA={
+  prefill:{reuse:[2.56,3.15,3.46,4.28,4.03,4.12,4.77],refine:[1.00,0.55,0.93,1.70,2.19,2.86,3.87]},
+  decode:{reuse:[2.65,3.08,3.47,3.72,4.08,4.09,3.98],refine:[1.00,0.93,1.40,2.05,2.85,3.16,3.42]}
+};
+let spdPhase='prefill';
+function spdDemo(){
+  const ci=parseInt(document.getElementById('spd-ctx').value);
+  document.getElementById('spd-ctxv').textContent=SPD_CTX[ci];
+  const o=setupCanvas('spd-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=40,padR=16,padT=26,padB=30,yMax=5.5;
+  const py=v=>(H-padB)-v/yMax*(H-padB-padT);
+  // DSA 基准虚线 1×
+  ctx.setLineDash([6,5]);ctx.strokeStyle='#8fb8ff';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(padL,py(1));ctx.lineTo(W-padR,py(1));ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#8fb8ff';ctx.font='11px sans-serif';ctx.textAlign='left';
+  ctx.fillText('DSA 索引器 = 1×',padL+4,py(1)-5);
+  // 轴
+  ctx.strokeStyle='#3a5078';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(padL,padT-4);ctx.lineTo(padL,H-padB);ctx.lineTo(W-padR,H-padB);ctx.stroke();
+  ctx.fillStyle='#7f92b8';ctx.font='10px sans-serif';ctx.textAlign='right';
+  [1,2,3,4,5].forEach(v=>ctx.fillText(v+'×',padL-6,py(v)+3));
+  const d=SPD_DATA[spdPhase];
+  const bars=[{name:'PIVOT-Reuse',v:d.reuse[ci],col:'#1783ff'},{name:'PIVOT-Refine',v:d.refine[ci],col:'#a55eea'}];
+  bars.forEach((b,i)=>{
+    const cx=W/2+(i-0.5)*150,bw=86;
+    ctx.fillStyle=b.v>=1?b.col:'#8a4a5a';
+    ctx.fillRect(cx-bw/2,py(Math.max(0.05,b.v)),bw,(H-padB)-py(Math.max(0.05,b.v)));
+    ctx.fillStyle='#eaf1ff';ctx.font='bold 14px sans-serif';ctx.textAlign='center';
+    ctx.fillText(b.v.toFixed(2)+'×',cx,py(Math.max(0.05,b.v))-8);
+    ctx.fillStyle='#9db4dd';ctx.font='12px sans-serif';
+    ctx.fillText(b.name,cx,H-padB+18);
+  });
+  ctx.fillStyle='#ffd97a';ctx.font='bold 13px sans-serif';ctx.textAlign='left';
+  ctx.fillText('上下文：'+SPD_CTX[ci]+'（'+(spdPhase==='prefill'?'Prefill':'Decode')+'）',padL,18);
+  const r=d.reuse[ci],f=d.refine[ci];
+  let msg;
+  if(f<1)msg='此长度下 Refine 尚未摊平逐 query 重打分的开销（'+f.toFixed(2)+'×，比稠密还慢）——部署时护栏会回退为稠密扫描，保证不亏；Reuse 已快 '+r.toFixed(2)+'×。';
+  else if(f===1)msg='此长度下 Refine 直接回退为稠密扫描（1×，护栏生效），不赚也不亏；Reuse 已快 '+r.toFixed(2)+'×。把滑杆往右拖，看上下文变长后差距如何拉开。';
+  else if(ci>=5)msg='长上下文区间：共享扫描摊掉了索引器的主导项，Reuse '+r.toFixed(2)+'× / Refine '+f.toFixed(2)+'×。端到端口径下 128K 达 1.61× / 1.45×。';
+  else msg='进入回本区间：Refine 开始跑赢稠密（'+f.toFixed(2)+'×），Reuse 保持 '+r.toFixed(2)+'× 左右。';
+  document.getElementById('spd-result').innerHTML=msg;
+}
+document.getElementById('spd-ctx').addEventListener('input',spdDemo);
+document.getElementById('spd-prefill').addEventListener('click',()=>{
+  spdPhase='prefill';
+  document.getElementById('spd-prefill').classList.add('active');
+  document.getElementById('spd-decode').classList.remove('active');
+  spdDemo();
+});
+document.getElementById('spd-decode').addEventListener('click',()=>{
+  spdPhase='decode';
+  document.getElementById('spd-decode').classList.add('active');
+  document.getElementById('spd-prefill').classList.remove('active');
+  spdDemo();
+});
+spdDemo();
+</script>
+</body>
+</html>

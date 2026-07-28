@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>看懂「规划物理学」 · 一座可控炼金实验室，解剖智能体的长程规划能力</title>
+<style>
+  :root{
+    --blue:#1783ff; --blue-d:#0b5cc4; --red:#ff6b6b; --amber:#f7b731;
+    --purple:#a55eea; --green:#2bc48a; --ink:#1b2430; --ink-soft:#48566a;
+    --bg:#f6f8fc; --card:#ffffff; --line:#e4eaf3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.8}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+
+  /* ===== Hero ===== */
+  .hero{background:linear-gradient(160deg,#0a1a3f 0%,#103a8c 55%,#1783ff 100%);
+    color:#fff;padding:72px 0 56px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+    padding:4px 14px;border-radius:99px;font-size:13px;letter-spacing:1px;margin-bottom:18px}
+  .hero h1{font-size:clamp(26px,4.6vw,44px);line-height:1.3;margin-bottom:14px}
+  .hero p.sub{font-size:clamp(14px,1.8vw,18px);opacity:.88;max-width:860px}
+  .hero .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);
+    border-radius:16px;padding:14px 22px;min-width:150px}
+  .stat b{display:block;font-size:26px;font-weight:800}
+  .stat span{font-size:13px;opacity:.85}
+
+  /* ===== Nav ===== */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  nav.toc .inner{display:flex;gap:6px;overflow-x:auto;padding:10px 22px;max-width:1060px;margin:0 auto}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--ink-soft);text-decoration:none;
+    padding:6px 12px;border-radius:99px;transition:.2s}
+  nav.toc a:hover{background:#eaf2ff;color:var(--blue-d)}
+
+  /* ===== Sections ===== */
+  section.chapter{padding:56px 0 8px}
+  .chap-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  .chap-num{font-size:14px;font-weight:800;color:#fff;background:var(--blue);
+    border-radius:10px;padding:3px 12px;letter-spacing:1px}
+  .chap-head h2{font-size:clamp(21px,3vw,30px)}
+  .oneline{color:var(--blue-d);font-weight:600;margin:4px 0 22px;font-size:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:0 2px 14px rgba(20,50,110,.05)}
+  .card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card p{margin-bottom:12px;color:#2c3a4e}
+  .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
+    border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
+  .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
+  .keyfact{position:relative;background:#eef5ff;border-left:4px solid var(--blue);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";position:absolute;left:16px;top:12px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .demo-box{background:#0e1830;border-radius:18px;padding:22px;margin:16px 0;color:#dfe8ff;
+    position:relative;overflow:hidden}
+  .demo-title{color:#8fb8ff;font-size:13px;letter-spacing:2px;font-weight:700;margin-bottom:14px;text-transform:uppercase}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:99px;padding:9px 22px;font-size:14px;
+    cursor:pointer;font-weight:600;transition:.2s;box-shadow:0 4px 14px rgba(23,131,255,.35)}
+  .btn:hover{background:var(--blue-d);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);box-shadow:none;color:#dfe8ff}
+  .btn.ghost.active{background:rgba(23,131,255,.22);border-color:#6db4ff;color:#fff}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border-radius:12px;overflow:hidden}
+  table.tbl th{background:#103a8c;color:#fff;padding:10px 12px;text-align:left;font-weight:600}
+  table.tbl td{padding:10px 12px;border-bottom:1px solid var(--line)}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl tr:nth-child(even) td{background:#f7faff}
+  .hl{color:var(--blue-d);font-weight:700}
+
+  /* ===== 公式（纯 HTML/CSS，无 MathJax）===== */
+  .formula{background:#0e1830;border-radius:14px;padding:20px 22px;margin:14px 0;color:#eaf1ff;
+    font-size:clamp(15px,2.2vw,19px);text-align:center;overflow-x:auto;line-height:2;
+    font-family:"STIX Two Math","Cambria Math",Georgia,serif}
+  .formula .op{color:#8fb8ff}
+  .formula .cond{font-size:.82em;color:#9db4dd}
+  .frac{display:inline-flex;flex-direction:column;vertical-align:middle;margin:0 2px;line-height:1.4}
+  .frac .num{border-bottom:1.5px solid currentColor;padding:0 7px}
+  .frac .den{padding:0 7px}
+  .fnote{font-size:13px;color:#7f92b8;margin-top:10px;text-align:center;line-height:1.7;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  .formula var{font-style:italic}
+
+  /* ===== 结果条形图 ===== */
+  .scorebar{height:10px;border-radius:99px;background:#e7edf6;overflow:hidden;margin:4px 0 12px}
+  .scorebar i{display:block;height:100%;border-radius:99px;width:0;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+  .bar-row{display:grid;grid-template-columns:170px 1fr 64px;gap:12px;align-items:center;margin-bottom:10px;font-size:14px}
+  @media(max-width:640px){.bar-row{grid-template-columns:110px 1fr 56px}}
+  .bar-row b{text-align:right;font-variant-numeric:tabular-nums}
+
+  /* ===== 滑杆 ===== */
+  .slider-row{display:flex;align-items:center;gap:14px;margin:14px 0 6px;flex-wrap:wrap}
+  .slider-row label{font-size:14px;color:#9db4dd;white-space:nowrap}
+  .slider-row input[type=range]{flex:1;min-width:180px;accent-color:var(--amber)}
+  .slider-row output{color:#ffd97a;font-weight:700;min-width:56px;text-align:right;font-variant-numeric:tabular-nums}
+  canvas.chart{width:100%;height:240px;display:block;border-radius:10px;background:#0a1326}
+  .demo-readout{margin-top:14px;font-size:14.5px;line-height:1.8}
+  .caption{font-size:12.5px;color:#7f92b8;margin-top:8px;line-height:1.6}
+
+  /* ===== 三区域网格 ===== */
+  .region-grid{display:grid;grid-template-columns:110px repeat(3,1fr);gap:8px;margin:14px 0}
+  .region-grid .rg-head{font-size:13px;color:#9db4dd;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.4}
+  .region-grid .rg-cell{border-radius:12px;padding:12px 8px;text-align:center;transition:.3s;min-height:74px;
+    display:flex;flex-direction:column;justify-content:center;gap:2px}
+  .region-grid .rg-cell b{font-size:20px;font-variant-numeric:tabular-nums}
+  .region-grid .rg-cell span{font-size:12px;opacity:.85}
+  .rg-pos{background:rgba(43,196,138,.16);border:1px solid rgba(43,196,138,.5);color:#7de8c0}
+  .rg-neg{background:rgba(255,107,107,.13);border:1px solid rgba(255,107,107,.45);color:#ff9d9d}
+  .rg-zero{background:rgba(143,184,255,.10);border:1px solid rgba(143,184,255,.3);color:#9db4dd}
+  @media(max-width:640px){.region-grid{grid-template-columns:78px repeat(3,1fr)}.region-grid .rg-cell b{font-size:16px}}
+
+  /* ===== 来源标注 ===== */
+  .src{color:var(--blue-d);text-decoration:none;font-size:.8em;font-weight:600;
+    border-bottom:1px dashed #9db8e8;padding:0 1px;white-space:nowrap}
+  .src:hover{color:var(--blue);border-bottom-style:solid;background:#eaf2ff;border-radius:4px}
+  .src::after{content:"↗";font-size:.85em;margin-left:1px}
+  .demo-box .src, .formula .src{color:#8fb8ff;border-bottom-color:#3a5078}
+  .demo-box .src:hover{color:#cfe2ff;background:rgba(23,131,255,.15)}
+  .src-inline{color:inherit;border-bottom:1px dashed #9db8e8;text-decoration:none}
+  .src-inline:hover{color:var(--blue)}
+
+  footer{margin-top:64px;padding:34px 0 46px;color:#7f8ca3;font-size:13px;text-align:center;
+    border-top:1px solid var(--line);line-height:2}
+  .fade-up{opacity:0;transform:translateY(26px);transition:all .7s cubic-bezier(.3,.7,.3,1)}
+  .fade-up.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">arXiv 论文交互解读 · 智能体规划</span>
+    <h1>看懂「规划物理学」：一座可控炼金实验室，解剖智能体的长程规划能力</h1>
+    <p class="sub">中科院自动化所团队造了一个完全可控的「合成世界」——幻想炼金、畜牧养殖、电子装配三个领域，让 100M 小模型从零学规划。借此回答一个大模型时代的核心问题：多轮长程规划能力，究竟是预训练时「长」出来的，还是后训练时「塑」出来的？多位教师的能力又如何「合体」？</p>
+    <div class="stats">
+      <div class="stat"><b>3 阶段</b><span>预训练习得 → OPD 塑形 → MOPD 合体</span></div>
+      <div class="stat"><b>100M</b><span>从零训练的 Qwen2.5 可控模型，词表仅 3000</span></div>
+      <div class="stat"><b>+45.8</b><span>内化世界模型带来的长程 avg@8 提升（22.7 → 68.5）</span></div>
+      <div class="stat"><b>90.0→15.6</b><span>无共享模式时，多教师蒸馏引发的灾难性遗忘</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="toc"><div class="inner">
+  <a href="#ch0">🦒 热身：规划的「物理学」</a>
+  <a href="#ch1">🧪 概念基础：实验室与两位教练</a>
+  <a href="#ch2">🌱 发现一：预训练怎么「长」出规划</a>
+  <a href="#ch3">✂️ 发现二：后训练怎么「塑」规划</a>
+  <a href="#ch4">🤝 发现三：多教师怎么「合体」</a>
+  <a href="#ch5">⚖️ 局限与意义</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ============ CH0 热身 ============ -->
+<section class="chapter" id="ch0">
+  <div class="chap-head"><span class="chap-num">第 0 章</span><h2>热身：为什么要给规划能力做「物理实验」？</h2></div>
+  <p class="oneline">大模型的规划能力像一锅成分不明的汤——想改进它，得先有一个每种配料都能精确控制的小灶。</p>
+
+  <div class="card fade-up">
+    <h3>🧩 核心问题：能力到底从哪来？</h3>
+    <p>让智能体「给我织一件羊毛衫」，它需要：拆解目标 → 追踪背包里有什么 → 记住「草籽+水→草、羊+草→羊毛」这类合成规则 → 在十几步内按正确顺序执行。这就是<b>多轮长程规划（multi-turn long-horizon planning）</b>。OSWorld 2.0、DeepPlanning 等基准都表明：现有大模型短任务还行，<b>长程任务显著吃力</b>（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §1</a>）。</p>
+    <p>但想改进它却无从下手：现有基础模型都训练在<b>不可控、不透明的互联网数据</b>上——没人说得清长程规划能力是预训练时就有、还是后训练「激活」的。论文把这个问题拆成三个递进的子问题（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §1</a>）：</p>
+    <table class="tbl">
+      <tr><th>训练阶段</th><th>子问题</th><th>对应章节</th></tr>
+      <tr><td>① 大规模预训练</td><td>规划能力如何<b>习得</b>（世界模型内化 / 原子技能组合 / 轨迹质量）</td><td>§4</td></tr>
+      <tr><td>② RL 后训练</td><td>规划能力如何被 GRPO / OPD <b>塑形</b>，适用边界在哪</td><td>§5</td></tr>
+      <tr><td>③ 多教师合并</td><td>规划能力如何<b>整合</b>：跨环境泛化、持续学习、冲突解决</td><td>§6</td></tr>
+    </table>
+    <div class="analogy">想知道「好厨子是怎么炼成的」，光品尝成品（评测大模型）没用——你得开一家<b>实验厨房</b>：食材、菜谱、学徒全都自己配，才能分别测试「选材重要还是刀工重要、跟几个师傅学会不会串味」。这篇论文就是开了这样一家厨房。</div>
+    <div class="keyfact">论文图 1 里藏了个彩蛋：用🦒长颈鹿代表 Long-Horizon 的「L」——长脖子象征智能体在长程规划中需要「看得远」（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文图 1 说明</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH1 概念基础 ============ -->
+<section class="chapter" id="ch1">
+  <div class="chap-head"><span class="chap-num">第 1 章</span><h2>概念基础：炼金实验室、两类「脑内资产」与两位教练</h2></div>
+  <p class="oneline">看懂全文只需要三件套：一个可控合成环境、一对「模式 vs 知识」的概念、两种后训练算法。</p>
+
+  <!-- 1. 环境 -->
+  <div class="card fade-up">
+    <h3>① 可控规划健身房（Controllable Planning Gym）</h3>
+    <p>作者构建了三个合成领域：<b>幻想炼金（Fantasy Alchemy）、畜牧养殖（Livestock Farming）、电子装配（Electronic Assembly）</b>。每个领域是一棵 5 层的「技能图」：每层 40 个物品类目、每类 20 个具体实例（如「草籽」类目下有「turf seed」等实例），共 200 个类目、4000 个物品名（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §3.1、附录 A.2 表 10</a>）。</p>
+    <p>低层物品按 <b>AND/OR 逻辑</b>合成高层物品——一个目标可以有多条独立配方（OR），每条配方需要集齐全部原料（AND）（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §3.1 式 (6)</a>）：</p>
+    <div class="formula">
+      <var>v</var> ⟸ ( <var>u</var><sub>1,1</sub> ∧ ⋯ ∧ <var>u</var><sub>1,<var>k</var>₁</sub> ) ∨ ⋯ ∨ ( <var>u</var><sub><var>m</var>,1</sub> ∧ ⋯ ∧ <var>u</var><sub><var>m</var>,<var>k</var><sub><var>m</var></sub></sub> )
+      <div class="fnote">白话：想合成物品 v，任选一条配方（∨ = 或），但配方里的每样原料都得备齐（∧ = 与）。</div>
+    </div>
+    <p><b>任务</b>：给智能体一个初始背包（原料 + 2~4 个干扰项），让它在有限步数内合成目标物品。<b>难度按最少步数分级</b>：Short 1~5 步、Middle 6~8 步、Long ≥ 9 步（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §3.1、§4.2</a>）。<b>评估</b>：3 域 × 3 难度，每个子集 160 个实例，共 1440 个/ checkpoint；温度 0.4 独立采 8 条轨迹，报 <b>avg@8</b>（平均成功率）与 <b>pass@8</b>（8 次至少成 1 次），单 checkpoint 最多 11,520 次推理（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §3.3、图 3 说明</a>）。</p>
+    <div class="analogy">这就是 Minecraft 的合成台：给你一背包材料（还混了几个没用的），问「能不能 15 步内做出羊毛衫」。会做单个配方（草籽+水→草）是「原子技能」，把 15 个配方串成一条链才是「长程规划」。</div>
+    <div class="keyfact">实验用的学生模型是从零随机初始化的 <b>Qwen2.5-100M</b>（12 层、隐藏维 768、GQA、词表仅 3000），预训练语料约 1.2B token，9000 步、2 张 GPU——一切成分透明可控（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §4.1、附录 A.1/A.4</a>）。</div>
+  </div>
+
+  <!-- 2. 模式 vs 知识 -->
+  <div class="card fade-up">
+    <h3>② 规划模式 vs 规划知识：方法论与菜谱</h3>
+    <p>论文把规划能力拆成两种「脑内资产」，这是理解后半篇全部结论的钥匙（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §4.3、§5.1</a>）：</p>
+    <table class="tbl">
+      <tr><th></th><th>规划模式（Pattern）</th><th>规划知识（Knowledge）</th></tr>
+      <tr><td>是什么</td><td>CoT 的<b>结构骨架</b>：先定目标、递归拆解、检查背包、再输出动作（DFS 式思维模板）</td><td><b>任务特定的配方</b>：「晶谷微粒 + 辉光蕨 → 石英溶液」这类具体合成规则</td></tr>
+      <tr><td>跨任务性</td><td>通用，跨样本共享</td><td>专用，每个任务可能不同</td></tr>
+      <tr><td>互信息</td><td>I(T;P) 低——知道任务 T 不太能推断用哪个模式</td><td>I(T;K) 高——任务几乎决定了需要什么知识</td></tr>
+    </table>
+    <div class="formula">
+      <var>I</var>(<var>T</var>;<var>P</var>) = <var>H</var>(<var>P</var>) − <var>H</var>(<var>P</var>|<var>T</var>) &nbsp;&nbsp;&lt;&nbsp;&nbsp; <var>I</var>(<var>T</var>;<var>K</var>) = <var>H</var>(<var>K</var>) − <var>H</var>(<var>K</var>|<var>T</var>)
+      <div class="fnote">互信息衡量「知道任务 T 能减少多少不确定性」。模式是通用的方法论（低互信息），知识是绑死任务的具体配方（高互信息）。这条不等式是第 3 章「三区域」结论的理论起点（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §5.1 式 (10)</a>）。</div>
+    </div>
+    <div class="analogy">模式是「做菜的方法论」——先看菜单、盘点冰箱、按步骤下锅，放之四海皆准；知识是「具体菜谱」——麻婆豆腐放几克花椒。方法论可以一通百通，菜谱必须逐条硬背。后面会看到：<b>RL 擅长塑造方法论，却灌不进菜谱</b>。</div>
+  </div>
+
+  <!-- 3. GRPO vs OPD -->
+  <div class="card fade-up">
+    <h3>③ 两位教练：GRPO「只看期末总分」，OPD「逐题批注」</h3>
+    <p>后训练阶段的两位主角（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §2.2、§5.2.1</a>）：</p>
+    <table class="tbl">
+      <tr><th>算法</th><th>监督信号</th><th>特点</th></tr>
+      <tr><td><a class="src" href="https://arxiv.org/abs/2402.03300" target="_blank" rel="noopener">GRPO</a></td><td><b>二元结果奖励</b>：一整条 15 步轨迹走完，只告诉模型「成了 / 没成」</td><td>稀疏奖励，功劳/黑锅要在长轨迹里分配（credit assignment）</td></tr>
+      <tr><td><a class="src" href="https://arxiv.org/abs/2306.13649" target="_blank" rel="noopener">OPD</a>（On-Policy Distillation）</td><td><b>逐 token 稠密监督</b>：学生在自己走出的轨迹上，每个 token 都对齐教师的概率分布（reverse KL）</td><td>每一步都有人批改，但前提是教师足够好</td></tr>
+    </table>
+    <div class="formula">
+      ℒ<sub>Agent-OPD</sub>(θ) = 𝔼<sub>τ∼π<sub>θ</sub></sub> <span style="font-size:1.15em">[</span>
+      <span style="font-size:1.3em">∑</span><sub><var>k</var>=1</sub><sup><var>K</var></sup>
+      <span style="font-size:1.3em">∑</span><sub><var>t</var>=1</sub><sup><var>T</var><sub><var>k</var></sub></sup>
+      <var>D</var><sub>KL</sub>( <var>p</var><sub><var>k</var>,<var>t</var></sub> ‖ <var>q</var><sub><var>k</var>,<var>t</var></sub> )
+      <span style="font-size:1.15em">]</span>
+      <div class="fnote">白话：学生先自己动手做一整轮（on-policy），然后教师对<b>学生写下的每个词</b>给出「要是我会怎么写」的概率分布，学生逐个词缩小与教师的差距（KL 散度）。本文多轮 OPD 采用 Top-k 截断（k=100）（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §2.2 式 (2)、§5.2.1</a>）。</div>
+    </div>
+    <div class="analogy">GRPO 像只看期末总分的教练：15 道题做成一锅，最后一句「59 分」——学生不知道哪道题丢的分。OPD 像坐在旁边的私教：学生每写一步，老师就批注「这一步我会这么写」。长卷子上，后者的批改意见显然更管用——这是第 3 章的核心结论。</div>
+  </div>
+</section>
+
+<!-- ============ CH2 发现一：预训练 ============ -->
+<section class="chapter" id="ch2">
+  <div class="chap-head"><span class="chap-num">第 2 章</span><h2>发现一：预训练期，规划能力怎么「长」出来</h2></div>
+  <p class="oneline">三个答案：脑内要装「模拟器」、光会零件不会整机、错题集毒性极强。</p>
+
+  <!-- 2.1 世界模型 -->
+  <div class="card fade-up">
+    <h3>🧠 数据格式：给模型装一台「脑内模拟器」</h3>
+    <p>同样的专家轨迹，可以有两种教法。<b>直接作答（w/o WM）</b>：看题直接报动作；<b>世界模型内化（w/ WM）</b>：先在 CoT 里显式推演状态转移——「合成羊毛衫需要毛线+钩针；毛线现在没有；合成毛线需要……」——即把状态转移函数 𝒯: 𝒮 × 𝒜 → 𝒮 内化成深度优先搜索（DFS）式的推理链，再输出动作（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §4.1 式 (7)(8)</a>）。结果（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §4.1 图 3</a>）：</p>
+    <table class="tbl">
+      <tr><th>难度</th><th>w/o WM avg@8</th><th>w/ WM avg@8</th><th>提升</th></tr>
+      <tr><td>Short（1~5 步）</td><td>89.5</td><td>98.9</td><td class="hl">+9.4</td></tr>
+      <tr><td>Middle（6~8 步）</td><td>46.6</td><td>85.9</td><td class="hl">+39.3</td></tr>
+      <tr><td class="hl">Long（≥9 步）</td><td>22.7</td><td>68.5</td><td class="hl">+45.8</td></tr>
+    </table>
+    <p style="margin-top:12px">任务越长，世界模型的优势越大。代价是：直接作答<b>收敛更快、token 更省</b>——它靠背诵记忆，上限却低得多（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §4.1 图 4</a>）。点下面的播放，看两种「学生」走同一个 15 步合成任务：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 直接作答 vs 世界模型：15 步合成「羊毛衫」（示意）</div>
+      <div class="btn-row" style="margin-top:0;margin-bottom:14px">
+        <button class="btn ghost active" id="wm-wm">🧠 世界模型（DFS 推演）</button>
+        <button class="btn ghost" id="wm-direct">⚡ 直接作答（背答案）</button>
+        <button class="btn" id="wm-play">▶ 播放</button>
+      </div>
+      <canvas class="chart" id="wm-canvas" style="height:300px"></canvas>
+      <div class="demo-readout" id="wm-result"></div>
+      <div class="caption">演示基于论文图 2 的畜牧养殖实例（合成 cardigan 约 15 步），过程为教学示意。真实结论：长程任务 avg@8 从 22.7% 提升到 68.5%（+45.8），pass@8 从 29.0% 提升到 71.9%（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §4.1 图 3</a>）。</div>
+    </div>
+    <div class="analogy">下棋时「背棋谱」和「脑内推演」的区别：背谱的人开局犀利，一旦对手走出没背过的局面就抓瞎；会推演的人把棋盘规则装进了脑子，局面越陌生、变化越多，优势越大。长程任务全是「没背过的局面」。</div>
+  </div>
+
+  <!-- 2.2 组合泛化 -->
+  <div class="card fade-up">
+    <h3>🧱 数据分布：会了所有零件，却拼不出整机</h3>
+    <p>一个诱人的假设是：只要模型学会了所有<b>原子技能</b>（单个合成步骤），就能自动组合出长程规划 h(x) = g(f(x))。论文用数据配比实验泼了冷水：只喂 100% 短任务（Short 区间包含全部原子技能）的模型，短任务 pass@8 高达 <b>93.12%</b>，中程只剩 <b>0.83%</b>，长程 <b>0.00%</b>——组合泛化几乎不发生（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §4.2 表 1</a>）。</p>
+    <p>但反转也很戏剧性：<b>只要掺入 5% 的长程轨迹，能力就被「点燃」</b>——5% 中程数据让中程 pass@8 从 0.83% 跳到 51.88%，5% 长程数据让长程从 0.00% 跳到 11.46%（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §4.2</a>）。拖动滑杆看数据配比如何改变三档难度的 pass@8（全部为论文表 1 真实数字）：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 预训练数据配比 → 组合泛化（论文表 1 真实数据）</div>
+      <canvas class="chart" id="mix-canvas"></canvas>
+      <div class="slider-row">
+        <label>长程数据配比档位</label>
+        <input type="range" id="mix-r" min="0" max="5" step="1" value="0">
+        <output id="mix-rv">档 0</output>
+      </div>
+      <div class="demo-readout" id="mix-result"></div>
+      <div class="caption">六档依次为：① 100% Short；② 100%S + 5% Middle；③ 100%S + 50%M；④ 100%S + 100%M；⑤ 100%S + 100%M + 5% Long；⑥ 100%S + 100%M + 50%L。数值为 pass@8（%），摘自论文表 1（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §4.2</a>）。</div>
+    </div>
+    <div class="analogy">只会加减乘除，不等于会解应用题——你需要见过几道「完整的应用题」才知道怎么把运算串起来。而且只需见过几道：5% 的示范就足以让学生领悟「原来技能是要串联使用的」。</div>
+  </div>
+
+  <!-- 2.3 次优轨迹 -->
+  <div class="card fade-up">
+    <h3>☠️ 数据质量：次优轨迹是长程规划的「剧毒」</h3>
+    <p>真实预训练语料不可能全是专家示范，总混着绕路、冗余甚至错误的<b>次优轨迹</b>。论文对比：纯 4 种最优模式 vs 混入 4/8 种次优模式（数据规模、训练步数完全相同）。结论：混入次优轨迹后，短程任务尚有残留能力，<b>中长程任务 pass@8 直接跌到个位数乃至归零</b>；而增加采样次数（pass@k 的 k）也救不回来（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §4.3 图 6</a>）。</p>
+    <p>为什么长程特别惨？因为<b>误差会累积放大</b>：早期一个次优决策不是局部损失，而是让后续所有步骤在错误状态上继续推演：</p>
+    <div class="formula">
+      <var>P</var>(整链成功) ≈ <var>p</var><sup><var>T</var></sup>
+      <div class="fnote">示意模型：若每步独立正确率为 p，T 步全对的概率是 p 的 T 次方。0.9⁵ ≈ 59%，0.9¹⁵ ≈ 21%——步数越多，「还不错的单步」也会被复利成「大概率失败」。</div>
+    </div>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 误差复利：单步正确率 vs 链条长度（示意）</div>
+      <canvas class="chart" id="err-canvas"></canvas>
+      <div class="slider-row">
+        <label>单步正确率 p</label>
+        <input type="range" id="err-p" min="0.80" max="0.99" step="0.01" value="0.90">
+        <output id="err-pv">0.90</output>
+      </div>
+      <div class="demo-readout" id="err-result"></div>
+      <div class="caption">示意曲线：成功率 = p<sup>T</sup>。三条参考线对应 Short 5 步 / Middle 8 步 / Long 15 步。真实实验中，4:8 混合次优数据使长程 pass@8 跌至接近 0（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §4.3 图 6</a>）。</div>
+    </div>
+    <div class="analogy">导航时每拐错一个路口，后面所有「距目的地还有 X 公里」的播报都建立在错误位置上——短途错一个弯还能绕回来，跨省长途错一个弯就是南辕北辙。次优轨迹教给模型的，正是这种「错误路口」。</div>
+    <div class="keyfact">第 2 章小结：① 内化世界模型 → 长程泛化大幅增强；② 原子技能不会自动组合，但 5% 长程数据即可点燃；③ 次优轨迹因误差复利严重摧毁长程规划（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §4 Takeaway</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH3 发现二：后训练 ============ -->
+<section class="chapter" id="ch3">
+  <div class="chap-head"><span class="chap-num">第 3 章</span><h2>发现二：后训练怎么「塑」规划——三区域地图</h2></div>
+  <p class="oneline">RL 不是万能塑形刀：它有明确的「不管用 / 管用 / 够不着」三个区域，而 OPD 的疆土比 GRPO 大。</p>
+
+  <!-- 3.1 三区域 -->
+  <div class="card fade-up">
+    <h3>🗺️ 三区域：什么时候该上 RL，上哪种 RL</h3>
+    <p>沿「预训练数据质量」和「任务规划长度」两个维度，论文把后训练的适用空间划成三个区域（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §5.2.1 图 7</a>）：</p>
+    <table class="tbl">
+      <tr><th>区域</th><th>含义</th><th>白话</th></tr>
+      <tr><td><b>A · 不必要区</b></td><td>各规划模式表现相近（数据本来就干净、任务短）</td><td>学生 already 全会，教练来了也白来</td></tr>
+      <tr><td><b>B · 有效区</b></td><td>模式间有明显优劣，RL 能「选出」更好的模式</td><td>可塑之才，教了就有提升</td></tr>
+      <tr><td><b>C · 不支持区</b></td><td>长程 + 低质数据：对错动作混在长轨迹里，二元奖励分不出功劳</td><td>GRPO 够不着——需要 OPD 这种逐 token 细粒度信号</td></tr>
+    </table>
+    <p style="margin-top:12px">切换按钮，看两种算法在 3×3 网格上相对 Instruct 基线的 avg@8 提升量（全部为论文真实数字）：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · GRPO vs OPD 的适用边界（论文图 7 / 表 3 真实数据）</div>
+      <div class="btn-row" style="margin-top:0;margin-bottom:6px">
+        <button class="btn ghost active" id="rg-grpo">GRPO（二元奖励）</button>
+        <button class="btn ghost" id="rg-opd">OPD（逐 token 蒸馏）</button>
+      </div>
+      <div class="region-grid" id="rg-grid"></div>
+      <div class="demo-readout" id="rg-result"></div>
+      <div class="caption">行 = 预训练数据质量（4 最优 → 4最优:8次优），列 = RL 任务规划长度。数值为相对同组 Instruct 模型的 avg@8 均值提升（百分点），摘自论文图 7 与表 3（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §5.2.1</a>）。绿 = 提升，红 = 下降，灰 = 持平。</div>
+    </div>
+    <div class="keyfact">最刺眼的一格：<b>长程 + 最低质量数据（4:8）</b>，GRPO 不升反降（−1.6），OPD 却提升 +18.6——这就是 Region C，二元结果奖励的「信用分配」在这里失效，而逐 token 的稠密蒸馏信号仍然有效（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §5.2.1 表 3</a>）。</div>
+    <div class="analogy">15 道菜的大餐最后只收到一句「不好吃」——厨师根本不知道是第几道菜出了问题（GRPO 的困境）。私教站在旁边逐道点评（OPD），即使学徒基础差、宴席长，也知道每道菜该怎么改。</div>
+  </div>
+
+  <!-- 3.2 梯度方向 -->
+  <div class="card fade-up">
+    <h3>🧭 为什么 OPD 走得更稳：给参数更新「看方向」</h3>
+    <p>论文不止看分数，还解剖了训练过程本身：对每个 checkpoint 计算权重更新矩阵 ΔW，做 SVD 取前 5 个主方向，比较<b>中途 checkpoint 的更新方向与最终方向的余弦相似度</b>（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §5.2.2 式 (11)–(16)</a>）。结果（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文图 9、图 10</a>）：</p>
+    <table class="tbl">
+      <tr><th>条件</th><th>GRPO</th><th>OPD</th></tr>
+      <tr><td>短程 + 高质数据</td><td>方向始终一致 ✅</td><td>方向始终一致 ✅</td></tr>
+      <tr><td>长程 + 高质数据</td><td>早期与最终方向开始偏离 ⚠️</td><td>方向一致 ✅</td></tr>
+      <tr><td>长程 + 低质数据</td><td>方向不一致，甚至<b>梯度消失</b>（曲线贴零平躺）❌</td><td>仍保持较高一致性 ✅</td></tr>
+    </table>
+    <div class="analogy">大雾天开车：GRPO 只有到达目的地才知道开对了没有，雾越大（轨迹越长、噪声越多）方向盘越乱打；OPD 沿路每个路口都有路标，自然走得直。</div>
+    <p>但 OPD 也有代价：它<b>压低熵、让学生的输出分布向教师收敛</b>——上限被教师锁死。GRPO 在有效区内大 k 采样（pass@k）的天花板反而更高。另外论文提醒：长程场景下 <b>pass@k 会失真</b>——RL 前 pass@k 近零不代表模型没这个能力，只是正确轨迹在预训练分布里太稀有、采不出来（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §5.2.1</a>）。</p>
+  </div>
+
+  <!-- 3.3 知识错配 -->
+  <div class="card fade-up">
+    <h3>💥 规划知识：满分教师也能把学生教崩</h3>
+    <p>模式能蒸馏，那知识呢？论文设计了一个精巧的「错配实验」：同一个目标（合成羊毛）有两条都正确的配方——<b>配方 A</b>：水+草籽+羊；<b>配方 B</b>：水+棉籽+纺车。学生预训练只学过 A，现在让学 B 出身的教师 B 通过 OPD 来教它（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §5.3.1 图 11</a>）。</p>
+    <table class="tbl">
+      <tr><th>模型（4 Opt.:4 Sub. 基座）</th><th>avg@8</th><th>pass@8</th><th>说明</th></tr>
+      <tr><td>Instruct 基线</td><td>26.13</td><td>44.03</td><td>未蒸馏</td></tr>
+      <tr><td>教师 A / 教师 B</td><td>100.00</td><td>100.00</td><td>两位教师各自域内都是满分</td></tr>
+      <tr><td>学生 + 教师 A（配方匹配）</td><td class="hl">41.37（+15.24）</td><td class="hl">46.74（+2.71）</td><td>正常提升</td></tr>
+      <tr><td>学生 + 教师 B（配方错配）</td><td class="hl">31.50（+5.37）</td><td class="hl">36.60（−7.43）</td><td>比不教还差 ❌</td></tr>
+    </table>
+    <p style="margin-top:12px">更细致的解剖：错配蒸馏<b>重创域内（ID）表现</b>——学生原有的配方 A 世界模型被覆写（中程 FA 域 avg@8 暴跌 36.09 分、pass@8 暴跌 43.75 分），而对域外（OOD）只有轻微影响，因为别的域的知识没被直接改写（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §5.3.1 表 4</a>）。</p>
+    <div class="analogy">川菜学徒跟粤菜师傅学「另一套也对的做法」：师傅确实厨艺满分，但学徒的旧手艺被新配方搅得半生不熟——原来的麻婆豆腐不会做了，新菜也没学透。KL 损失把学生原本写对的 token 当成「错的」来惩罚，等于先拆旧房、新房却没封顶。</div>
+    <div class="keyfact">KL 动态分析揭示了时间线：<b>训练早期</b>学生先对齐教师的规划模式（KL 顺利下降、奖励上升）；<b>后期</b>进入知识对齐阶段，高互信息的逐点知识超出 RL 更新幅度，训练直接崩溃。结论：知识要靠 SFT 灌入，RL/OPD 只适合塑模式（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §5.3.2 图 13–15</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH4 发现三：MOPD ============ -->
+<section class="chapter" id="ch4">
+  <div class="chap-head"><span class="chap-num">第 4 章</span><h2>发现三：多位教师怎么「合体」——MOPD</h2></div>
+  <p class="oneline">多教师蒸馏的本质不是「兼收并蓄」，而是「寻找公约数」：收敛到所有教师共享的那个规划模式。</p>
+
+  <!-- 4.1 机制 -->
+  <div class="card fade-up">
+    <h3>🔧 MOPD 的机制：级联蒸馏，模式收敛（mode seeking）</h3>
+    <p><b>多教师 On-Policy 蒸馏（MOPD）</b>已是 MiMo-V2-Flash、GLM-5、Nemotron-Cascade 2、DeepSeek-V4 等模型整合多域能力的标准工序，但机制一直不透明（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §6.1 表 5</a>）。论文研究其<b>级联（cascaded）形式</b>：学生依次从教师 1、2、…、M 学习，每位教师都用逐 token 的 reverse KL 目标（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §6.1 式 (20)</a>）。</p>
+    <p>关键发现是<b>模式收敛</b>：蒸馏后学生的规划模式分布<b>不是覆盖所有教师的偏好</b>（mode covering），而是快速收缩到教师们<b>共享</b>的那一两种模式上——三个环境里的分布最终同时收敛到同一个「T1 Goal」模板（占比 1.00）（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §6.2 图 18</a>）。</p>
+    <div class="analogy">徒弟先后拜三位风格不同的师傅，最后形成的不是「三派武功都会一点」，而是三派<b>共同的那套基本功</b>——共享模式被反复强化，独门绝技反而被磨平。这个「求交集」的秉性，决定了下面三种截然不同的结局。</div>
+  </div>
+
+  <!-- 4.2 三模式动画 -->
+  <div class="card fade-up">
+    <h3>🎭 三种结局：泛化、续学、遗忘</h3>
+    <p>结局由两个维度决定：各环境的规划模式<b>有没有交集</b>、交集<b>冲不冲突</b>（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §6.1 图 16</a>）。切换三种类型并播放，看学生的模式分布（横轴 8 个模式：T1~T4 高质量，D1~D4 捷径/干扰）在 Instruct → 依次蒸馏 FA → LF → EA 教师后的演变（全部为论文图 18/20/21 的真实分布）：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · MOPD 三种模式下学生的规划模式分布演变（论文真实数据）</div>
+      <div class="btn-row" style="margin-top:0;margin-bottom:14px">
+        <button class="btn ghost active" id="mp-t1">Ⅰ 共享+兼容</button>
+        <button class="btn ghost" id="mp-t2">Ⅱ 共享+冲突</button>
+        <button class="btn ghost" id="mp-t3">Ⅲ 无共享+冲突</button>
+        <button class="btn" id="mp-play">▶ 播放蒸馏过程</button>
+      </div>
+      <canvas class="chart" id="mp-canvas" style="height:260px"></canvas>
+      <div class="demo-readout" id="mp-result"></div>
+      <div class="caption">数据为幻想炼金（FA）域的模式分布，摘自论文图 18(b)、图 20(c)、图 21(d)。T1 Goal / T2 Step / T3 Planning / T4 Reasoning 为高质量模式（蓝），D1~D4 为捷径干扰模式（灰红）。</div>
+    </div>
+    <table class="tbl">
+      <tr><th>模式</th><th>条件</th><th>结果（真实数字）</th></tr>
+      <tr><td><b>Ⅰ 泛化模式</b></td><td>共享且兼容</td><td>只蒸馏 FA 教师，未见的 LF 域 avg@8 从 34.92 → <b>52.58</b>；即使基座被低质数据污染（中程 avg@8 仅 0.03），MOPD 后仍恢复到 <b>22.99</b>（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §6.2 表 6</a>）</td></tr>
+      <tr><td><b>Ⅱ 持续学习模式</b></td><td>有共享但部分冲突</td><td>依次学完三个域后，短程 avg@8 仍保持 FA <b>91.88</b> / LF <b>88.98</b> / EA <b>89.77</b>——共享模式保住了旧能力（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §6.3 表 7</a>）</td></tr>
+      <tr><td><b>Ⅲ 冲突模式</b></td><td>无共享且冲突</td><td>学完 EA 教师后，之前已练到 90.00 的 LF 域 avg@8 崩到 <b>15.62</b>——灾难性遗忘（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §6.3 表 7、图 21</a>）</td></tr>
+    </table>
+    <div class="analogy">三位老师用三种方言授课：若都夹杂着「普通话」（共享模式），徒弟能借普通话把三门的知识串起来，甚至举一反三到没听过的课（泛化）；若方言各异但普通话还在，至少能一门门接着学（持续学习）；若完全没有共同语言，每换一位老师，上一位的内容就被「洗掉」（灾难性遗忘）。</div>
+    <div class="keyfact">边界也很清楚：MOPD 只能<b>激活并放大已存在于学生分布中的模式</b>——FA 域训练激活的 T3 模式无法迁移到预训练里没见过 T3 的 LF 域。它提炼「公约数」，但不能无中生有（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §6.2 图 17</a>）。</div>
+  </div>
+
+  <!-- 4.3 参数动力学 -->
+  <div class="card fade-up">
+    <h3>🔬 参数动力学：MOPD 只在基座「附近」小步移动</h3>
+    <p>对所有模型参数做 PCA 投影并计算两两 L2 距离（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §6.4 图 22</a>）：</p>
+    <table class="tbl">
+      <tr><th>参数对</th><th>L2 距离</th><th>含义</th></tr>
+      <tr><td>Instruct ↔ 各位教师</td><td>约 71.0 ~ 73.6</td><td>教师们离基座很远（各自重金训练）</td></tr>
+      <tr><td class="hl">Instruct ↔ MOPD 第 1 阶段</td><td class="hl">0.482</td><td>MOPD 几乎贴着基座移动</td></tr>
+      <tr><td>相邻两个 MOPD 阶段</td><td>0.377 ~ 0.409</td><td>每位教师只带来小步更新</td></tr>
+    </table>
+    <p style="margin-top:12px">且各阶段更新方向的余弦相似度很低（0.002~0.065）——每阶段都在添加<b>新的</b>任务信号而不是重复旧方向。这也从侧面解释了第 3 章的结论：<b>参数移动幅度这么小，天然装不下大段全新的规划知识</b>——知识注入必须靠预训练/SFT，RL 类方法只负责模式层的「微调对齐」（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §6.4</a>）。</p>
+  </div>
+</section>
+
+<!-- ============ CH5 局限与意义 ============ -->
+<section class="chapter" id="ch5">
+  <div class="chap-head"><span class="chap-num">第 5 章</span><h2>成绩单、局限与意义</h2></div>
+  <p class="oneline">这是一篇「机制研究」而非「刷榜论文」：结论的价值在于可控因果，代价是规模有限。</p>
+
+  <div class="card fade-up">
+    <h3>🏆 一页看懂全部关键数字</h3>
+    <div class="bar-row"><span>世界模型·长程 avg@8</span><div class="scorebar"><i data-w="68.5" style="background:linear-gradient(90deg,#1783ff,#a55eea)"></i></div><b class="hl">68.5</b></div>
+    <div class="bar-row"><span>直接作答·长程 avg@8</span><div class="scorebar"><i data-w="22.7" style="background:#9db4dd"></i></div><b>22.7</b></div>
+    <div class="bar-row"><span>仅短数据·中程 pass@8</span><div class="scorebar"><i data-w="0.83" style="background:#ff6b6b"></i></div><b>0.83</b></div>
+    <div class="bar-row"><span>掺 5% 中程·中程 pass@8</span><div class="scorebar"><i data-w="51.88" style="background:linear-gradient(90deg,#1783ff,#a55eea)"></i></div><b class="hl">51.88</b></div>
+    <div class="bar-row"><span>4:8 低质·长程 GRPO Δ</span><div class="scorebar"><i data-w="1.6" style="background:#ff6b6b"></i></div><b>−1.6</b></div>
+    <div class="bar-row"><span>4:8 低质·长程 OPD Δ</span><div class="scorebar"><i data-w="18.6" style="background:linear-gradient(90deg,#1783ff,#a55eea)"></i></div><b class="hl">+18.6</b></div>
+    <div class="bar-row"><span>错配蒸馏 pass@8</span><div class="scorebar"><i data-w="36.6" style="background:#f7b731"></i></div><b>36.60</b></div>
+    <div class="bar-row"><span>匹配蒸馏 pass@8</span><div class="scorebar"><i data-w="46.74" style="background:linear-gradient(90deg,#1783ff,#a55eea)"></i></div><b class="hl">46.74</b></div>
+    <div class="bar-row"><span>无共享冲突·LF 域 avg@8</span><div class="scorebar"><i data-w="15.62" style="background:#ff6b6b"></i></div><b>15.62</b></div>
+    <div class="bar-row"><span>共享冲突·LF 域 avg@8</span><div class="scorebar"><i data-w="88.98" style="background:linear-gradient(90deg,#1783ff,#a55eea)"></i></div><b class="hl">88.98</b></div>
+    <p style="font-size:13.5px;color:#7f8ca3;margin-top:10px">条形按数值绝对值等比缩放，便于同屏比较；口径各异，出处见各章节标注。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>⚠️ 读这些结论时要记住的边界</h3>
+    <table class="tbl">
+      <tr><th>边界</th><th>说明</th></tr>
+      <tr><td>合成环境，规模有限</td><td>实验在 3 个合成域、Qwen2.5-100M 小模型、词表 3000 上进行——这是「物理实验」的可控性代价，结论向大模型的迁移需要进一步验证</td></tr>
+      <tr><td>OPD 的结论依赖「理想教师」</td><td>OPD 有效区更广的前提是教师足够好；教师模式错误时，学生会照单全收（OPD 压低熵、追随教师）</td></tr>
+      <tr><td>知识注入非 RL 所长</td><td>「知识靠 SFT、模式靠 RL」的划分来自该环境的互信息分析，真实语料中两者未必如此泾渭分明</td></tr>
+      <tr><td>反事实合成规则</td><td>为规模化构建数据，状态转移用了反事实配方（同一物品多条合成路径）；作者说明其贯穿所有实验、不影响相对比较（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §3.1、§4.3</a>）</td></tr>
+    </table>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🌟 为什么这项工作值得读</h3>
+    <p>多教师 OPD 已经是工业界整合基础模型能力的<b>既成工序</b>——MiMo-V2-Flash、DeepSeek-V4 用它做跨域整合，GLM-5、Nemotron-Cascade 2 用它做跨阶段能力保持——但「什么时候有效、什么时候翻车」此前没人系统回答（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §6.1 表 5</a>）。这篇论文的贡献是把「炼丹」变成「物理」：</p>
+    <div class="keyfact">一条贯穿三阶段的统一主线：<b>规划知识要在预训练/SFT 阶段以高质量、含长程、含世界模型推演的形式注入；规划模式可以在后训练阶段用 OPD 类细粒度信号安全塑形；多教师合并的成败取决于模式分布有无共享交集。</b>（<a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">论文 §8 结论</a>）</div>
+    <p>对实践者的直接启示：预训练别把长程轨迹洗没了（5% 就够点燃组合泛化，但 0% 就是 0%）；别把次优轨迹当免费数据（误差复利毒性极强）；后训练先判断自己在哪个区域；多教师合并前先检查「模式兼容性」。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📎 原文与资源</h3>
+    <p>
+      📄 论文：<a class="src" href="https://arxiv.org/abs/2607.24720" target="_blank" rel="noopener">The Physics of Multi-Turn Long-Horizon Planning（arXiv:2607.24720）</a>
+      · <a class="src" href="https://arxiv.org/pdf/2607.24720" target="_blank" rel="noopener">PDF 全文</a><br>
+      🏫 作者团队：中科院自动化所复杂系统认知与决策智能重点实验室 & 国科大人工智能学院（Tianyi Men、Zhuoran Jin、Kang Liu、Jun Zhao）<br>
+      🔗 项目资源：<a class="src" href="https://quester-one.github.io/PlanPhysWebsite/" target="_blank" rel="noopener">项目主页</a>
+      · <a class="src" href="https://github.com/Quester-one/PlanPhysCode" target="_blank" rel="noopener">GitHub 代码</a>
+      · <a class="src" href="https://huggingface.co/MultimodalAgent/TianyiMen_PlanPhys_Models" target="_blank" rel="noopener">模型权重</a>
+      · <a class="src" href="https://huggingface.co/datasets/MultimodalAgent/TianyiMen_PlanPhys_Datasets" target="_blank" rel="noopener">数据集</a><br>
+      📚 相关工作：<a class="src" href="https://arxiv.org/abs/2306.13649" target="_blank" rel="noopener">On-Policy Distillation（Agarwal et al., ICLR 2024）</a>
+      · <a class="src" href="https://arxiv.org/abs/2402.03300" target="_blank" rel="noopener">GRPO（DeepSeekMath）</a>
+      · <a class="src" href="https://arxiv.org/abs/2306.08543" target="_blank" rel="noopener">MiniLLM（GKD 式蒸馏）</a>
+      · <a class="src" href="https://arxiv.org/abs/2305.14992" target="_blank" rel="noopener">RAP（语言模型即世界模型）</a>
+    </p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    本页基于 arXiv 论文《The Physics of Multi-Turn Long-Horizon Planning: From Pre-training to Post-training via Single- and Multi-Teacher On-Policy Agentic Distillation》（arXiv:2607.24720v1，2026-07-27）整理制作 · 2026-07<br>
+    通俗类比与演示动画仅用于帮助理解；除特别标注「示意」的演示外，所有实验数字均直接摘自论文图 3/6/7/17/18/20/21/22 与表 1/3/4/6/7，技术细节以
+    <a class="src-inline" href="https://arxiv.org/abs/2607.24720" target="_blank" rel="noopener">原文</a> 为准 · 文中所有标注 ↗ 的链接均指向原始出处
+  </div>
+</footer>
+
+<script>
+/* ============ 入场动画 ============ */
+const io = new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('show');
+    e.target.querySelectorAll('.scorebar i').forEach(b=>b.style.width=b.dataset.w+'%');
+  }
+}),{threshold:.15});
+document.querySelectorAll('.fade-up').forEach(el=>io.observe(el));
+
+/* ============ 工具：高清 canvas ============ */
+function setupCanvas(id){
+  const cv=document.getElementById(id);
+  const dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx:ctx,W:W,H:H};
+}
+
+/* ============ 动画 1：世界模型 vs 直接作答（合成树） ============ */
+const WM_NODES=[
+  {id:'cardigan', label:'羊毛衫', x:.50, y:.10, leaf:false},
+  {id:'yarn',     label:'毛线',   x:.30, y:.30, leaf:false},
+  {id:'hook',     label:'钩针',   x:.72, y:.30, leaf:true},
+  {id:'wool',     label:'羊毛',   x:.20, y:.52, leaf:false},
+  {id:'wheel',    label:'纺车',   x:.42, y:.52, leaf:true},
+  {id:'lamb',     label:'小羊',   x:.10, y:.74, leaf:true},
+  {id:'grass',    label:'草',     x:.30, y:.74, leaf:false},
+  {id:'seed',     label:'草籽',   x:.22, y:.93, leaf:true},
+  {id:'water',    label:'泉水',   x:.40, y:.93, leaf:true},
+  {id:'stone',    label:'石块(干扰)', x:.62, y:.74, leaf:true},
+  {id:'cotton',   label:'棉籽(干扰)', x:.82, y:.74, leaf:true}
+];
+const WM_EDGES=[['cardigan','yarn'],['cardigan','hook'],['yarn','wool'],['yarn','wheel'],
+  ['wool','lamb'],['wool','grass'],['grass','seed'],['grass','water']];
+const WM_SCRIPT={
+  wm:[
+    {n:'cardigan',t:'🧠 CoT：目标=羊毛衫。规则：毛线+钩针→羊毛衫。检查背包……毛线缺失，先造毛线。'},
+    {n:'yarn',t:'🧠 CoT：毛线=羊毛+纺车。羊毛缺失，继续向下拆。'},
+    {n:'wool',t:'🧠 CoT：羊毛=小羊+草。草缺失，继续拆。'},
+    {n:'grass',t:'🧠 CoT：草=草籽+泉水。两样都在背包里 ✓ 可以动手了！'},
+    {n:'seed',t:'⚙️ Action 1：merge(草籽, 泉水) → 得到草 ✓'},
+    {n:'water',t:'⚙️ （泉水已用）状态更新：背包 = 草、小羊、纺车、钩针……'},
+    {n:'lamb',t:'⚙️ Action 2：merge(小羊, 草) → 得到羊毛 ✓'},
+    {n:'wheel',t:'⚙️ Action 3：merge(羊毛, 纺车) → 得到毛线 ✓'},
+    {n:'hook',t:'⚙️ Action 4：merge(毛线, 钩针) → ……'},
+    {n:'cardigan',t:'🎉 得到羊毛衫！15 步内走完全程，任务成功。'}
+  ],
+  direct:[
+    {n:'cotton',t:'⚡ 直接猜：merge(棉籽, 泉水) → You get nothing ✗'},
+    {n:'stone',t:'⚡ 再猜：merge(石块, 小羊) → You get nothing ✗'},
+    {n:'yarn',t:'⚡ 蒙对一个：merge(羊毛?, 纺车) → 背包里没有羊毛 ✗'},
+    {n:'cotton',t:'⚡ 继续试错：merge(棉籽, 钩针) → nothing ✗（步数所剩无几）'},
+    {n:'stone',t:'💀 步数耗尽。没有世界模型，每一步都是盲人摸象，任务失败。'}
+  ]
+};
+let wmMode='wm', wmTimer=null, wmStep=-1;
+function wmDraw(){
+  const o=setupCanvas('wm-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const px=x=>30+x*(W-70), py=y=>16+y*(H-36);
+  ctx.strokeStyle='#33477a';ctx.lineWidth=1.5;
+  WM_EDGES.forEach(e=>{
+    const a=WM_NODES.find(n=>n.id===e[0]),b=WM_NODES.find(n=>n.id===e[1]);
+    ctx.beginPath();ctx.moveTo(px(a.x),py(a.y));ctx.lineTo(px(b.x),py(b.y));ctx.stroke();
+  });
+  const script=WM_SCRIPT[wmMode];
+  WM_NODES.forEach(nd=>{
+    let st='idle';
+    for(let i=0;i<=wmStep&&i<script.length;i++){if(script[i].n===nd.id)st=(i===script.length-1&&wmStep===script.length-1)?(wmMode==='wm'?'done':'bad'):(i===wmStep?'cur':'seen');}
+    const X=px(nd.x),Y=py(nd.y);
+    ctx.beginPath();ctx.arc(X,Y,13,0,7);
+    ctx.fillStyle=st==='cur'?'#f7b731':st==='seen'?'#2bc48a':st==='done'?'#2bc48a':st==='bad'?'#ff6b6b':'#22355e';
+    ctx.fill();
+    if(st==='cur'){ctx.beginPath();ctx.arc(X,Y,17,0,7);ctx.strokeStyle='#ffd97a';ctx.lineWidth=2;ctx.stroke();}
+    ctx.fillStyle=st==='idle'?'#7f92b8':'#0e1830';ctx.font='10px sans-serif';ctx.textAlign='center';
+    ctx.fillStyle=st==='idle'?'#8fa3cc':'#eaf1ff';
+    ctx.fillText(nd.label,X,Y+26);
+  });
+  ctx.fillStyle='#7f92b8';ctx.font='11px sans-serif';ctx.textAlign='left';
+  ctx.fillText(wmMode==='wm'?'世界模型：先在脑内 DFS 拆解目标，再动手':'直接作答：不看规则，直接试错',10,14);
+}
+function wmSetResult(txt){document.getElementById('wm-result').innerHTML=txt;}
+function wmPlay(){
+  if(wmTimer){clearTimeout(wmTimer);wmTimer=null;}
+  wmStep=-1;wmDraw();
+  const script=WM_SCRIPT[wmMode];
+  let i=0;
+  const tick=()=>{
+    if(i>=script.length){wmTimer=null;
+      wmSetResult((wmMode==='wm'
+        ?'<b style="color:#2bc48a">成功 ✓</b> 世界模型把 15 步长链拆成可推演的子目标序列。真实数据：长程 avg@8 <b style="color:#ffd97a">22.7% → 68.5%</b>（+45.8），pass@8 29.0% → 71.9%。'
+        :'<b style="color:#ff6b6b">失败 ✗</b> 直接作答在短任务上还能靠背答案混过去（短程 avg@8 89.5%），长程只剩 <b style="color:#ffd97a">22.7%</b>——它记住了动作，却没学会状态怎么变。')
+      );return;}
+    wmStep=i;wmDraw();wmSetResult(script[i].t);
+    i++;wmTimer=setTimeout(tick,1100);
+  };
+  tick();
+}
+document.getElementById('wm-play').addEventListener('click',wmPlay);
+document.getElementById('wm-wm').addEventListener('click',()=>{
+  wmMode='wm';
+  document.getElementById('wm-wm').classList.add('active');
+  document.getElementById('wm-direct').classList.remove('active');
+  wmStep=-1;wmDraw();wmSetResult('点「▶ 播放」，看世界模型学生如何先在脑内拆解整棵合成树，再一步步执行。');
+});
+document.getElementById('wm-direct').addEventListener('click',()=>{
+  wmMode='direct';
+  document.getElementById('wm-direct').classList.add('active');
+  document.getElementById('wm-wm').classList.remove('active');
+  wmStep=-1;wmDraw();wmSetResult('点「▶ 播放」，看直接作答学生在长任务上如何试错到步数耗尽。');
+});
+wmDraw();wmSetResult('点「▶ 播放」开始演示。');
+
+/* ============ 动画 2：数据配比 → 组合泛化 ============ */
+const MIX=[
+  {label:'100% Short',           s:93.12, m:0.83,  l:0.00,  note:'只见过短任务：原子技能全会（短程 93.12%），但中程 0.83%、长程 0.00%——技能不会自动串联。'},
+  {label:'S + 5% Middle',        s:93.75, m:51.88, l:1.25,  note:'🔥 只掺 5% 中程轨迹，中程 pass@8 从 0.83% 跳到 51.88%——「点燃」组合泛化！'},
+  {label:'S + 50% Middle',       s:93.75, m:54.58, l:1.46,  note:'中程加到 50%，中程微涨，长程依旧冰封。'},
+  {label:'S + 100% Middle',      s:98.33, m:90.42, l:2.71,  note:'中程喂满：中程 90.42%，但长程仍只有 2.71%——长程能力不会从中程自动外推。'},
+  {label:'S+M + 5% Long',        s:91.25, m:47.29, l:11.46, note:'🔥 再掺 5% 长程轨迹：长程从 0.00% 量级跳到 11.46%——每个长度档都需要自己的「点火数据」。'},
+  {label:'S+M + 50% Long',       s:98.54, m:90.00, l:78.54, note:'长程加到 50%：长程 78.54%。少量长程数据点燃能力，足量数据才能练扎实。'}
+];
+function mixDraw(){
+  const idx=parseInt(document.getElementById('mix-r').value);
+  document.getElementById('mix-rv').textContent='档 '+idx;
+  const d=MIX[idx];
+  const o=setupCanvas('mix-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=40,padB=34,padT=18;
+  const bw=(W-padL-40)/3;
+  const vals=[d.s,d.m,d.l],names=['Short 短程','Middle 中程','Long 长程'],cols=['#4d9fff','#f7b731','#ff6b6b'];
+  // 5% 参考线
+  const y5=H-padB-(5/100)*(H-padB-padT);
+  ctx.setLineDash([5,5]);ctx.strokeStyle='#3a5078';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(padL,y5);ctx.lineTo(W-20,y5);ctx.stroke();ctx.setLineDash([]);
+  for(let i=0;i<3;i++){
+    const h=(vals[i]/100)*(H-padB-padT);
+    const x=padL+i*bw+bw*0.18,y=H-padB-h,w=bw*0.64;
+    ctx.fillStyle=cols[i];ctx.fillRect(x,y,w,h);
+    ctx.fillStyle='#eaf1ff';ctx.font='bold 14px sans-serif';ctx.textAlign='center';
+    ctx.fillText(vals[i].toFixed(2)+'%',x+w/2,Math.max(14,y-8));
+    ctx.fillStyle='#9db4dd';ctx.font='12px sans-serif';
+    ctx.fillText(names[i],x+w/2,H-padB+18);
+  }
+  ctx.fillStyle='#7f92b8';ctx.font='12px sans-serif';ctx.textAlign='left';
+  ctx.fillText('训练配比：'+d.label,padL,14);
+  document.getElementById('mix-result').innerHTML=d.note;
+}
+document.getElementById('mix-r').addEventListener('input',mixDraw);
+mixDraw();
+
+/* ============ 动画 3：误差复利 ============ */
+function errDraw(){
+  const p=parseFloat(document.getElementById('err-p').value);
+  document.getElementById('err-pv').textContent=p.toFixed(2);
+  const o=setupCanvas('err-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=44,padR=20,padT=18,padB=30,TMAX=20;
+  const px=t=>padL+(t-1)/(TMAX-1)*(W-padL-padR);
+  const py=v=>padT+(1-v)*(H-padT-padB);
+  ctx.strokeStyle='#3a5078';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(padL,py(0));ctx.lineTo(W-padR,py(0));ctx.stroke();
+  [5,8,15].forEach(t=>{
+    ctx.setLineDash([4,4]);ctx.strokeStyle='#33477a';
+    ctx.beginPath();ctx.moveTo(px(t),padT);ctx.lineTo(px(t),H-padB);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#7f92b8';ctx.font='10px sans-serif';ctx.textAlign='center';
+    ctx.fillText(t+(t===5?' 步(Short)':t===8?' 步(Mid)':' 步(Long)'),px(t),H-padB+14);
+  });
+  ctx.beginPath();ctx.strokeStyle='#ffd97a';ctx.lineWidth=2.5;
+  for(let t=1;t<=TMAX;t++){const x=px(t),y=py(Math.pow(p,t));t===1?ctx.moveTo(x,y):ctx.lineTo(x,y);}
+  ctx.stroke();
+  [5,8,15].forEach(t=>{
+    ctx.beginPath();ctx.arc(px(t),py(Math.pow(p,t)),5,0,7);
+    ctx.fillStyle='#ff6b6b';ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();
+  });
+  ctx.fillStyle='#9db4dd';ctx.font='11px sans-serif';ctx.textAlign='left';
+  ctx.fillText('整链成功率 p^T',padL,14);
+  document.getElementById('err-result').innerHTML=
+    '单步 p = <b style="color:#ffd97a">'+p.toFixed(2)+'</b> 时：5 步成功率 <b>'+(Math.pow(p,5)*100).toFixed(1)+'%</b>，8 步 <b>'+(Math.pow(p,8)*100).toFixed(1)+'%</b>，15 步 <b style="color:#ff6b6b">'+(Math.pow(p,15)*100).toFixed(1)+'%</b>。'+
+    (p<=0.85?'次优轨迹教出的单步质量，足以让长程任务团灭 ☠️':p<0.95?'看起来「还行」的单步，在长链上被复利拖垮 📉':'即使 95%+ 的单步，15 步后成功率也明显流失——这还没算错误状态上的级联放大。');
+}
+document.getElementById('err-p').addEventListener('input',errDraw);
+errDraw();
+
+/* ============ 动画 4：GRPO vs OPD 三区域网格 ============ */
+const RG_DATA={
+  grpo:{name:'GRPO',vals:[[0.1,-0.3,-0.1],[10.0,13.5,12.3],[7.4,-0.3,-1.6]],
+    msg:'GRPO（二元结果奖励）：在 4:4 混合数据上三档全正（有效区 B），但到了 4:8 低质数据的中长程，提升归零甚至转负——<b style="color:#ff9d9d">长程 + 低质 = 不支持区 C</b>，稀疏奖励分不清 15 步里哪步立功、哪步闯祸。'},
+  opd:{name:'OPD',vals:[[-1.7,-1.4,-1.1],[16.6,15.2,15.1],[18.4,18.9,18.6]],
+    msg:'OPD（逐 token 蒸馏）：高质数据上同样无需用力（区域 A），但有效区明显更宽——即使 4:8 低质 + 长程，仍稳定 +18.4 ~ +18.9。<b style="color:#7de8c0">稠密监督让它在 GRPO 的不支持区依然有效</b>（前提：教师足够好）。'}
+};
+let rgAlgo='grpo';
+function rgDraw(){
+  const d=RG_DATA[rgAlgo];
+  const rows=['4 最优','4:4 混合','4:8 低质'],cols=['Short','Middle','Long'];
+  const regions=[['A','A','A'],['B','B','B'],['B·C','C','C']];
+  let html='<div class="rg-head"></div>';
+  cols.forEach(c=>{html+='<div class="rg-head">'+c+'</div>';});
+  for(let r=0;r<3;r++){
+    html+='<div class="rg-head">'+rows[r]+'</div>';
+    for(let c=0;c<3;c++){
+      const v=d.vals[r][c];
+      const cls=v>2?'rg-pos':v<-2?'rg-neg':'rg-zero';
+      const sign=v>0?'+'+(v).toFixed(1):(v).toFixed(1);
+      html+='<div class="rg-cell '+cls+'"><b>'+sign+'</b><span>区域 '+regions[r][c]+'</span></div>';
+    }
+  }
+  document.getElementById('rg-grid').innerHTML=html;
+  document.getElementById('rg-result').innerHTML=d.msg;
+}
+document.getElementById('rg-grpo').addEventListener('click',()=>{
+  rgAlgo='grpo';
+  document.getElementById('rg-grpo').classList.add('active');
+  document.getElementById('rg-opd').classList.remove('active');
+  rgDraw();
+});
+document.getElementById('rg-opd').addEventListener('click',()=>{
+  rgAlgo='opd';
+  document.getElementById('rg-opd').classList.add('active');
+  document.getElementById('rg-grpo').classList.remove('active');
+  rgDraw();
+});
+rgDraw();
+
+/* ============ 动画 5：MOPD 模式分布演变 ============ */
+const MP_LABELS=['T1 Goal','T2 Step','T3 Planning','T4 Reasoning','D1 Quick','D2 Shortcut','D3 Direct','D4 Heuristic'];
+const MP_TYPES={
+  t1:{name:'Ⅰ 共享+兼容（泛化模式）',frames:[
+    {tag:'Instruct',v:[0.12,0.12,0.12,0.12,0.14,0.14,0.10,0.12]},
+    {tag:'蒸馏 FA 教师后',v:[0.47,0,0,0.53,0,0,0,0]},
+    {tag:'蒸馏 LF 教师后',v:[0.51,0,0,0.49,0,0,0,0]},
+    {tag:'蒸馏 EA 教师后',v:[1.00,0,0,0,0,0,0,0]}
+  ],msg:'教师们共享 T1/T4 等兼容模式 → 分布收敛到共享的 T1 Goal。结果：<b style="color:#7de8c0">跨环境泛化</b>——只蒸馏 FA 教师，没见过的 LF 域 avg@8 从 34.92 → 52.58（表 6）。'},
+  t2:{name:'Ⅱ 共享+冲突（持续学习模式）',frames:[
+    {tag:'Instruct',v:[0.04,0.73,0.04,0.05,0.06,0.06,0.03,0.01]},
+    {tag:'蒸馏 FA 教师后',v:[0.17,0,0.29,0.53,0,0,0,0]},
+    {tag:'蒸馏 LF 教师后',v:[0.15,0,0,0.85,0,0,0,0]},
+    {tag:'蒸馏 EA 教师后',v:[1.00,0,0,0,0,0,0,0]}
+  ],msg:'各域有冲突模式（T2/T3/T4 各含陷阱），但共享的 T1 仍在 → 最终收敛到 T1 保住旧能力：<b style="color:#7de8c0">持续学习成立</b>——学完三域后短程 avg@8 仍 FA 91.88 / LF 88.98 / EA 89.77（表 7）。'},
+  t3:{name:'Ⅲ 无共享+冲突（冲突模式）',frames:[
+    {tag:'Instruct',v:[0.00,0.77,0.01,0.06,0.06,0.06,0.01,0.04]},
+    {tag:'蒸馏 FA 教师后',v:[0,0,0,1.00,0,0,0,0]},
+    {tag:'蒸馏 LF 教师后',v:[0,0,0,1.00,0,0,0,0]},
+    {tag:'蒸馏 EA 教师后',v:[0,0,1.00,0,0,0,0]}
+  ],msg:'共享的 T1 被刻意移除 → 没有「公约数」可收敛，学生只能全盘照搬当前教师的冲突模式（T3=1.00），触发其他域的陷阱：<b style="color:#ff9d9d">灾难性遗忘</b>——LF 域 avg@8 从 90.00 崩到 15.62（表 7、图 21）。'}
+};
+let mpType='t1', mpFrame=0, mpAnim=null, mpPlaying=false;
+function mpInterp(a,b,f){return a.map((v,i)=>v+(b[i]-v)*f);}
+function mpDrawFrame(vals,tag){
+  const o=setupCanvas('mp-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=14,padB=46,padT=26,N=8;
+  const bw=(W-padL-14)/N;
+  for(let i=0;i<N;i++){
+    const h=Math.max(0,vals[i])*(H-padB-padT);
+    const x=padL+i*bw+4,y=H-padB-h;
+    ctx.fillStyle=i<4?'#4d9fff':'#6b5a52';
+    ctx.fillRect(x,y,bw-8,h);
+    ctx.fillStyle='#eaf1ff';ctx.font='11px sans-serif';ctx.textAlign='center';
+    if(vals[i]>0.005)ctx.fillText(vals[i].toFixed(2),x+(bw-8)/2,Math.max(14,y-5));
+    ctx.save();ctx.translate(x+(bw-8)/2,H-padB+8);ctx.rotate(-0.45);
+    ctx.fillStyle=i<4?'#9db4dd':'#8a7f78';ctx.font='10px sans-serif';ctx.textAlign='right';
+    ctx.fillText(MP_LABELS[i],0,10);ctx.restore();
+  }
+  ctx.fillStyle='#ffd97a';ctx.font='bold 13px sans-serif';ctx.textAlign='left';
+  ctx.fillText(MP_TYPES[mpType].name+' · '+tag,padL,16);
+}
+function mpShow(fIdx){
+  mpFrame=fIdx;
+  const fr=MP_TYPES[mpType].frames;
+  mpDrawFrame(fr[fIdx].v,fr[fIdx].tag);
+  document.getElementById('mp-result').innerHTML=MP_TYPES[mpType].msg+
+    '<br><span style="font-size:12.5px;color:#7f92b8">当前阶段：'+fr[fIdx].tag+'（'+(fIdx+1)+'/'+fr.length+'）— 点「▶ 播放」看完整演变。</span>';
+}
+function mpPlay(){
+  if(mpAnim){cancelAnimationFrame(mpAnim);mpAnim=null;mpPlaying=false;}
+  mpPlaying=true;
+  const fr=MP_TYPES[mpType].frames;
+  let seg=0;
+  const step=t0=>{
+    const dur=900;
+    const go=t=>{
+      const f=Math.min(1,(t-t0)/dur);
+      const e=1-Math.pow(1-f,3);
+      mpDrawFrame(mpInterp(fr[seg].v,fr[seg+1].v,e),fr[seg].tag+' → '+fr[seg+1].tag);
+      if(f<1){mpAnim=requestAnimationFrame(go);}
+      else{
+        seg++;
+        if(seg<fr.length-1){mpAnim=requestAnimationFrame(step(performance.now()));}
+        else{mpPlaying=false;mpShow(fr.length-1);}
+      }
+    };
+    return go;
+  };
+  mpDrawFrame(fr[0].v,fr[0].tag);
+  mpAnim=requestAnimationFrame(step(performance.now()));
+}
+function mpSetType(t,btn){
+  mpType=t;
+  ['mp-t1','mp-t2','mp-t3'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  document.getElementById(btn).classList.add('active');
+  if(mpAnim){cancelAnimationFrame(mpAnim);mpAnim=null;mpPlaying=false;}
+  mpShow(0);
+}
+document.getElementById('mp-t1').addEventListener('click',()=>mpSetType('t1','mp-t1'));
+document.getElementById('mp-t2').addEventListener('click',()=>mpSetType('t2','mp-t2'));
+document.getElementById('mp-t3').addEventListener('click',()=>mpSetType('t3','mp-t3'));
+document.getElementById('mp-play').addEventListener('click',mpPlay);
+mpShow(0);
+</script>
+</body>
+</html>
