@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>看懂 D-Score · 一次前向传播，从大模型「心声」里听出幻觉</title>
+<style>
+  :root{
+    --blue:#1783ff; --blue-d:#0b5cc4; --red:#ff6b6b; --amber:#f7b731;
+    --purple:#a55eea; --green:#2bc48a; --ink:#1b2430; --ink-soft:#48566a;
+    --bg:#f6f8fc; --card:#ffffff; --line:#e4eaf3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.8}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+
+  /* ===== Hero ===== */
+  .hero{background:linear-gradient(160deg,#0a1a3f 0%,#103a8c 55%,#1783ff 100%);
+    color:#fff;padding:72px 0 56px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+    padding:4px 14px;border-radius:99px;font-size:13px;letter-spacing:1px;margin-bottom:18px}
+  .hero h1{font-size:clamp(26px,4.6vw,44px);line-height:1.3;margin-bottom:14px}
+  .hero p.sub{font-size:clamp(14px,1.8vw,18px);opacity:.88;max-width:820px}
+  .hero .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);
+    border-radius:16px;padding:14px 22px;min-width:150px}
+  .stat b{display:block;font-size:26px;font-weight:800}
+  .stat span{font-size:13px;opacity:.85}
+
+  /* ===== Nav ===== */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  nav.toc .inner{display:flex;gap:6px;overflow-x:auto;padding:10px 22px;max-width:1060px;margin:0 auto}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--ink-soft);text-decoration:none;
+    padding:6px 12px;border-radius:99px;transition:.2s}
+  nav.toc a:hover{background:#eaf2ff;color:var(--blue-d)}
+
+  /* ===== Sections ===== */
+  section.chapter{padding:56px 0 8px}
+  .chap-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  .chap-num{font-size:14px;font-weight:800;color:#fff;background:var(--blue);
+    border-radius:10px;padding:3px 12px;letter-spacing:1px}
+  .chap-head h2{font-size:clamp(21px,3vw,30px)}
+  .oneline{color:var(--blue-d);font-weight:600;margin:4px 0 22px;font-size:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:0 2px 14px rgba(20,50,110,.05)}
+  .card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card p{margin-bottom:12px;color:#2c3a4e}
+  .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
+    border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
+  .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
+  .keyfact{position:relative;background:#eef5ff;border-left:4px solid var(--blue);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";position:absolute;left:16px;top:12px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .demo-box{background:#0e1830;border-radius:18px;padding:22px;margin:16px 0;color:#dfe8ff;
+    position:relative;overflow:hidden}
+  .demo-title{color:#8fb8ff;font-size:13px;letter-spacing:2px;font-weight:700;margin-bottom:14px;text-transform:uppercase}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:99px;padding:9px 22px;font-size:14px;
+    cursor:pointer;font-weight:600;transition:.2s;box-shadow:0 4px 14px rgba(23,131,255,.35)}
+  .btn:hover{background:var(--blue-d);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);box-shadow:none;color:#dfe8ff}
+  .btn.ghost.active{background:rgba(23,131,255,.22);border-color:#6db4ff;color:#fff}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border-radius:12px;overflow:hidden}
+  table.tbl th{background:#103a8c;color:#fff;padding:10px 12px;text-align:left;font-weight:600}
+  table.tbl td{padding:10px 12px;border-bottom:1px solid var(--line)}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl tr:nth-child(even) td{background:#f7faff}
+  .hl{color:var(--blue-d);font-weight:700}
+
+  /* ===== 公式（纯 HTML/CSS，无 MathJax）===== */
+  .formula{background:#0e1830;border-radius:14px;padding:20px 22px;margin:14px 0;color:#eaf1ff;
+    font-size:clamp(15px,2.2vw,19px);text-align:center;overflow-x:auto;line-height:2;
+    font-family:"STIX Two Math","Cambria Math",Georgia,serif}
+  .formula .op{color:#8fb8ff}
+  .formula .cond{font-size:.82em;color:#9db4dd}
+  .frac{display:inline-flex;flex-direction:column;vertical-align:middle;margin:0 2px;line-height:1.4}
+  .frac .num{border-bottom:1.5px solid currentColor;padding:0 7px}
+  .frac .den{padding:0 7px}
+  .fnote{font-size:13px;color:#7f92b8;margin-top:10px;text-align:center;line-height:1.7;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  .formula var{font-style:italic}
+
+  /* ===== 结果条形图 ===== */
+  .scorebar{height:10px;border-radius:99px;background:#e7edf6;overflow:hidden;margin:4px 0 12px}
+  .scorebar i{display:block;height:100%;border-radius:99px;width:0;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+  .bar-row{display:grid;grid-template-columns:170px 1fr 64px;gap:12px;align-items:center;margin-bottom:10px;font-size:14px}
+  @media(max-width:640px){.bar-row{grid-template-columns:110px 1fr 56px}}
+  .bar-row b{text-align:right;font-variant-numeric:tabular-nums}
+
+  /* ===== 滑杆 ===== */
+  .slider-row{display:flex;align-items:center;gap:14px;margin:14px 0 6px;flex-wrap:wrap}
+  .slider-row label{font-size:14px;color:#9db4dd;white-space:nowrap}
+  .slider-row input[type=range]{flex:1;min-width:180px;accent-color:var(--amber)}
+  .slider-row output{color:#ffd97a;font-weight:700;min-width:56px;text-align:right;font-variant-numeric:tabular-nums}
+  canvas.chart{width:100%;height:240px;display:block;border-radius:10px;background:#0a1326}
+  .demo-readout{margin-top:14px;font-size:14.5px;line-height:1.8}
+  .caption{font-size:12.5px;color:#7f92b8;margin-top:8px;line-height:1.6}
+
+  /* ===== 来源标注 ===== */
+  .src{color:var(--blue-d);text-decoration:none;font-size:.8em;font-weight:600;
+    border-bottom:1px dashed #9db8e8;padding:0 1px;white-space:nowrap}
+  .src:hover{color:var(--blue);border-bottom-style:solid;background:#eaf2ff;border-radius:4px}
+  .src::after{content:"↗";font-size:.85em;margin-left:1px}
+  .demo-box .src, .formula .src{color:#8fb8ff;border-bottom-color:#3a5078}
+  .demo-box .src:hover{color:#cfe2ff;background:rgba(23,131,255,.15)}
+  .src-inline{color:inherit;border-bottom:1px dashed #9db8e8;text-decoration:none}
+  .src-inline:hover{color:var(--blue)}
+
+  footer{margin-top:64px;padding:34px 0 46px;color:#7f8ca3;font-size:13px;text-align:center;
+    border-top:1px solid var(--line);line-height:2}
+  .fade-up{opacity:0;transform:translateY(26px);transition:all .7s cubic-bezier(.3,.7,.3,1)}
+  .fade-up.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">arXiv 论文交互解读 · 幻觉检测</span>
+    <h1>看懂 D-Score：一次前向传播，从大模型的「心声」里听出幻觉</h1>
+    <p class="sub">博洛尼亚大学团队提出的一种谱统计量：不做检索、不多次采样、不借助外部验证器，只把一段文本在模型某一层的隐藏激活矩阵做一次奇异值分析，数一数「和最大方向差不多大」的奇异方向有几个——数得越多，幻觉风险越高。</p>
+    <div class="stats">
+      <div class="stat"><b>1 次</b><span>前向传播即可计算，零额外生成</span></div>
+      <div class="stat"><b>66.98</b><span>FAVA 基准 Llama-3-8B 的 AUROC（全场最高）</span></div>
+      <div class="stat"><b>3 × 2</b><span>三个开源模型 × 两个基准，整体领先</span></div>
+      <div class="stat"><b>+9.88</b><span>相比最强隐状态基线的 AUROC 提升（Llama-3-8B）</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="toc"><div class="inner">
+  <a href="#ch0">🎭 热身：幻觉与「内心戏」</a>
+  <a href="#ch1">🧮 数学基础</a>
+  <a href="#ch2">🎯 核心方法：D-Score</a>
+  <a href="#ch3">📊 实验结果</a>
+  <a href="#ch4">⚖️ 局限与意义</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ============ CH0 热身 ============ -->
+<section class="chapter" id="ch0">
+  <div class="chap-head"><span class="chap-num">第 0 章</span><h2>热身：幻觉，和它的「内心戏」</h2></div>
+  <p class="oneline">大模型说得越流利，越可能在一本正经地胡说八道——问题是，它自己「心里」知道吗？</p>
+
+  <div class="card fade-up">
+    <h3>🤥 什么是「幻觉」？先分清两种说法</h3>
+    <p>大语言模型会生成<b>流利但虚假</b>、或得不到证据支持的内容，这就是「幻觉」（hallucination）。论文先给出一个清晰的判定框架：把文本拆成一条条可核查的<b>断言（claim）</b>——比如「Transformer 架构发布于 2017 年」是一条断言，而「Transformer 比 RNN 更优雅」只是主观评价，不算。一条断言如果有证据支持就是 <b>supported</b>，否则是 <b>unsupported</b>；含有至少一条 unsupported 断言的文本，就被视为幻觉文本（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §1、§3.2</a>）。</p>
+    <p>更关键的是论文提出的<b>「模型内部幻觉」（model-internal hallucination）</b>概念：一条断言不仅得不到外部证据支持，而且<b>模型自己的内部状态里就藏着「这话不对劲」的信息</b>（内部真值置信度低于容忍度 β）。换句话说：模型嘴上在胡说，心里其实有数（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §3.2 定义 2</a>）。</p>
+    <div class="analogy">像一个人撒谎时嘴硬、但眼神飘忽、心跳加速——「嘴上说的」和「身体反应」不一致。D-Score 干的事不是去审问他说的话，而是给他接上「测谎仪」，直接读他的生理指标。</div>
+    <div class="keyfact">本文检测的正是「模型内部可见」的那类幻觉：模型内部已经包含了识别错误所需的信息，只是没有体现在输出文本里（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §3.2</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🧰 现有检测方法的三条路，都有点「绕」</h3>
+    <p>在 D-Score 之前，主流的幻觉检测大致分三派：</p>
+    <table class="tbl">
+      <tr><th>路线</th><th>代表方法</th><th>思路</th><th>代价</th></tr>
+      <tr><td>检索对比</td><td>RAG 事实核查类</td><td>拿生成文本去和外部文档比对</td><td>需要检索系统和外部知识源</td></tr>
+      <tr><td>多次采样一致性</td><td><a class="src" href="https://arxiv.org/abs/2303.08896" target="_blank" rel="noopener">SelfCheckGPT</a>、<a class="src" href="https://doi.org/10.1038/s41586-024-07421-0" target="_blank" rel="noopener">语义熵（Nature 2024）</a></td><td>同一个问题问很多遍，看答案互相矛盾不矛盾</td><td>多次生成，推理成本成倍增加</td></tr>
+      <tr><td>隐状态分析</td><td><a class="src" href="https://arxiv.org/abs/2402.03744" target="_blank" rel="noopener">INSIDE</a>、<a class="src" href="https://proceedings.neurips.cc/paper_files/paper/2024/hash/3c1e1fdf305195cd620c118aaa9717ad-Abstract-Conference.html" target="_blank" rel="noopener">LLM-Check</a></td><td>直接分析模型的隐藏激活、注意力或输出概率</td><td>需要白盒访问；部分方法还需额外训练或多次生成</td></tr>
+    </table>
+    <p style="margin-top:14px">本文的问题因此非常直接（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §1</a>）：</p>
+    <div class="keyfact"><b>能不能只靠「一次前向传播」产生的内部状态，直接判断这段文本是不是幻觉？</b>——不检索、不采样多次、不训练新分类器。</div>
+  </div>
+</section>
+
+<!-- ============ CH1 数学基础 ============ -->
+<section class="chapter" id="ch1">
+  <div class="chap-head"><span class="chap-num">第 1 章</span><h2>数学基础：隐藏状态、SVD 与「谱」</h2></div>
+  <p class="oneline">看懂 D-Score 只需要三件数学道具：隐藏状态矩阵、奇异值分解、奇异值谱的形状。</p>
+
+  <!-- 1. 隐藏状态 -->
+  <div class="card fade-up">
+    <h3>① 隐藏状态：模型每读一个词时的「心理活动记录」</h3>
+    <p>Transformer 模型每处理一个 token（大致相当于一个词或字），网络的每一层都会产出一个高维向量，叫<b>隐藏状态（hidden state）</b>——可以把它理解为模型读到这个词时，这一层「脑子里在想什么」的完整快照。设模型隐藏维度为 <var>d</var>、文本长度为 <var>T</var> 个 token，把第 <var>j</var> 层上所有 token 的隐藏状态排成一排，就得到<b>隐藏激活矩阵</b>（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §3.1</a>）：</p>
+    <div class="formula">
+      <var>H</var><sup>(<var>j</var>)</sup>(<var>x</var>) = [ <var>h</var><sub>1</sub><sup>(<var>j</var>)</sup>(<var>x</var>) &nbsp;⋯&nbsp; <var>h</var><sub><var>T</var></sub><sup>(<var>j</var>)</sup>(<var>x</var>) ] ∈ ℝ<sup><var>d</var>×<var>T</var></sup>
+      <div class="fnote">每一列是一个 token 的「心理快照」，整个矩阵是模型读完这段话的「脑电图纸带」。对 7B/8B 级模型，<var>d</var> 是 4096 维，而 <var>T</var> 通常只有几百——矩阵又瘦又高。</div>
+    </div>
+    <div class="analogy">隐藏状态矩阵就像一条<b>心电图纸带</b>：每个 token 是一个心跳采样点。医生（D-Score）不问病人「你感觉如何」（生成文本），而是直接读纸带的形状。</div>
+  </div>
+
+  <!-- 2. SVD -->
+  <div class="card fade-up">
+    <h3>② 奇异值分解 SVD：把「脑电图」拆成若干层「主旋律 + 伴奏」</h3>
+    <p>任何矩阵都可以做<b>奇异值分解（SVD）</b>：拆成一组互相垂直的「方向」，每个方向配一个<b>奇异值 σ</b> 表示这个方向携带的能量大小。按从大到小排列（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §3.1</a>）：</p>
+    <div class="formula">
+      <var>H</var> = <var>U</var>Σ<var>V</var><sup>⊤</sup>，&nbsp;&nbsp; σ<sub>1</sub> ≥ σ<sub>2</sub> ≥ ⋯ ≥ σ<sub><var>r</var></sub> &gt; 0
+      <div class="fnote">σ₁ 是「最大方向」的强度；排在后面的 σ 越小，说明那个方向越可有可无。这一列从大到小的数，就叫矩阵的<b>奇异值谱（spectrum）</b>。</div>
+    </div>
+    <div class="analogy">把合唱团录音做 SVD：σ₁ 是主旋律声部的音量，后面的小 σ 是和声、伴奏、呼吸声。<b>如果整首歌基本只有一个主旋律</b>（σ₁ 很大、其余迅速衰减），谱就是「尖」的；<b>如果好几个声部音量差不多</b>，谱就是「平」的。</div>
+    <p>拖动下面的滑杆，直观感受「谱的衰减速度」如何改变谱的形状——这是理解 D-Score 的关键直觉：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 奇异值谱的「尖」与「平」（示意）</div>
+      <canvas class="chart" id="svd-canvas"></canvas>
+      <div class="slider-row">
+        <label>谱衰减速度 r（越小越「尖」）</label>
+        <input type="range" id="svd-r" min="0.30" max="0.90" step="0.01" value="0.50">
+        <output id="svd-rv">0.50</output>
+      </div>
+      <div class="demo-readout" id="svd-result"></div>
+      <div class="caption">演示规则：σ<sub>i</sub> = 10 × r<sup>i−1</sup>，共 10 个方向；虚线为示例阈值 σ₁/4。r 越小谱越集中，r 越大越多方向「和老大差不多大」。本演示为教学示意，非论文实验数据。</div>
+    </div>
+  </div>
+
+  <!-- 3. 相对数值秩 -->
+  <div class="card fade-up">
+    <h3>③ 谱的形状 vs 谱的大小：为什么只看「比值」</h3>
+    <p>D-Score 属于线性代数里<b>「数值秩 / 有效秩」（numerical rank / effective rank）</b>家族：不问你「绝对音量」多大，只问<b>有多少个方向的音量「接近最大方向」</b>（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §2、附录 A.2</a>）。</p>
+    <p>论文严格证明了 D-Score 的两个「只看形状」的性质（命题 2）：</p>
+    <table class="tbl">
+      <tr><th>性质</th><th>数学表述</th><th>白话含义</th></tr>
+      <tr><td>缩放不变</td><td>D<sub>τ</sub>(c·H) = D<sub>τ</sub>(H)</td><td>整体音量放大 10 倍，结论不变——它看的是谱的<b>形状</b>不是响度</td></tr>
+      <tr><td>旋转不变</td><td>D<sub>τ</sub>(UHV) = D<sub>τ</sub>(H)</td><td>换个坐标系看同一份脑电图，结论不变</td></tr>
+    </table>
+    <div class="keyfact">论文还证明 D-Score 与经典「稳定秩」（stable rank）满足 D<sub>τ</sub>(H) ≤ τ²·srank(H)，把它锚定在了成熟的数值线性代数工具上（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文附录 A.2 命题 2</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH2 核心方法 ============ -->
+<section class="chapter" id="ch2">
+  <div class="chap-head"><span class="chap-num">第 2 章</span><h2>核心方法：D-Score 到底是什么</h2></div>
+  <p class="oneline">一句话：数一数隐藏激活矩阵里，有多少个奇异方向「和最大方向差不多大」——数得越多，幻觉风险越高。</p>
+
+  <!-- 定义 -->
+  <div class="card fade-up">
+    <h3>📐 D-Score 的定义：一次「达标点名」</h3>
+    <p>固定模型 <var>m</var>、层 <var>j</var> 和容忍参数 <var>τ</var> &gt; 1。对输入文本 <var>x</var>，做一次前向传播拿到隐藏激活矩阵 <var>H</var>(<var>x</var>)，求出它的奇异值谱，然后（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §3.1 定义 1，式 (1)</a>）：</p>
+    <div class="formula">
+      <var>D</var><sub>τ</sub><sup>(<var>j</var>)</sup>(<var>x</var>) = <span style="font-size:1.3em">∑</span><sub><var>i</var>=1</sub><sup><var>r</var></sup> <b>1</b><span class="cond">{</span>
+      <span class="frac"><span class="num">σ<sub>1</sub>(<var>H</var>)</span><span class="den">σ<sub><var>i</var></sub>(<var>H</var>)</span></span>
+      ≤ τ <span class="cond">}</span>
+      <div class="fnote">
+        白话翻译：逐个方向检查「σ₁ 是 σ<sub>i</sub> 的几倍」。倍数不超过 τ 的记 1 分，超过的记 0 分。总分就是 D-Score——<b>达标方向的数量</b>（一种相对数值秩）。
+      </div>
+    </div>
+    <div class="analogy">班里按身高排队，第一名是「标尺」。D-Score 问的是：<b>有多少人的身高不低于第一名的 1/τ</b>。如果队伍明显一高一矮，只有寥寥几人达标（D 小）；如果前排一片「差不多高」（D 大），说明能量没有集中在少数主导方向上。</div>
+    <div class="keyfact">D-Score 小 → 隐藏轨迹的变化集中在少数主导方向（文本「口径一致」）；D-Score 大 → 多个方向同时活跃且量级相当（文本内部「有多股力量在拉扯」）。这就是论文的核心假设（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §3.2 假设 1</a>）。</div>
+  </div>
+
+  <!-- 核心演示 -->
+  <div class="card fade-up">
+    <h3>🎛️ 亲手算一次：幻觉文本的谱为什么会「摊开」</h3>
+    <p>论文的直觉是：当文本里包含一条与模型内部知识冲突的断言时，隐藏表示既要编码「文本声称的内容」，又要编码「反证、不确定、纠正信号」——这些额外信号会沿<b>新的方向</b>展开，把原本「尖」的谱摊「平」（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §3.2</a>）。下面用两条示意谱演示（谱形状为教学构造，判定规则与论文一致）：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 正常文本 vs 幻觉文本的 D-Score（示意）</div>
+      <div class="btn-row" style="margin-top:0;margin-bottom:14px">
+        <button class="btn ghost active" id="spec-normal">📗 正常文本（谱集中）</button>
+        <button class="btn ghost" id="spec-hall">📕 幻觉文本（混入 3 个冲突方向）</button>
+      </div>
+      <canvas class="chart" id="ds-canvas"></canvas>
+      <div class="slider-row">
+        <label>容忍参数 τ（越大越宽松）</label>
+        <input type="range" id="ds-tau" min="2" max="8" step="0.5" value="4">
+        <output id="ds-tauv">4.0</output>
+      </div>
+      <div class="demo-readout" id="ds-result"></div>
+      <div class="caption">演示规则：正常谱 σ<sub>i</sub> = 10×0.45<sup>i−1</sup>；幻觉谱在其基础上混入 3 个冲突方向（σ = 8, 6, 5.5，橙色柱）。蓝色虚线为阈值 σ₁/τ。判定阈值 D̄ = 4 为示意取值——实际部署中 τ、层 j、D̄ 都需在验证集上校准（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §3.1、§4.1</a>）。</div>
+    </div>
+    <div class="analogy">原本一个主旋律的合唱团里，混进了一支「跑调的第二声部」——指挥不用听懂歌词，光听「有几个声部音量接近主旋律」就知道队伍里出事了。</div>
+  </div>
+
+  <!-- 判定规则 -->
+  <div class="card fade-up">
+    <h3>🚦 从分数到判决：阈值 D̄ 决定「松」还是「严」</h3>
+    <p>有了 D-Score 这个标量，检测器只剩一步：选一个整数阈值 <var>D̄</var>，分数超过它就判幻觉（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §3.1 式 (2)</a>）：</p>
+    <div class="formula">
+      Ŷ = <b>1</b>（幻觉） 若 <var>D</var><sub>τ</sub>(<var>x</var>) &gt; <var>D̄</var>；否则 Ŷ = <b>0</b>（正常）
+      <div class="fnote">τ 决定「多大的方向算达标」，D̄ 决定「几个达标方向算可疑」。两者都在验证集上校准后固定。</div>
+    </div>
+    <p>阈值往左移（更严，宁可错杀）：抓住更多幻觉，但误伤正常文本；往右移（更松）：漏掉更多幻觉。拖动滑杆体会这个权衡（数据为示意构造）：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 阈值 D̄ 的松紧权衡（示意数据）</div>
+      <canvas class="chart" id="thr-canvas"></canvas>
+      <div class="slider-row">
+        <label>判定阈值 D̄</label>
+        <input type="range" id="thr-d" min="1" max="9" step="1" value="4">
+        <output id="thr-dv">4</output>
+      </div>
+      <div class="demo-readout" id="thr-result"></div>
+      <div class="caption">示意数据：36 段文本（蓝 = 正常，红 = 幻觉），D-Score 落在横轴上，竖线右侧判为幻觉，带白圈的是误判样本。论文用 AUROC 衡量「不固定阈值时的整体区分能力」，并额外报告 TPR@5%FPR（把误报率压到 5% 时能抓住多少幻觉）（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §4.1</a>）。</div>
+    </div>
+  </div>
+
+  <!-- 几何论证 -->
+  <div class="card fade-up">
+    <h3>🧭 为什么这能成立：冲突方向的严格论证</h3>
+    <p>论文不是只讲故事，而是给了一个<b>充分条件的数学命题</b>：把隐藏轨迹拆成「连贯成分」<var>S</var>（处理文本声称的内容）和「冲突成分」<var>C</var>（内部可见的反证/不确定信号）。若 <var>C</var> 的奇异方向与 <var>S</var> 正交、σ₁(<var>C</var>) ≤ σ₁(<var>S</var>)，且 <var>C</var> 有 <var>q</var> 个奇异值 ≥ σ₁(<var>S</var>)/τ，那么（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §3.2 命题 1</a>）：</p>
+    <div class="formula">
+      <var>D</var><sub>τ</sub>(<var>S</var> + <var>C</var>) ≥ <var>D</var><sub>τ</sub>(<var>S</var>) + <var>q</var>
+      <div class="fnote">白话：每混进一个「够强且不重合」的冲突方向，D-Score 至少 +1。上面演示在默认 τ=4 时，幻觉谱正好从 2 涨到 5（+3），就是这条不等式取等号的情形。</div>
+    </div>
+    <p>论文同时坦承：正交假设是理想化的，真实模型里方向只是「统计上分离」；命题是<b>充分条件</b>而非幻觉表示的完整理论（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §3.2、附录 A.3</a>）。附录 A.3 还补了一个概率分离结论：只要两类文本的 D-Score 分布大致分开，任何落在中间的阈值都有相应小的分类误差。</p>
+  </div>
+
+  <!-- 计算效率 -->
+  <div class="card fade-up">
+    <h3>⚡ 算得起：不用完整 SVD，幂迭代数到「跌破线」就停</h3>
+    <p>隐藏维度 <var>d</var>（4096 级）远大于文本长度 <var>T</var>，所以实际计算不碰 <var>d</var>×<var>T</var> 大矩阵，而是转成 <var>T</var>×<var>T</var> 的 <b>Gram 矩阵</b> <var>G</var> = <var>H</var><sup>⊤</sup><var>H</var>——它的特征值正是奇异值的平方（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §3.3、附录 A.2 命题 2(iii)</a>）：</p>
+    <div class="formula">
+      <var>D</var><sub>τ</sub>(<var>H</var>) = <span style="font-size:1.3em">∑</span><sub><var>i</var></sub> <b>1</b><span class="cond">{</span> λ<sub><var>i</var></sub>(<var>G</var>) ≥
+      <span class="frac"><span class="num">λ<sub>1</sub>(<var>G</var>)</span><span class="den">τ²</span></span>
+      <span class="cond">}</span>
+      <div class="fnote">Gram 矩阵版定义：数 G 有多少个特征值不小于最大特征值的 1/τ²。</div>
+    </div>
+    <table class="tbl">
+      <tr><th>做法</th><th>代价</th><th>说明</th></tr>
+      <tr><td>完整 SVD</td><td>O(dT² + T³)</td><td>把整个谱都算出来，浪费——我们只需要「在哪里跌破阈值」</td></tr>
+      <tr><td>幂迭代 / Lanczos 部分求解</td><td>≈ O(N<sub>it</sub>·K·dT)</td><td>只从大到小恢复前 K 个特征值，一跌破 λ₁/τ² 就停；K ≪ T 时显著更省</td></tr>
+    </table>
+    <div class="analogy">不需要给全班排完整名次（完整 SVD），只需要从第一名往下数，数到「比第一名矮 1/τ 以上」的那个人就停（幂迭代提前终止）。</div>
+    <div class="keyfact">整个流程：<b>一次前向传播 + 一次小规模谱计算</b>，无外部验证器、无检索、无多次生成（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §6 结论</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH3 实验结果 ============ -->
+<section class="chapter" id="ch3">
+  <div class="chap-head"><span class="chap-num">第 3 章</span><h2>实验结果：三个模型、两个基准，全面领先</h2></div>
+  <p class="oneline">D-Score 在 FAVA-Annotation 和 RAGTruth 上、对 Llama-2-7B / Llama-3-8B / Vicuna-7B 几乎全面领先（唯一例外：RAGTruth 上 Llama-3-8B 的 TPR@5%FPR 略低于 Hidden Score，见表 2）。</p>
+
+  <!-- 协议 -->
+  <div class="card fade-up">
+    <h3>🧪 实验怎么搭的</h3>
+    <p><b>数据集</b>：<a class="src" href="https://arxiv.org/abs/2401.06855" target="_blank" rel="noopener">FAVA-Annotation</a>（细粒度事实幻觉标注：实体错误、关系错误、矛盾陈述、虚构陈述等）和 <a class="src" href="https://arxiv.org/abs/2401.00396" target="_blank" rel="noopener">RAGTruth</a>（检索增强生成场景的幻觉语料，人工 span 级标注），均转成「响应级」二分类标签。</p>
+    <p><b>模型</b>：<a class="src" href="https://arxiv.org/abs/2307.09288" target="_blank" rel="noopener">Llama-2-7B</a>、<a class="src" href="https://arxiv.org/abs/2407.21783" target="_blank" rel="noopener">Llama-3-8B</a>、Vicuna-7B。每个输入只跑<b>一次前向传播</b>，取单层隐藏状态计算 D-Score（奇异值用幂迭代高效估计）。</p>
+    <p><b>指标</b>：AUROC（分数排序能力）、Accuracy 与 F1（配合阈值 D̄）、TPR@5%FPR（误报率压到 5% 时的幻觉召回）。<b>基线</b>：困惑度 PPL、窗口熵、Logit 熵，以及最接近的隐状态谱方法 Hidden Score（来自 <a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">LLM-Check，论文 §4.1</a>）（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §4.1</a>）。</p>
+  </div>
+
+  <!-- 亮点条形图 -->
+  <div class="card fade-up">
+    <h3>🏆 亮点速览（AUROC，越高越好，满分 100）</h3>
+    <p style="font-size:14px;color:#48566a">FAVA-Annotation · Llama-3-8B（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文表 1</a>）：</p>
+    <div class="bar-row"><span>Window Entropy</span><div class="scorebar"><i data-w="56.9" style="background:#9db4dd"></i></div><b>56.90</b></div>
+    <div class="bar-row"><span>Hidden Score</span><div class="scorebar"><i data-w="57.1" style="background:#5a7bb5"></i></div><b>57.10</b></div>
+    <div class="bar-row"><span class="hl">D-Score</span><div class="scorebar"><i data-w="66.98" style="background:linear-gradient(90deg,#1783ff,#a55eea)"></i></div><b class="hl">66.98</b></div>
+    <p style="font-size:14px;color:#48566a;margin-top:18px">RAGTruth · Llama-3-8B / Vicuna-7B（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文表 2</a>）：</p>
+    <div class="bar-row"><span>Hidden Score · L3-8B</span><div class="scorebar"><i data-w="54.95" style="background:#5a7bb5"></i></div><b>54.95</b></div>
+    <div class="bar-row"><span class="hl">D-Score · L3-8B</span><div class="scorebar"><i data-w="61.53" style="background:linear-gradient(90deg,#1783ff,#a55eea)"></i></div><b class="hl">61.53</b></div>
+    <div class="bar-row"><span>Hidden Score · V-7B</span><div class="scorebar"><i data-w="51.93" style="background:#5a7bb5"></i></div><b>51.93</b></div>
+    <div class="bar-row"><span class="hl">D-Score · V-7B</span><div class="scorebar"><i data-w="60.2" style="background:linear-gradient(90deg,#1783ff,#a55eea)"></i></div><b class="hl">60.20</b></div>
+    <div class="keyfact">Vicuna-7B 上 Hidden Score 的 AUROC（51.93）已接近随机猜测（50），而 D-Score 仍保持 60.20——谱信号在不同模型家族间更稳（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §4.2</a>）。</div>
+  </div>
+
+  <!-- 完整表格 -->
+  <div class="card fade-up">
+    <h3>📋 完整数据：FAVA-Annotation（表 1）</h3>
+    <table class="tbl">
+      <tr><th>模型</th><th>方法</th><th>AUROC</th><th>Acc.</th><th>TPR@5%FPR</th><th>F1</th></tr>
+      <tr><td rowspan="5">Llama-2-7B</td><td>PPL Score</td><td>53.22</td><td>58.68</td><td>3.59</td><td>68.33</td></tr>
+      <tr><td>Window Entropy</td><td>56.90</td><td>56.59</td><td>2.99</td><td>42.52</td></tr>
+      <tr><td>Logit Entropy</td><td>53.80</td><td>55.99</td><td>2.99</td><td>56.73</td></tr>
+      <tr><td>Hidden Score</td><td>58.44</td><td>58.08</td><td>11.98</td><td>59.66</td></tr>
+      <tr><td class="hl">D-Score</td><td class="hl">62.87</td><td class="hl">62.87</td><td class="hl">13.17</td><td class="hl">68.95</td></tr>
+      <tr><td rowspan="5">Llama-3-8B</td><td>PPL Score</td><td>53.22</td><td>58.68</td><td>3.59</td><td>67.40</td></tr>
+      <tr><td>Window Entropy</td><td>56.90</td><td>56.59</td><td>2.99</td><td>55.52</td></tr>
+      <tr><td>Logit Entropy</td><td>53.80</td><td>55.99</td><td>2.99</td><td>56.27</td></tr>
+      <tr><td>Hidden Score</td><td>57.10</td><td>57.78</td><td>10.78</td><td>65.38</td></tr>
+      <tr><td class="hl">D-Score</td><td class="hl">66.98</td><td class="hl">65.57</td><td class="hl">17.96</td><td class="hl">68.64</td></tr>
+      <tr><td rowspan="5">Vicuna-7B</td><td>PPL Score</td><td>53.96</td><td>56.89</td><td>3.59</td><td>64.20</td></tr>
+      <tr><td>Window Entropy</td><td>55.24</td><td>58.38</td><td>5.99</td><td>66.02</td></tr>
+      <tr><td>Logit Entropy</td><td>52.29</td><td>55.69</td><td>1.80</td><td>57.31</td></tr>
+      <tr><td>Hidden Score</td><td>58.22</td><td>59.28</td><td>10.18</td><td>66.99</td></tr>
+      <tr><td class="hl">D-Score</td><td class="hl">63.93</td><td class="hl">63.17</td><td class="hl">13.77</td><td class="hl">69.67</td></tr>
+    </table>
+    <p style="margin-top:12px;font-size:13.5px;color:#7f8ca3">数值均为百分点，全部直接摘自 <a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文表 1</a>。Llama-3-8B 上 D-Score 与 Hidden Score 的 AUROC 差距达 9.88 个百分点——模型越强，差距越大（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §4.2</a>）。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📋 完整数据：RAGTruth（表 2）</h3>
+    <table class="tbl">
+      <tr><th>模型</th><th>方法</th><th>AUROC</th><th>Acc.</th><th>TPR@5%FPR</th><th>F1</th></tr>
+      <tr><td rowspan="5">Llama-2-7B</td><td>PPL Score</td><td>53.73</td><td>54.07</td><td>7.69</td><td>58.70</td></tr>
+      <tr><td>Window Entropy</td><td>52.08</td><td>53.17</td><td>4.98</td><td>53.98</td></tr>
+      <tr><td>Logit Entropy</td><td>53.95</td><td>55.43</td><td>7.24</td><td>53.74</td></tr>
+      <tr><td>Hidden Score</td><td>54.11</td><td>56.33</td><td>8.14</td><td>61.51</td></tr>
+      <tr><td class="hl">D-Score</td><td class="hl">57.30</td><td class="hl">57.47</td><td class="hl">12.03</td><td class="hl">67.54</td></tr>
+      <tr><td rowspan="2">Llama-3-8B</td><td>Hidden Score</td><td>54.95</td><td>56.02</td><td>15.77</td><td>30.97</td></tr>
+      <tr><td class="hl">D-Score</td><td class="hl">61.53</td><td class="hl">60.79</td><td class="hl">12.86</td><td class="hl">67.60</td></tr>
+      <tr><td rowspan="2">Vicuna-7B</td><td>Hidden Score</td><td>51.93</td><td>56.02</td><td>12.45</td><td>59.89</td></tr>
+      <tr><td class="hl">D-Score</td><td class="hl">60.20</td><td class="hl">59.75</td><td class="hl">13.69</td><td class="hl">67.86</td></tr>
+    </table>
+    <p style="margin-top:12px;font-size:13.5px;color:#7f8ca3">数值均为百分点，全部直接摘自 <a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文表 2</a>（RAGTruth summarization 子集；Llama-3-8B 与 Vicuna-7B 只列有同协议数据的基线）。</p>
+  </div>
+
+  <!-- 子集分析 -->
+  <div class="card fade-up">
+    <h3>🔍 模型「心里有数」时，D-Score 有多准？</h3>
+    <p>论文做了一个很聪明的子集实验：先让模型自己显式判断「这段回答有没有幻觉」，只保留<b>模型自我判断与人工标注一致</b>的样本——即模型「心里确实有数」的干净集合。在这两个子集上，D-Score 的 AUROC 明显进一步上涨（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §4.3 表 3、表 4</a>）：</p>
+    <table class="tbl">
+      <tr><th>子集</th><th>模型</th><th>Hidden Score</th><th>D-Score</th></tr>
+      <tr><td rowspan="3">幻觉样本中「模型自己也承认」的子集（表 3）</td><td>Llama-2-7B (n=256)</td><td>56.26</td><td class="hl">62.79</td></tr>
+      <tr><td>Llama-3-8B (n=118)</td><td>62.17</td><td class="hl">72.51</td></tr>
+      <tr><td>Vicuna-7B (n=134)</td><td>59.56</td><td class="hl">65.46</td></tr>
+      <tr><td rowspan="3">正常样本中「模型也没误报」的子集（表 4）</td><td>Llama-2-7B (n=248)</td><td>56.34</td><td class="hl">61.86</td></tr>
+      <tr><td>Llama-3-8B (n=326)</td><td>56.27</td><td class="hl">67.14</td></tr>
+      <tr><td>Vicuna-7B (n=318)</td><td>57.51</td><td class="hl">63.16</td></tr>
+    </table>
+    <div class="keyfact">Llama-3-8B 在「模型自知」子集上 AUROC 冲到 <b>72.51</b>。这说明完整数据集上相当一部分误判，来自模型内部根本没有识别该错误所需的信息——即不属于「模型内部幻觉」的样本（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §4.3</a>）。</div>
+  </div>
+
+  <!-- 鲁棒性 -->
+  <div class="card fade-up">
+    <h3>🛡️ 不是碰运气调参调出来的</h3>
+    <p>担心结果是某个「神仙参数组合」碰出来的？论文附录 C 用 Llama-3-8B 在 FAVA 上扫描了 τ（横轴，细密取值）× 层 j（纵轴，覆盖全部 32 层）的完整热力图：<b>一大片相邻配置的 AUROC 都差不多</b>，性能随参数平滑变化而不是断崖式跌落（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文附录 C 图 1</a>）。</p>
+    <div class="analogy">好比相机的对焦环：不是只有某个精确刻度才清晰，而是一整段区间内画面都可用——部署时在验证集上选一个合理配置固定下来即可。</div>
+  </div>
+</section>
+
+<!-- ============ CH4 局限与意义 ============ -->
+<section class="chapter" id="ch4">
+  <div class="chap-head"><span class="chap-num">第 4 章</span><h2>局限与意义</h2></div>
+  <p class="oneline">论文自己的态度很克制：D-Score 是「校准过的风险信号」，不是「真理检测仪」。</p>
+
+  <div class="card fade-up">
+    <h3>⚠️ 四条明确的局限（论文 §5）</h3>
+    <table class="tbl">
+      <tr><th>局限</th><th>含义</th></tr>
+      <tr><td>需要白盒访问</td><td>必须能拿到隐藏激活，闭源 API 模型直接用不了</td></tr>
+      <tr><td>只能测「内部可见」的幻觉</td><td>如果模型内部根本没有识别错误的知识（不是「模型内部幻觉」），谱上不会留下痕迹</td></tr>
+      <tr><td>复杂正常文本也会「摊谱」</td><td>长、多样、语义复杂的文本同样可能激活多个方向 → 可能误报。D-Score 高 ≠ 一定有错</td></tr>
+      <tr><td>分数范围随文本长度变化</td><td>D<sub>τ</sub>(x) ≤ T（token 数），部署时可能需要按长度分层校准阈值</td></tr>
+    </table>
+    <p style="margin-top:12px">此外，论文报告的是「每个模型取最优层」的诊断性结果；实际部署应在留出校准集上选定层、τ、D̄ 后固定（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §4.1、§5</a>）。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🌟 为什么这项工作值得读</h3>
+    <p>在「幻觉检测」这个越来越依赖重型外挂（检索器、验证模型、多次采样）的领域里，D-Score 反其道而行：<b>把问题还原成一行线性代数</b>。它的价值不在于数字本身多高（AUROC 60+ 离实用还有距离），而在于证明了一件事——</p>
+    <div class="keyfact"><b>「有多少个奇异方向与最大方向相当」这个极简的几何量，本身就携带幻觉风险信息。</b>不需要训练、不需要外部资源、一次前向传播即可提取（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §6</a>）。</div>
+    <p>论文给出的未来方向也很具体：与语义熵、一致性检测、探针分类器等更全基线对比；逐层曲线与跨数据集阈值迁移实验；按长度分层的结果分析；token 级 / span 级的局部 D-Score（定位幻觉出现在回答的哪个位置）（<a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">论文 §5</a>）。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📎 原文与延伸阅读</h3>
+    <p>
+      📄 论文：<a class="src" href="https://arxiv.org/abs/2607.24586" target="_blank" rel="noopener">D-Score: A Spectral Hidden-State Signal for Hallucination Detection in LLMs（arXiv:2607.24586）</a>
+      · <a class="src" href="https://arxiv.org/pdf/2607.24586" target="_blank" rel="noopener">PDF 全文</a><br>
+      🏫 作者团队：University of Bologna 计算机科学与工程系（Bianca Raimondi、Davide Evangelista、Maurizio Gabbrielli、Elena Loli Piccolomini）<br>
+      📚 相关工作：<a class="src" href="https://arxiv.org/abs/2303.08896" target="_blank" rel="noopener">SelfCheckGPT</a> · <a class="src" href="https://doi.org/10.1038/s41586-024-07421-0" target="_blank" rel="noopener">语义熵（Nature 2024）</a> · <a class="src" href="https://arxiv.org/abs/2402.03744" target="_blank" rel="noopener">INSIDE</a> · <a class="src" href="https://arxiv.org/abs/2401.06855" target="_blank" rel="noopener">FAVA</a> · <a class="src" href="https://arxiv.org/abs/2401.00396" target="_blank" rel="noopener">RAGTruth</a>
+    </p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    本页基于 arXiv 论文《D-Score: A Spectral Hidden-State Signal for Hallucination Detection in Large Language Models》（arXiv:2607.24586v1，2026-07-27）整理制作 · 2026-07<br>
+    通俗类比与演示动画仅用于帮助理解，演示中的谱形状与分类数据为教学示意；所有实验数字均直接摘自论文表 1–4，技术细节以
+    <a class="src-inline" href="https://arxiv.org/abs/2607.24586" target="_blank" rel="noopener">原文</a> 为准 · 文中所有标注 ↗ 的链接均指向原始出处
+  </div>
+</footer>
+
+<script>
+/* ============ 入场动画 ============ */
+const io = new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('show');
+    e.target.querySelectorAll('.scorebar i').forEach(b=>b.style.width=b.dataset.w+'%');
+  }
+}),{threshold:.15});
+document.querySelectorAll('.fade-up').forEach(el=>io.observe(el));
+
+/* ============ 工具：高清 canvas ============ */
+function setupCanvas(id){
+  const cv=document.getElementById(id);
+  const dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx:ctx,W:W,H:H};
+}
+
+/* ============ 数学基础: ② SVD 谱衰减 ============ */
+function svdDemo(){
+  const r=parseFloat(document.getElementById('svd-r').value);
+  document.getElementById('svd-rv').textContent=r.toFixed(2);
+  const o=setupCanvas('svd-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const N=10,sig=[];for(let i=0;i<N;i++)sig.push(10*Math.pow(r,i));
+  const tau=4,thr=sig[0]/tau;
+  const padL=36,padB=28,padT=16,bw=(W-padL-16)/N;
+  // 阈值线
+  const yThr=(H-padB)-(thr/sig[0])*(H-padB-padT);
+  ctx.setLineDash([6,5]);ctx.strokeStyle='#8fb8ff';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(padL,yThr);ctx.lineTo(W-8,yThr);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#8fb8ff';ctx.font='11px sans-serif';ctx.textAlign='left';
+  ctx.fillText('阈值 σ₁/'+tau,padL,Math.max(12,yThr-4));
+  let cnt=0;
+  for(let i=0;i<N;i++){
+    const h=(sig[i]/sig[0])*(H-padB-padT);
+    const x=padL+i*bw+3,y=H-padB-h;
+    const inCnt=sig[i]>=thr-1e-9;
+    if(inCnt)cnt++;
+    ctx.fillStyle=inCnt?'#f7b731':'#2a3c5f';
+    ctx.fillRect(x,y,bw-6,h);
+    ctx.fillStyle='#7f92b8';ctx.font='10px sans-serif';ctx.textAlign='center';
+    ctx.fillText('σ'+(i+1),x+(bw-6)/2,H-padB+14);
+  }
+  let msg;
+  if(r<=0.45)msg='谱非常「尖」：能量几乎全在第一个方向，合唱团只有一个主旋律 🎵';
+  else if(r<=0.65)msg='谱开始变「平」：有几个方向与最大方向量级相当';
+  else msg='谱很「平」：大量方向「和老大差不多大」，能量摊在许多方向上 🌀';
+  document.getElementById('svd-result').innerHTML=
+    '当前 <b style="color:#ffd97a">'+cnt+' / '+N+'</b> 个方向达到阈值线以上（τ=4 时）。'+msg;
+}
+document.getElementById('svd-r').addEventListener('input',svdDemo);
+svdDemo();
+
+/* ============ 核心方法: D-Score 对比演示 ============ */
+const DS_NORMAL=[];for(let i=0;i<12;i++)DS_NORMAL.push(10*Math.pow(0.45,i));
+const DS_HALL=DS_NORMAL.concat([8,6,5.5]).sort((a,b)=>b-a);
+let dsMode='normal',dsAnim=null;
+function dsSpectrum(){return dsMode==='normal'?DS_NORMAL:DS_HALL;}
+function dsCount(sig,tau){const thr=sig[0]/tau;let c=0;for(let i=0;i<sig.length;i++)if(sig[i]>=thr-1e-9)c++;return c;}
+function drawDs(sig,frac){
+  const tau=parseFloat(document.getElementById('ds-tau').value);
+  const o=setupCanvas('ds-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const N=sig.length,s1=sig[0],thr=s1/tau;
+  const padL=36,padB=28,padT=16,bw=(W-padL-16)/N;
+  const yThr=(H-padB)-(thr/s1)*(H-padB-padT);
+  ctx.setLineDash([6,5]);ctx.strokeStyle='#8fb8ff';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(padL,yThr);ctx.lineTo(W-8,yThr);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#8fb8ff';ctx.font='11px sans-serif';ctx.textAlign='left';
+  ctx.fillText('阈值 σ₁/τ = '+(s1/tau).toFixed(2),padL,Math.max(12,yThr-4));
+  for(let i=0;i<N;i++){
+    const h=(sig[i]/s1)*(H-padB-padT)*frac;
+    const x=padL+i*bw+2,y=H-padB-h;
+    const inCnt=sig[i]>=thr-1e-9;
+    const isConflict=(dsMode==='hall'&&(sig[i]===8||sig[i]===6||sig[i]===5.5));
+    ctx.fillStyle=isConflict?(inCnt?'#f7b731':'#7a5c1e'):(inCnt?'#4d9fff':'#2a3c5f');
+    ctx.fillRect(x,y,bw-4,h);
+    ctx.fillStyle='#7f92b8';ctx.font='10px sans-serif';ctx.textAlign='center';
+    ctx.fillText(sig[i].toFixed(sig[i]<1?2:1),x+(bw-4)/2,Math.max(12,y-4));
+  }
+}
+function dsDemo(animate){
+  const tau=parseFloat(document.getElementById('ds-tau').value);
+  document.getElementById('ds-tauv').textContent=tau.toFixed(1);
+  const sig=dsSpectrum();
+  const D=dsCount(sig,tau);
+  const dNorm=dsCount(DS_NORMAL,tau);
+  const dBar=4;
+  if(dsAnim){cancelAnimationFrame(dsAnim);dsAnim=null;}
+  if(animate){
+    const t0=performance.now(),dur=600;
+    const step=t=>{
+      const f=Math.min(1,(t-t0)/dur);
+      drawDs(sig,1-Math.pow(1-f,3));
+      if(f<1)dsAnim=requestAnimationFrame(step);
+    };
+    dsAnim=requestAnimationFrame(step);
+  }else{drawDs(sig,1);}
+  const verdict=D>dBar;
+  const delta=D-dNorm;
+  let extra;
+  if(dsMode==='hall'&&delta>0){
+    extra=' 比同 τ 下正常文本（D='+dNorm+'）<b style="color:#ffd97a">+'+delta+'</b>——命题 1 说每个够强的冲突方向至少 +1，这里新增 3 个冲突方向全部越线 ✓';
+  }else if(dsMode==='hall'){
+    extra=' 当前 τ 较严，部分冲突方向未越线；把 τ 调大试试';
+  }else{
+    extra=' 谱集中在少数主导方向，这是「口径一致」文本的典型形态';
+  }
+  document.getElementById('ds-result').innerHTML=
+    'σ₁/τ 阈值线以上的方向共 <b style="color:#ffd97a">D-Score = '+D+'</b> 个。'+extra+'<br>'+
+    '判定（示意阈值 D̄='+dBar+'）：'+(verdict?
+    '<b style="color:#ff6b6b">D &gt; D̄ → 判为「幻觉」⚠️</b>':
+    '<b style="color:#2bc48a">D ≤ D̄ → 判为「正常」✅</b>')+
+    (dsMode==='hall'&&!verdict?'<br><span style="font-size:12.5px;color:#7f92b8">注意：τ 调得太严时，连幻觉文本的 D-Score 都过不了 D̄——这正是论文强调 τ、层、D̄ 必须在验证集上联合校准的原因。</span>':'');
+}
+document.getElementById('ds-tau').addEventListener('input',()=>dsDemo(false));
+document.getElementById('spec-normal').addEventListener('click',()=>{
+  dsMode='normal';
+  document.getElementById('spec-normal').classList.add('active');
+  document.getElementById('spec-hall').classList.remove('active');
+  dsDemo(true);
+});
+document.getElementById('spec-hall').addEventListener('click',()=>{
+  dsMode='hall';
+  document.getElementById('spec-hall').classList.add('active');
+  document.getElementById('spec-normal').classList.remove('active');
+  dsDemo(true);
+});
+dsDemo(false);
+
+/* ============ 核心方法: 阈值分类演示（示意数据） ============ */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;
+  let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;
+  return((t^t>>>14)>>>0)/4294967296;};}
+const thrRng=mulberry32(42);
+const THR_DATA=[];
+for(let i=0;i<18;i++)THR_DATA.push({d:1+Math.round(thrRng()*3+thrRng()*1.2),hall:false,j:thrRng()});
+for(let i=0;i<18;i++)THR_DATA.push({d:3+Math.round(thrRng()*4+thrRng()*1.6),hall:true,j:thrRng()});
+function thrDemo(){
+  const dBar=parseInt(document.getElementById('thr-d').value);
+  document.getElementById('thr-dv').textContent=dBar;
+  const o=setupCanvas('thr-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=30,padR=16,padT=20,padB=30;
+  const DMAX=9;
+  const px=d=>padL+(d-1)/(DMAX-1)*(W-padL-padR);
+  // 阈值线
+  const xBar=px(dBar);
+  ctx.setLineDash([6,5]);ctx.strokeStyle='#ffd97a';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(xBar,padT);ctx.lineTo(xBar,H-padB);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#ffd97a';ctx.font='12px sans-serif';ctx.textAlign='center';
+  ctx.fillText('D̄ = '+dBar,xBar,padT-6);
+  ctx.fillStyle='#7f92b8';ctx.font='10px sans-serif';
+  ctx.fillText('← 判正常',padL+36,H-10);
+  ctx.fillText('判幻觉 →',W-padR-40,H-10);
+  let tp=0,fp=0,tn=0,fn=0;
+  THR_DATA.forEach(p=>{
+    const pred=p.d>dBar;
+    let wrong=false;
+    if(p.hall&&pred)tp++;else if(p.hall&&!pred){fn++;wrong=true;}
+    else if(!p.hall&&pred){fp++;wrong=true;}else tn++;
+    const y=padT+14+p.j*(H-padB-padT-28);
+    ctx.beginPath();ctx.arc(px(p.d),y,6,0,7);
+    ctx.fillStyle=p.hall?'#ff6b6b':'#4d9fff';ctx.fill();
+    if(wrong){ctx.beginPath();ctx.arc(px(p.d),y,10,0,7);
+      ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();}
+  });
+  const acc=((tp+tn)/THR_DATA.length*100);
+  document.getElementById('thr-result').innerHTML=
+    '抓住幻觉 <b style="color:#2bc48a">'+tp+'</b>，漏掉 <b style="color:#ff6b6b">'+fn+
+    '</b>；误伤正常 <b style="color:#ff6b6b">'+fp+'</b>，正确放行 <b style="color:#2bc48a">'+tn+
+    '</b>。准确率 <b style="color:#ffd97a">'+acc.toFixed(1)+'%</b>。'+
+    (dBar<=2?'阈值太严：几乎全判幻觉，误报很多 ⚠️':
+     dBar>=8?'阈值太松：大部分幻觉被漏掉 ⚠️':
+     '中间阈值在「抓幻觉」与「少误伤」之间取得平衡 ⚖️');
+}
+document.getElementById('thr-d').addEventListener('input',thrDemo);
+thrDemo();
+</script>
+</body>
+</html>
