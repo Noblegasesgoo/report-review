@@ -6,7 +6,7 @@
 
 | 分类 | 内容 | 链接 |
 |---|---|---|
-| 🤖 kimi | 看懂 Kimi K3：2.8 万亿参数的开源模型是怎么炼成的 | [在线阅读](https://noblegasesgoo.github.io/%E6%8A%A5%E5%91%8A%E8%A7%A3%E8%AF%BB/kimi/) |
+| 🤖 kimi | 看懂 Kimi K3：2.8 万亿参数的开源模型是怎么炼成的 | [在线阅读](https://noblegasesgoo.github.io/report-review/kimi/) |
 
 ## 目录结构
 
