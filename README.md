@@ -1,29 +1,32 @@
 # 报告解读
 
-大模型技术报告的**通俗交互解读**合集：把长篇技术报告拆解为生活化比喻 + 可点击的动画演示，支持知识、技术平权。
+大模型技术报告与论文的**通俗交互解读**合集：把长篇技术报告/论文拆解为生活化比喻 + 可点击的动画演示，支持知识、技术平权。
 
 ## 在线访问
 
 | 分类 | 内容 | 链接 |
 |---|---|---|
-| 🤖 kimi | 看懂 Kimi K3：2.8 万亿参数的开源模型是怎么炼成的 | [在线阅读](https://noblegasesgoo.github.io/report-review/kimi/) |
-| 📄 arxiv | 看懂 D-Score：一次前向传播，从大模型「心声」里听出幻觉 | [在线阅读](https://noblegasesgoo.github.io/report-review/arxiv/d-score/) |
+| 📑 技术报告 | 看懂 Kimi K3：2.8 万亿参数的开源模型是怎么炼成的 | [在线阅读](https://noblegasesgoo.github.io/report-review/reports/kimi-k3/) |
+| 📄 论文 | 看懂 D-Score：一次前向传播，从大模型「心声」里听出幻觉 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/d-score/) |
 
 ## 目录结构
 
+按内容类型分类：厂商技术报告放 `reports/`，arXiv 等学术论文放 `papers/`，每篇解读一个子目录。
+
 ```
-├── kimi/                 # Kimi 系列模型报告解读
-│   └── index.html        # Kimi K3 技术报告交互解读（单文件，零依赖）
-├── arxiv/                # arXiv 论文解读
+├── reports/                     # 厂商技术报告解读
+│   └── kimi-k3/
+│       └── index.html           # Kimi K3 技术报告交互解读（单文件，零依赖）
+├── papers/                      # 学术论文解读
 │   └── d-score/
-│       └── index.html    # D-Score 幻觉检测论文交互解读（单文件，零依赖）
+│       └── index.html           # D-Score 幻觉检测论文交互解读（单文件，零依赖）
 ├── README.md
-└── LICENSE               # MIT
+└── LICENSE                      # MIT
 ```
 
 ## 当前收录
 
-### Kimi K3 技术报告解读（`kimi/index.html`）
+### Kimi K3 技术报告解读（`reports/kimi-k3/index.html`）
 
 基于 Moonshot AI 官方《Kimi K3: Open Frontier Intelligence》47 页技术报告制作的单文件交互页面，内容包括：
 
@@ -34,7 +37,7 @@
 
 页面为纯 HTML/CSS/JS 单文件，无外部依赖，可直接用浏览器打开本地文件，或托管到任意静态服务器。
 
-### D-Score 论文解读（`arxiv/d-score/index.html`）
+### D-Score 论文解读（`papers/d-score/index.html`）
 
 基于 arXiv 论文《D-Score: A Spectral Hidden-State Signal for Hallucination Detection in Large Language Models》（arXiv:2607.24586，博洛尼亚大学）制作的单文件交互页面，内容包括：
 
@@ -47,4 +50,4 @@
 
 [MIT License](LICENSE) © Noblegasesgoo
 
-页面内容基于各厂商公开发布的技术报告整理，通俗类比仅用于帮助理解，技术细节以原始报告为准。
+页面内容基于各厂商公开发布的技术报告与论文整理，通俗类比仅用于帮助理解，技术细节以原始报告/论文为准。
