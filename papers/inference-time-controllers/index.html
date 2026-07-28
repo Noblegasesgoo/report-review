@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>看懂 CALM · 让大模型学会配合任何「推理时控制器」</title>
+<style>
+  :root{
+    --blue:#1783ff; --blue-d:#0b5cc4; --red:#ff6b6b; --amber:#f7b731;
+    --purple:#a55eea; --green:#2bc48a; --ink:#1b2430; --ink-soft:#48566a;
+    --bg:#f6f8fc; --card:#ffffff; --line:#e4eaf3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.8}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+
+  /* ===== Hero ===== */
+  .hero{background:linear-gradient(160deg,#0a1a3f 0%,#103a8c 55%,#1783ff 100%);
+    color:#fff;padding:72px 0 56px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+    padding:4px 14px;border-radius:99px;font-size:13px;letter-spacing:1px;margin-bottom:18px}
+  .hero h1{font-size:clamp(26px,4.6vw,44px);line-height:1.3;margin-bottom:14px}
+  .hero p.sub{font-size:clamp(14px,1.8vw,18px);opacity:.88;max-width:820px}
+  .hero .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);
+    border-radius:16px;padding:14px 22px;min-width:150px}
+  .stat b{display:block;font-size:26px;font-weight:800}
+  .stat span{font-size:13px;opacity:.85}
+
+  /* ===== Nav ===== */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  nav.toc .inner{display:flex;gap:6px;overflow-x:auto;padding:10px 22px;max-width:1060px;margin:0 auto}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--ink-soft);text-decoration:none;
+    padding:6px 12px;border-radius:99px;transition:.2s}
+  nav.toc a:hover{background:#eaf2ff;color:var(--blue-d)}
+
+  /* ===== Sections ===== */
+  section.chapter{padding:56px 0 8px}
+  .chap-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  .chap-num{font-size:14px;font-weight:800;color:#fff;background:var(--blue);
+    border-radius:10px;padding:3px 12px;letter-spacing:1px}
+  .chap-head h2{font-size:clamp(21px,3vw,30px)}
+  .oneline{color:var(--blue-d);font-weight:600;margin:4px 0 22px;font-size:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:0 2px 14px rgba(20,50,110,.05)}
+  .card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card p{margin-bottom:12px;color:#2c3a4e}
+  .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
+    border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
+  .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
+  .keyfact{position:relative;background:#eef5ff;border-left:4px solid var(--blue);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";position:absolute;left:16px;top:12px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .demo-box{background:#0e1830;border-radius:18px;padding:22px;margin:16px 0;color:#dfe8ff;
+    position:relative;overflow:hidden}
+  .demo-title{color:#8fb8ff;font-size:13px;letter-spacing:2px;font-weight:700;margin-bottom:14px;text-transform:uppercase}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:99px;padding:9px 22px;font-size:14px;
+    cursor:pointer;font-weight:600;transition:.2s;box-shadow:0 4px 14px rgba(23,131,255,.35)}
+  .btn:hover{background:var(--blue-d);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);box-shadow:none;color:#dfe8ff}
+  .btn.ghost.active{background:rgba(23,131,255,.22);border-color:#6db4ff;color:#fff}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border-radius:12px;overflow:hidden}
+  table.tbl th{background:#103a8c;color:#fff;padding:10px 12px;text-align:left;font-weight:600}
+  table.tbl td{padding:10px 12px;border-bottom:1px solid var(--line)}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl tr:nth-child(even) td{background:#f7faff}
+  .hl{color:var(--blue-d);font-weight:700}
+
+  /* ===== 公式（纯 HTML/CSS，无 MathJax）===== */
+  .formula{background:#0e1830;border-radius:14px;padding:20px 22px;margin:14px 0;color:#eaf1ff;
+    font-size:clamp(15px,2.2vw,19px);text-align:center;overflow-x:auto;line-height:2;
+    font-family:"STIX Two Math","Cambria Math",Georgia,serif}
+  .formula .op{color:#8fb8ff}
+  .formula .cond{font-size:.82em;color:#9db4dd}
+  .frac{display:inline-flex;flex-direction:column;vertical-align:middle;margin:0 2px;line-height:1.4}
+  .frac .num{border-bottom:1.5px solid currentColor;padding:0 7px}
+  .frac .den{padding:0 7px}
+  .fnote{font-size:13px;color:#7f92b8;margin-top:10px;text-align:center;line-height:1.7;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  .formula var{font-style:italic}
+
+  /* ===== 结果条形图 ===== */
+  .scorebar{height:10px;border-radius:99px;background:#e7edf6;overflow:hidden;margin:4px 0 12px}
+  .scorebar i{display:block;height:100%;border-radius:99px;width:0;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+  .bar-row{display:grid;grid-template-columns:170px 1fr 64px;gap:12px;align-items:center;margin-bottom:10px;font-size:14px}
+  @media(max-width:640px){.bar-row{grid-template-columns:110px 1fr 56px}}
+  .bar-row b{text-align:right;font-variant-numeric:tabular-nums}
+
+  /* ===== 滑杆 ===== */
+  .slider-row{display:flex;align-items:center;gap:14px;margin:14px 0 6px;flex-wrap:wrap}
+  .slider-row label{font-size:14px;color:#9db4dd;white-space:nowrap}
+  .slider-row input[type=range]{flex:1;min-width:180px;accent-color:var(--amber)}
+  .slider-row output{color:#ffd97a;font-weight:700;min-width:56px;text-align:right;font-variant-numeric:tabular-nums}
+  canvas.chart{width:100%;height:240px;display:block;border-radius:10px;background:#0a1326}
+  .demo-readout{margin-top:14px;font-size:14.5px;line-height:1.8}
+  .caption{font-size:12.5px;color:#7f92b8;margin-top:8px;line-height:1.6}
+
+  /* ===== 模块流程动画 ===== */
+  .mod-flow{display:flex;align-items:center;flex-wrap:wrap;gap:0;margin:18px 0 8px;min-height:74px}
+  .mod-box{background:#1a2a4d;border:2px solid #33507f;border-radius:12px;padding:10px 16px;
+    font-size:13.5px;font-weight:700;color:#9db4dd;transition:all .45s;text-align:center;line-height:1.4}
+  .mod-box small{display:block;font-size:11px;font-weight:400;color:#6d81a8}
+  .mod-box.lit{border-color:var(--amber);color:#ffd97a;background:#2a3a1f00;
+    box-shadow:0 0 18px rgba(247,183,49,.45);transform:translateY(-4px)}
+  .mod-box.done{border-color:var(--green);color:#7fe3bb;background:#123026}
+  .mod-box.new-mod{border-style:dashed}
+  .mod-arrow{color:#3a5078;font-size:20px;padding:0 8px;transition:.3s}
+  .mod-arrow.lit{color:var(--amber)}
+  .flow-status{font-size:14px;color:#9db4dd;min-height:26px;margin-top:6px}
+
+  /* ===== 对比动画 ===== */
+  .duel{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:6px}
+  @media(max-width:760px){.duel{grid-template-columns:1fr}}
+  .duel-panel{background:#0a1326;border:1px solid #22345c;border-radius:14px;padding:16px}
+  .duel-panel h4{font-size:14px;color:#cfe2ff;margin-bottom:8px}
+  .duel-log{font-size:13px;color:#8fa3c8;min-height:132px;line-height:1.9;font-variant-numeric:tabular-nums}
+  .duel-log .cur{color:#ffd97a}
+  .duel-bar{display:grid;grid-template-columns:92px 1fr 52px;gap:8px;align-items:center;font-size:12.5px;margin-top:8px}
+  .duel-bar .track{height:9px;background:#16223e;border-radius:99px;overflow:hidden}
+  .duel-bar .track i{display:block;height:100%;width:0;border-radius:99px;transition:width .5s}
+  .duel-bar b{text-align:right;color:#cfe2ff;font-variant-numeric:tabular-nums}
+
+  /* ===== 来源标注 ===== */
+  .src{color:var(--blue-d);text-decoration:none;font-size:.8em;font-weight:600;
+    border-bottom:1px dashed #9db8e8;padding:0 1px;white-space:nowrap}
+  .src:hover{color:var(--blue);border-bottom-style:solid;background:#eaf2ff;border-radius:4px}
+  .src::after{content:"↗";font-size:.85em;margin-left:1px}
+  .demo-box .src, .formula .src{color:#8fb8ff;border-bottom-color:#3a5078}
+  .demo-box .src:hover{color:#cfe2ff;background:rgba(23,131,255,.15)}
+
+  footer{margin-top:64px;padding:34px 0 46px;color:#7f8ca3;font-size:13px;text-align:center;
+    border-top:1px solid var(--line);line-height:2}
+  .fade-up{opacity:0;transform:translateY(26px);transition:all .7s cubic-bezier(.3,.7,.3,1)}
+  .fade-up.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">arXiv 论文交互解读 · 推理与思维链</span>
+    <h1>看懂 CALM：别只练一套拳法，让大模型学会配合任何「推理时控制器」</h1>
+    <p class="sub">UMass Amherst 与三菱电机研究院（MERL）团队提出的控制器感知后训练框架：CoT、自我反思、多智能体辩论……这些组织推理的「推理时控制器」在部署中五花八门，但现有后训练只针对单一固定交互模式优化。CALM 把控制器直接放进训练循环，让模型学会的是可复用的「推理模块」，从而能泛化到训练时从没见过的控制器组合。</p>
+    <div class="stats">
+      <div class="stat"><b>−31 分</b><span>单控制器模型「换指挥」的断崖：Debate 71.87% → CoT 40.86%</span></div>
+      <div class="stat"><b>73.72%</b><span>CALM-ADAPTIVE 在训练控制器上的平均准确率（超过全部单控基线）</span></div>
+      <div class="stat"><b>70.68%</b><span>在「旧模块新组合」控制器上的平均（CALM-ADAPTIVE）</span></div>
+      <div class="stat"><b>75.69%</b><span>在「新模块迁移」控制器上的平均（CALM-MIXED）</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="toc"><div class="inner">
+  <a href="#ch0">🎭 热身：模型背后的「指挥家」</a>
+  <a href="#ch1">🧩 概念基础：控制器与模块</a>
+  <a href="#ch2">🧮 数学基础：GRPO</a>
+  <a href="#ch3">🎯 核心方法：CALM</a>
+  <a href="#ch4">📊 实验结果</a>
+  <a href="#ch5">⚖️ 局限与意义</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ============ CH0 热身 ============ -->
+<section class="chapter" id="ch0">
+  <div class="chap-head"><span class="chap-num">热身</span><h2>大模型答题，背后还有一位「指挥家」</h2></div>
+  <p class="oneline">模型的分数，越来越不只取决于模型本身，还取决于谁在指挥它推理。</p>
+
+  <div class="card fade-up">
+    <h3>🎻 什么是「推理时控制器」？</h3>
+    <p>今天的大模型很少「一问一答」就交卷。真实系统会组织一连串结构化的推理过程：让模型先一步步思考（Chain-of-Thought，思维链 <a class="src" href="https://arxiv.org/abs/2201.11903" target="_blank" rel="noopener">Wei et al. 2022</a>），或者自问自答地挑错修改（Self-Refine <a class="src" href="https://arxiv.org/abs/2303.17651" target="_blank" rel="noopener">Madaan et al. 2023</a>），或者让三个「分身」吵两轮架再由裁判拍板（多智能体辩论 <a class="src" href="https://arxiv.org/abs/2305.14325" target="_blank" rel="noopener">Du et al. 2023</a>），甚至先退后一步抽象出原理再解题（Step-back <a class="src" href="https://arxiv.org/abs/2310.06117" target="_blank" rel="noopener">Zheng et al. 2023</a>）。</p>
+    <p>论文把这些「组织推理的外部程序」统称为<b>推理时控制器（inference-time controller）</b>：它规定了模型被怎么调用——问几轮、每轮扮演什么角色、中间结果怎么传递、最后怎么汇总或验证 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§1</a>。</p>
+    <div class="analogy">模型是乐手，控制器是指挥。同一个乐手，在「独奏指挥」手下一个人演，在「复盘指挥」手下演一遍、听批评、再演一遍，在「辩论指挥」手下和另外两位乐手各持己见、最后由指挥裁决。乐手没变，但演出效果天差地别——指挥的水平和组织方式，直接决定了最终成绩。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>⚠️ 问题：训练时只配一个指挥，部署时指挥天天换</h3>
+    <p>现有的后训练（post-training，如 RLHF、GRPO 这类强化学习微调）几乎都是<b>在一种固定交互模式下</b>优化的：要么只对单次 CoT 问答训练，要么只对某一个固定流程训练。但真实部署中，控制器多种多样、还在不断被自动搜索算法发明出来（如 ADAS <a class="src" href="https://arxiv.org/abs/2408.08435" target="_blank" rel="noopener">Hu et al. 2025</a>）。论文把这称为<b>「训练–部署错配」（training–deployment mismatch）</b> <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">摘要/§1</a>。</p>
+    <p>这个错配有多严重？论文实验里，一个专门在「辩论」控制器上训练的模型，在辩论流程下能拿 71.87%，可一旦换成最简单的 CoT 单次问答，直接崩到 40.86%——比没训练过的基座模型强不了多少 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§6.2, Table 2</a>。</p>
+    <div class="keyfact">单控制器训练出来的模型是「偏科生」：在自己的主场很强，换个工作流就断崖式下跌。CALM 的目标就是治好这种偏科——训练时让模型轮流配合多种控制器，学会通用的推理招式，而不是背熟一套固定套路 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§6.2</a>。</div>
+    <div class="analogy">这像一个只跟固定搭档练过双打战术的运动员：和原配搭档配合行云流水，临时换搭档就手足无措。而真正的「通用型选手」练的是传球、跑位、判断这些基本功——任何新搭档、新阵型都能即插即用。</div>
+  </div>
+</section>
+
+<!-- ============ CH1 概念基础 ============ -->
+<section class="chapter" id="ch1">
+  <div class="chap-head"><span class="chap-num">01</span><h2>概念基础：控制器 = 模块的组合</h2></div>
+  <p class="oneline">五花八门的控制器，拆开看其实是同一堆积木的不同拼法。</p>
+
+  <div class="card fade-up">
+    <h3>🧱 模块：所有控制器共用的「积木」</h3>
+    <p>论文的关键观察是：不同控制器并不是彼此孤立的任务，它们共享一批反复出现的局部推理组件。论文把每个组件形式化为一个<b>模块（module）</b> = 角色（role，如「批评家」「辩手」）+ 轮次接口（规定的提示词与结构化输出格式，如 <code>[thinking, answer]</code>、<code>[feedback, correct]</code>）<a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§3, Table 4</a>。实验中出现的模块词汇表：</p>
+    <table class="tbl">
+      <tr><th>模块</th><th>角色</th><th>输出格式</th></tr>
+      <tr><td><b>COT</b></td><td>思维链推理智能体</td><td>[thinking, answer]</td></tr>
+      <tr><td><b>CRITIC</b></td><td>批评与反馈智能体</td><td>[feedback, correct]</td></tr>
+      <tr><td><b>ABSTRACTOR</b></td><td>退后一步抽象原理</td><td>[thinking, principle]</td></tr>
+      <tr><td><b>DEBATER</b></td><td>多智能体辩论参与者</td><td>[thinking, answer]</td></tr>
+      <tr><td><b>JUDGE</b></td><td>汇总与裁决智能体</td><td>[thinking, answer]</td></tr>
+      <tr><td><b>ROUTER</b></td><td>动态角色分配（路由）</td><td>[choice]</td></tr>
+    </table>
+    <p style="margin-top:12px">而<b>控制器</b>就是一张「拼装说明书」：一份决定模块调用顺序、轮次间如何传递输出、以及分支/循环/投票等非模型逻辑的控制流程序。论文沿用了 ADAS 的「代码即控制器」范式，每个控制器就是一段透明、可复现的 Python 程序 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§3, 附录B</a>：</p>
+    <ul style="margin:8px 0 0 22px;color:#2c3a4e;font-size:15px;line-height:2">
+      <li>Chain-of-Thought = 单个 <b>COT</b></li>
+      <li>Step-back = <b>ABSTRACTOR → COT</b></li>
+      <li>Self-Refine = <b>COT → (CRITIC → COT) × 2</b></li>
+      <li>LLM 辩论 = <b>DEBATER × 3 → JUDGE</b>（2 轮交锋后裁决）</li>
+    </ul>
+    <div class="analogy">模块是乐高积木，控制器是拼装图纸。CoT 只用一块积木；Self-Refine 是「主体 + 质检」来回拼插；辩论是三块同样的积木加一个封顶件。图纸千差万别，积木却是同一盒——这就是组合性。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🎬 动手看：六种控制器是怎么「走流程」的</h3>
+    <p>点下面的控制器按钮，看模块被依次点亮。注意最后两个：<b>H2 是训练时没见过的新组合</b>（旧积木新拼法），<b>H4 连积木都是新的</b>（测试时才引入 TEACHER / STUDENT / VERIFIER 角色）——这正是论文用来考「泛化」的两档难度 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">Table 1</a>。</p>
+    <div class="demo-box">
+      <div class="demo-title">控制器模块流程动画</div>
+      <div class="btn-row" id="ctrlBtns"></div>
+      <div class="mod-flow" id="modFlow"></div>
+      <div class="flow-status" id="flowStatus">选择一个控制器，点击 ▶ 播放。</div>
+      <div class="btn-row"><button class="btn" id="flowPlay">▶ 播放</button></div>
+      <div class="caption">模块序列与各控制器的轮次结构取自论文 Table 1 与附录 B 的控制器伪代码；H2/H4 为留出评测控制器，训练时不可见 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">Table 1, 附录B</a>。</div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🎯 中心假设：学好积木，就能应付没见过的图纸</h3>
+    <p>由此论文提出 CALM 的核心假设：<b>如果共享策略把每个模块都执行好，它就能泛化到训练时没见过的模块组合</b>——即新控制器 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§3</a>。这也解释了为什么要做「模块级」的训练策略（见第 3 章）：与其笼统地优化整条轨迹，不如关心每种积木学得好不好。</p>
+    <div class="keyfact">论文把评测分成三档难度：<b>Train</b>（训练见过的 6 种控制器 B1–B6）、<b>Compositional</b>（旧模块的新组合 H1–H3）、<b>Controller-Shift</b>（引入全新模块类型的 H4–H6）<a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">Table 1, §6</a>。后面所有成绩单都按这三档汇报。</div>
+  </div>
+</section>
+
+<!-- ============ CH2 数学基础 ============ -->
+<section class="chapter" id="ch2">
+  <div class="chap-head"><span class="chap-num">02</span><h2>数学基础：GRPO 与「轮级」扩展</h2></div>
+  <p class="oneline">同一道题让模型做 8 遍，组内互相比——不用额外训练打分模型。</p>
+
+  <div class="card fade-up">
+    <h3>📏 GRPO：组内相对排名代替「打分老师」</h3>
+    <p>CALM 建立在 GRPO（Group Relative Policy Optimization，<a class="src" href="https://arxiv.org/abs/2402.03300" target="_blank" rel="noopener">Shao et al. 2024</a>）之上。它的想法很朴素：对同一道题采样 <b>G = 8</b> 条回答，每条拿到一个奖励（本文是终局对错，R ∈ {0, 1}，外加少量格式奖励），然后把每条的奖励和组内均值、标准差比较，得到归一化优势 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">附录A, Eq.9, Table 5</a>：</p>
+    <div class="formula">
+      <var>Â</var><sub><var>i</var></sub> <span class="op">=</span>
+      <span class="frac"><span class="num"><var>R</var><sub><var>i</var></sub> <span class="op">−</span> <var>μ</var><sub><var>c</var></sub></span><span class="den"><var>σ</var><sub><var>c</var></sub> <span class="op">+</span> <var>ε</var></span></span>,
+      &nbsp;&nbsp;<span class="cond"><var>μ</var><sub><var>c</var></sub> = 组内平均奖励，<var>σ</var><sub><var>c</var></sub> = 组内标准差</span>
+      <div class="fnote">白话翻译：比同组平均水平好多少，就表扬多少；比平均差，就压一压。优势在整个轨迹内部共享——终局奖励同一个，所以一条轨迹里每一轮的优势相同（附录A 明确说明：模块分解不改变信用分配）。</div>
+    </div>
+    <div class="analogy">同一考场 8 个考生做同一张卷子，不发绝对分数，只按「组内排名」奖惩：比组平均强的表扬，弱的批评。这样就省掉了一个额外训练「阅卷老师」（价值网络）的成本。妙处是：题目太难全组覆没、或太简单全组满分时，组内没有差异，谁都学不到东西——只有「有对有错」的题才有训练信号。</div>
+
+    <div class="demo-box">
+      <div class="demo-title">滑杆探索 · 组内优势怎么算</div>
+      <div class="slider-row">
+        <label>8 条轨迹中答对的条数 k</label>
+        <input type="range" id="grpoK" min="0" max="8" step="1" value="3">
+        <output id="grpoKOut">3 / 8</output>
+      </div>
+      <canvas class="chart" id="grpoCanvas" width="900" height="240"></canvas>
+      <div class="demo-readout" id="grpoReadout"></div>
+      <div class="caption">演示口径与论文一致：G = 8（Table 5 的 Group size n = 8），奖励 R ∈ {0,1}，Â = (R−μ)/(σ+ε)，ε = 0.01 仅作数值稳定。试试把滑杆拖到 0 或 8：全对或全错时优势全部归零，这正是 GRPO 的「无信号区」 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">附录A, Table 5</a>。</div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔁 多轮怎么办？把裁剪从「词级」搬到「轮级」</h3>
+    <p>标准 GRPO 在<b>每个词</b>上做重要性裁剪，多轮轨迹里会引入长度偏置、鼓励单轮说得过长。CALM 采用 ReMA（<a class="src" href="https://arxiv.org/abs/2503.09501" target="_blank" rel="noopener">Wan et al. 2025</a>）的轮级（turn-level）变体：先把一轮内所有词的重要性比率取平均，再在<b>轮</b>这一级裁剪 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§2, Eq.2</a>：</p>
+    <div class="formula">
+      <var>r</var><sub><var>i</var>,<var>u</var></sub>(<var>θ</var>) <span class="op">=</span>
+      <span class="frac"><span class="num">1</span><span class="den"><var>T</var><sub><var>i</var>,<var>u</var></sub></span></span>
+      <span style="font-size:1.35em;vertical-align:middle">Σ</span><sub><var>j</var>=1</sub><sup><var>T</var><sub><var>i</var>,<var>u</var></sub></sup>
+      <var>r</var><sub><var>i</var>,<var>u</var>,<var>j</var></sub>(<var>θ</var>)
+      <div class="fnote">白话翻译：一轮（一次模块调用）里每个词的「新旧策略概率比」先取平均，得到这一整轮的比率——一轮就是一份成绩单，不再让每个词单独算。</div>
+    </div>
+    <p>多控制器场景还有一个新坑：不同控制器<b>轮数差异巨大</b>（CoT 只有 1 轮，辩论多达 7 轮）。CALM 在控制器级损失里对每条轨迹除以轮数 1/<var>U</var><sub><var>i</var></sub>，否则长控制器会在损失中「嗓门」过大、淹没短控制器的贡献 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">附录A, Eq.12</a>。</p>
+    <div class="formula">
+      <var>𝓛</var><sub>CALM</sub>(<var>θ</var>) <span class="op">=</span>
+      <span class="frac"><span class="num">1</span><span class="den">|<var>C</var><sub>train</sub>|</span></span>
+      <span style="font-size:1.35em;vertical-align:middle">Σ</span><sub><var>c</var>∈<var>C</var><sub>train</sub></sub>
+      <var>𝓛</var><sub>GRPO</sub><sup><var>c</var></sup>(<var>θ</var>) <span class="op">+</span> <var>β</var>·KL
+      <div class="fnote">白话翻译：对训练控制器家族求平均——每个控制器不论长短，发言权一样大；KL 项防止模型偏离参考模型太远。实际实现中每步只均匀抽一个控制器做单样本估计（§4.1）。当 |C<sub>train</sub>|=1 且单轮时，这个公式退化回标准 GRPO（附录A）。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH3 核心方法 ============ -->
+<section class="chapter" id="ch3">
+  <div class="chap-head"><span class="chap-num">03</span><h2>核心方法：CALM 训练框架</h2></div>
+  <p class="oneline">把控制器放进训练循环：每步随机抽一位「指挥」，让模型配合它演出。</p>
+
+  <div class="card fade-up">
+    <h3>🎲 训练循环：每一步都换一位指挥</h3>
+    <p>CALM（Controller-Aware Language Models）的训练流程 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§4.1, 图1(c)</a>：</p>
+    <ol style="margin:8px 0 12px 22px;color:#2c3a4e;font-size:15px;line-height:2">
+      <li>从 6 个训练控制器中<b>均匀随机抽一个</b>控制器 c，再抽一道题 x；</li>
+      <li>执行控制流 G = 8 次，得到 8 条轨迹，每条拿终局奖励 R ∈ {0,1}（外加格式奖励：JSON 解析失败 −0.5、缺字段 −0.2）<a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§6.1</a>；</li>
+      <li>组内归一化得到优势，按轮级 GRPO 目标更新共享策略。</li>
+    </ol>
+    <p>对比看传统做法就明白了——下面这个动画左边是「单控制器训练」（每步都是同一位指挥），右边是 CALM（每步抽不同指挥）。底部三根柱子是训完之后在三档评测上的真实成绩（取自论文 Table 2）：</p>
+    <div class="demo-box">
+      <div class="demo-title">对比动画 · 单控制器训练 vs CALM</div>
+      <div class="duel">
+        <div class="duel-panel">
+          <h4>😴 单控制器基线（Self-Refine）</h4>
+          <div class="duel-log" id="logSingle"></div>
+          <div class="duel-bar"><span>见过的控制器</span><div class="track"><i id="sb1" style="background:var(--red)"></i></div><b id="sv1">0%</b></div>
+          <div class="duel-bar"><span>旧模块新组合</span><div class="track"><i id="sb2" style="background:var(--amber)"></i></div><b id="sv2">0%</b></div>
+          <div class="duel-bar"><span>全新模块迁移</span><div class="track"><i id="sb3" style="background:var(--purple)"></i></div><b id="sv3">0%</b></div>
+        </div>
+        <div class="duel-panel">
+          <h4>🎲 CALM-MIXED（多控制器训练）</h4>
+          <div class="duel-log" id="logCalm"></div>
+          <div class="duel-bar"><span>见过的控制器</span><div class="track"><i id="cb1" style="background:var(--red)"></i></div><b id="cv1">0%</b></div>
+          <div class="duel-bar"><span>旧模块新组合</span><div class="track"><i id="cb2" style="background:var(--amber)"></i></div><b id="cv2">0%</b></div>
+          <div class="duel-bar"><span>全新模块迁移</span><div class="track"><i id="cb3" style="background:var(--purple)"></i></div><b id="cv3">0%</b></div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="duelPlay">▶ 播放 8 步训练</button>
+        <button class="btn ghost" id="duelReset">↺ 重置</button>
+      </div>
+      <div class="caption">终点数字即论文 Table 2 的三档平均：Self-Refine 基线 36.30 / 45.84 / 53.50，CALM-MIXED 73.45 / 70.31 / 75.69（%）。中间训练过程为示意；CALM 侧的控制器抽样为随机演示，与论文「每步均匀采样」的口径一致 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§4.1, Table 2</a>。</div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🎚️ 模块级分解：四种「调音台」策略</h3>
+    <p>控制器轮数、角色构成各不相同，天然导致某些模块的梯度更新比别人大。CALM 按模块类型把损失拆开，研究了四种加权策略 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§4.2, Eq.5–8</a>：</p>
+    <table class="tbl">
+      <tr><th>变体</th><th>模块权重 w<sub>m</sub></th><th>一句话</th></tr>
+      <tr><td><b>CALM-MIXED</b>（默认）</td><td>不分解，所有轮混成一个批次</td><td>大锅烩，谁轮数多谁声音大</td></tr>
+      <tr><td><b>CALM-UNIFORM</b></td><td>w<sub>m</sub> = 1/|M<sub>batch</sub>|</td><td>每种模块发言权相等</td></tr>
+      <tr><td><b>CALM-SINGLE</b></td><td>每步只随机保留一种模块的轮</td><td>一次只练一招，其余丢弃</td></tr>
+      <tr><td><b>CALM-ADAPTIVE</b></td><td>w<sub>m</sub> = clip((ν̄/(ν<sub>m</sub>+δ))<sup>α</sup>, 0.1, 10)</td><td>梯度范数越大的模块越被压权重</td></tr>
+    </table>
+    <p style="margin-top:12px">ADAPTIVE 的 ν<sub>m</sub> 是各模块梯度范数的指数滑动平均（EMA 衰减 ρ=0.9，α=1.0），思路借自多任务学习的 GradNorm：谁一直「嗓门大」就调低谁的音量 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§4.2, 附录C</a>。</p>
+    <div class="analogy">共享策略是一台调音台，每种模块是一路输入。MIXED 是所有推子摆一样高，谁话多谁响；UNIFORM 强制每路响度相同；SINGLE 每次只开一路独奏；ADAPTIVE 则像个勤快的调音师——实时盯着每路的音量表，谁持续太响就压谁的推子。</div>
+
+    <div class="demo-box">
+      <div class="demo-title">滑杆探索 · ADAPTIVE 的「反着调」权重</div>
+      <div class="slider-row">
+        <label>COT 模块的梯度范数 ν</label>
+        <input type="range" id="nuCot" min="0.5" max="8" step="0.1" value="2">
+        <output id="nuCotOut">2.0</output>
+      </div>
+      <div class="slider-row">
+        <label>CRITIC 模块的梯度范数 ν</label>
+        <input type="range" id="nuCritic" min="0.5" max="8" step="0.1" value="6">
+        <output id="nuCriticOut">6.0</output>
+      </div>
+      <canvas class="chart" id="adaptCanvas" width="900" height="240"></canvas>
+      <div class="demo-readout" id="adaptReadout"></div>
+      <div class="caption">按论文 Eq.8 计算：w<sub>m</sub> = clip((ν̄/ν<sub>m</sub>)<sup>α</sup>, 0.1, 10)，α=1.0，ν̄ 为两模块均值（省略 δ=10<sup>−6</sup>，演示范数远大于它）。把 CRITIC 的范数拉大，看它的权重怎么被压下去 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§4.2</a>。</div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🧗 一个坦白的坑：多轮 RL 训练会「翻车」</h3>
+    <p>论文明确指出：多轮 GRPO 只有终局奖励时存在已知的稳定性问题——一个二元奖励要摊到贡献各异的多轮上，信用分配很难，训练在若干步后可能直接崩掉，单控制器和多控制器配置都会中招。作者<b>没有声称解决这个问题</b>，而是在实验协议中如实处理：比如 Self-Refine 基线在 156 步后崩溃，就取验证集最好的检查点来评测 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§4.1, §6.2, 附录D</a>。</p>
+  </div>
+</section>
+
+<!-- ============ CH4 实验结果 ============ -->
+<section class="chapter" id="ch4">
+  <div class="chap-head"><span class="chap-num">04</span><h2>实验结果：换指挥之后，谁还能稳住？</h2></div>
+  <p class="oneline">12 种控制器 × 三档难度 × 两个 OOD 数据集，CALM 全面压过单控基线。</p>
+
+  <div class="card fade-up">
+    <h3>🧪 实验设置</h3>
+    <p>基座模型为 Llama-3.2-3B-Instruct（<a class="src" href="https://arxiv.org/abs/2407.21783" target="_blank" rel="noopener">Grattafiori et al. 2024</a>），用 LoRA（rank 64 / alpha 32）在 GSM8K（<a class="src" href="https://arxiv.org/abs/2110.14168" target="_blank" rel="noopener">Cobbe et al. 2021</a>）训练集的 2,048 道题上训练 3 个 epoch（192 步）。RL 配置：轮级 GRPO，组大小 G = 8，裁剪 ε = 0.2，KL 系数 5e-4，学习率 5e-6。奖励为终局对错二元奖励 + 每轮格式奖励 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§6.1, Table 5</a>。评测分三档：6 种见过的训练控制器（B1–B6）、3 种旧模块新组合（H1–H3）、3 种全新模块（H4–H6）<a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">Table 1</a>。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📉 发现一：单控制器训练 = 严重偏科</h3>
+    <p>只在一种控制器上训练的模型，出了自家主场就崩：辩论模型在自家控制器 71.87%，换到 CoT 只剩 40.86%；Quality-Diversity 模型换到 CoT 崩到 38.89%；RoleAssign 模型在 Self-Refine 流程下只有 43.97%——<b>比没做任何 RL 训练的基座模型（49.66%）还差</b> <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§6.2, Table 2</a>。最强的两个单控基线是 CoT（平均 71.04%）和 Step-back（71.11%），原因很简单：它们依赖的 COT 模块几乎出现在每个评测控制器里。</p>
+    <div class="keyfact">偏科的极端证据：Self-Refine 基线在训练控制器上的平均只有 36.30%（自家主场也不过 58.23%），而所有 CALM 变体在同一档达到 71.49%–73.72% <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§6.2</a>。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🏆 发现二：四种 CALM 变体全部反超最强单控基线</h3>
+    <p>切换下面三个标签，看三档难度下各模型的平均分（%）。CALM 变体为蓝色系，单控基线为灰色，基座模型为深色：</p>
+    <div class="btn-row" style="margin:6px 0 18px">
+      <button class="btn tier-tab" data-tier="0">① 见过的控制器（B1–B6）</button>
+      <button class="btn ghost tier-tab" data-tier="1" style="border-color:var(--line);color:var(--ink-soft)">② 旧模块新组合（H1–H3）</button>
+      <button class="btn ghost tier-tab" data-tier="2" style="border-color:var(--line);color:var(--ink-soft)">③ 全新模块迁移（H4–H6）</button>
+    </div>
+    <div id="tierBars"></div>
+    <div class="caption" style="color:#7f8ca3">数字为论文 Table 2 对应档位的平均准确率（Avg 列）；CALM 行在全部六个训练控制器上联合训练，基线各只训一个控制器 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">Table 2</a>。</div>
+    <ul style="margin:14px 0 0 22px;color:#2c3a4e;font-size:15px;line-height:2">
+      <li><b>训练控制器档</b>：CALM 四个变体 71.49%–73.72%，全部超过最强基线 Step-back 的 71.11%；提升最大的是 Self-Refine 流程（B2）：基线 43.97–59.36%，CALM 达到 60.96–66.41%——多控制器训练把「批评家」类轮次学得更扎实。</li>
+      <li><b>新组合档</b>：CALM-ADAPTIVE（70.68%）与 CALM-MIXED（70.31%）领先，超过最强基线的 68.31%；CALM-SINGLE（65.78%）落后——丢弃跨模块轮次数据，伤害长链条组合（H2、H3）。</li>
+      <li><b>新模块迁移档</b>：CALM-MIXED（75.69%）与 CALM-SINGLE（75.46%）最强，小胜 CoT 基线（74.91%）；但 CALM-ADAPTIVE 掉到 69.88%，<b>反而低于 CoT 基线</b>——自适应权重过拟合了训练时的模块分布。</li>
+    </ul>
+    <div class="analogy">没有一个变体是「全能冠军」：ADAPTIVE 擅长「旧积木新拼法」，MIXED 在「连积木都换了」时最稳。论文的结论很务实——选哪种训练策略，取决于你预期部署时会遇到什么样的控制器分布 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§6.2, §7</a>。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🌍 发现三：迁移到更难的 OOD 数据集</h3>
+    <p>实验二把战场换到训练时没见过的数据：MATH500（<a class="src" href="https://arxiv.org/abs/2305.20050" target="_blank" rel="noopener">Lightman et al. 2023</a>）和 AMC 2023 竞赛题，对比 CoT 单控基线（三档平均，%）<a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§6.3, Table 3</a>：</p>
+    <table class="tbl">
+      <tr><th>数据集</th><th>模型</th><th>见过的控制器</th><th>新组合</th><th>新模块迁移</th></tr>
+      <tr><td rowspan="2">MATH500</td><td>CoT 基线</td><td>38.30</td><td>33.80</td><td>38.50</td></tr>
+      <tr><td><b>CALM-MIXED</b></td><td><span class="hl">38.90</span></td><td><span class="hl">35.40</span></td><td><span class="hl">40.10</span></td></tr>
+      <tr><td rowspan="2">AMC 2023</td><td>CoT 基线</td><td>16.25</td><td>18.75</td><td>22.50</td></tr>
+      <tr><td><b>CALM-MIXED</b></td><td><span class="hl">20.00</span></td><td><span class="hl">26.25</span></td><td><span class="hl">23.75</span></td></tr>
+    </table>
+    <p style="margin-top:12px">AMC 2023 只有 40 题，绝对数字噪声较大，但方向一致：CALM-MIXED 在三档上全部领先，新组合档提升最明显（+7.5 分）。论文总结：多控制器训练既能泛化到更难的同域题目，也能泛化到分布外的竞赛基准，其中 CALM-MIXED 跨档位、跨数据集最稳定 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§6.3</a>。</p>
+  </div>
+</section>
+
+<!-- ============ CH5 局限与意义 ============ -->
+<section class="chapter" id="ch5">
+  <div class="chap-head"><span class="chap-num">05</span><h2>局限与意义</h2></div>
+  <p class="oneline">框架有效，但作者对短板说得也很坦白。</p>
+
+  <div class="card fade-up">
+    <h3>⚖️ 局限</h3>
+    <ul style="margin:8px 0 0 22px;color:#2c3a4e;font-size:15px;line-height:2">
+      <li><b>训练不稳定性未解决</b>：多轮 GRPO + 终局二元奖励的信用分配难题仍在，Self-Refine 训练 156 步后崩溃，只能靠早停检查点应对 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§4.1, 附录D</a>。</li>
+      <li><b>没有全能变体</b>：ADAPTIVE 在新组合档领先却在新模块档垫底（69.88%，低于 CoT 基线 74.91%），梯度平衡会过拟合训练模块分布——策略选择需要「看菜下饭」 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§6.2</a>。</li>
+      <li><b>规模与领域有限</b>：仅在 3B 单模型、数学推理域（GSM8K 训练）验证；终局奖励依赖可自动判对错的任务。论文自己也承认「如何训练基座模型与不断演化的控制器家族协作仍 largely open」 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§6, §7</a>。</li>
+    </ul>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🌉 意义：补上「自动发明工作流」与「后训练」之间的缺口</h3>
+    <p>近两年 ADAS、Archon 等工作开始<b>自动搜索</b>推理时控制器——新工作流会像积木图纸一样被源源不断发明出来。但如果模型只在一种固定模式下后训练，每发明一种新控制器，模型都可能要重训。CALM 补上了另一半：让基座模型学会与<b>多样且持续演化的控制器家族</b>协作。论文将其定位为连接「推理时技术的自动发现」与「基座模型后训练」两条研究线的桥梁 <a class="src" href="https://arxiv.org/pdf/2607.23771" target="_blank" rel="noopener">§5, §7</a>。</p>
+    <div class="keyfact">一句话记住 CALM：别把模型训练成某一位指挥的专属乐手——训练时轮流换指挥，学好每块推理积木，部署时任何新图纸都能即插即用 <a class="src" href="https://arxiv.org/abs/2607.23771" target="_blank" rel="noopener">arXiv:2607.23771</a>。</div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    本页面为 arXiv 论文 <a class="src-inline" href="https://arxiv.org/abs/2607.23771" target="_blank" rel="noopener">Training Language Models to Cooperate with Inference-Time Controllers（CALM, arXiv:2607.23771）</a> 的中文交互解读，非官方页面。<br>
+    所有实验数字均取自论文原文（Table 1/2/3/5、§4–§6、附录A/C），动画中的演示参数与论文口径一致处已在图注标明，其余为示意。<br>
+    论文作者：M. Choudhury, V. Khattar, J. Liu, T. Koike-Akino, A. Chakrabarty, S. Zilberstein, Y. Wang（UMass Amherst & MERL）。
+  </div>
+</footer>
+
+<script>
+/* ============ 动画1：控制器模块流程 ============ */
+(function(){
+  var CTRLS = [
+    {id:'b1', label:'B1 CoT', note:'见过的控制器', mods:['COT'],
+      status:'单次思维链：一步思考直接给答案。只有 1 轮。'},
+    {id:'b4', label:'B4 Step-back', note:'见过的控制器', mods:['ABSTRACTOR','COT'],
+      status:'先抽象出背后的原理，再带着原理做题。2 轮。'},
+    {id:'b2', label:'B2 Self-Refine', note:'见过的控制器', mods:['COT','CRITIC','COT','CRITIC','COT'],
+      status:'先答 → 批评 → 带着反馈重答，批评↔重答最多 2 轮，共约 5 轮。'},
+    {id:'b3', label:'B3 辩论', note:'见过的控制器', mods:['DEBATER','DEBATER','DEBATER','JUDGE'],
+      status:'三位辩手（教授/老师/爱好者）交锋 2 轮后，由裁判汇总裁决，约 7 轮。'},
+    {id:'h2', label:'H2 Step-back+Refine', note:'新组合 · 训练没见过', mods:['ABSTRACTOR','COT','CRITIC','COT'],
+      status:'旧积木、新拼法：把「抽象」和「自我反思」串成一条新流水线。训练时没见过这个组合。'},
+    {id:'h4', label:'H4 角色扮演', note:'新模块 · 训练没见过', mods:['TEACHER','STUDENT','VERIFIER'], isNew:true,
+      status:'连积木都是新的：TEACHER / STUDENT / VERIFIER 角色训练时从未出现，考的是真迁移。'}
+  ];
+  var btnBox = document.getElementById('ctrlBtns');
+  var flow = document.getElementById('modFlow');
+  var status = document.getElementById('flowStatus');
+  var playBtn = document.getElementById('flowPlay');
+  var cur = 0, timers = [];
+
+  CTRLS.forEach(function(c, i){
+    var b = document.createElement('button');
+    b.className = 'btn ghost';
+    b.textContent = c.label;
+    b.addEventListener('click', function(){ select(i); });
+    btnBox.appendChild(b);
+  });
+
+  function select(i){
+    cur = i;
+    timers.forEach(clearTimeout); timers = [];
+    var c = CTRLS[i];
+    Array.prototype.forEach.call(btnBox.children, function(b, j){
+      b.classList.toggle('active', j === i);
+    });
+    flow.innerHTML = '';
+    c.mods.forEach(function(m, j){
+      if(j > 0){
+        var ar = document.createElement('span');
+        ar.className = 'mod-arrow'; ar.textContent = '→';
+        flow.appendChild(ar);
+      }
+      var box = document.createElement('div');
+      box.className = 'mod-box' + (c.isNew ? ' new-mod' : '');
+      box.innerHTML = m + '<small>' + (c.isNew ? '新角色' : '模块') + '</small>';
+      flow.appendChild(box);
+    });
+    status.textContent = c.label + '（' + c.note + '）：' + c.mods.length + ' 个模块节点。点 ▶ 播放。';
+  }
+
+  playBtn.addEventListener('click', function(){
+    select(cur);
+    var c = CTRLS[cur];
+    var boxes = flow.querySelectorAll('.mod-box');
+    var arrows = flow.querySelectorAll('.mod-arrow');
+    boxes.forEach(function(box, j){
+      timers.push(setTimeout(function(){
+        box.classList.add('lit');
+        status.textContent = '第 ' + (j+1) + ' 轮：' + c.mods[j] + ' 模块工作中……';
+        if(j > 0){ arrows[j-1].classList.add('lit'); }
+      }, 500 * j + 100));
+      timers.push(setTimeout(function(){
+        box.classList.remove('lit'); box.classList.add('done');
+      }, 500 * j + 480));
+    });
+    timers.push(setTimeout(function(){
+      status.textContent = c.label + ' 流程走完 → ' + c.status;
+    }, 500 * boxes.length + 500));
+  });
+
+  select(0);
+})();
+
+/* ============ 动画2：单控制器 vs CALM 对比 ============ */
+(function(){
+  var CALM_NAMES = ['CoT','Self-Refine','辩论','Step-back','Quality-Diversity','RoleAssign'];
+  var SINGLE_FINAL = [36.30, 45.84, 53.50];
+  var CALM_FINAL = [73.45, 70.31, 75.69];
+  var STEPS = 8;
+  var timers = [];
+  var logS = document.getElementById('logSingle');
+  var logC = document.getElementById('logCalm');
+  var sBars = ['sb1','sb2','sb3'].map(function(id){ return document.getElementById(id); });
+  var cBars = ['cb1','cb2','cb3'].map(function(id){ return document.getElementById(id); });
+  var sVals = ['sv1','sv2','sv3'].map(function(id){ return document.getElementById(id); });
+  var cVals = ['cv1','cv2','cv3'].map(function(id){ return document.getElementById(id); });
+
+  function setBars(bars, vals, finals, frac){
+    finals.forEach(function(f, i){
+      var v = f * frac;
+      bars[i].style.width = (v / 80 * 100) + '%';
+      vals[i].textContent = v.toFixed(2) + '%';
+    });
+  }
+  function reset(){
+    timers.forEach(clearTimeout); timers = [];
+    logS.innerHTML = ''; logC.innerHTML = '';
+    setBars(sBars, sVals, SINGLE_FINAL, 0);
+    setBars(cBars, cVals, CALM_FINAL, 0);
+  }
+  document.getElementById('duelPlay').addEventListener('click', function(){
+    reset();
+    for(var step = 1; step <= STEPS; step++){
+      (function(s){
+        timers.push(setTimeout(function(){
+          logS.innerHTML += '<div>步 ' + s + '：抽中 <span class="cur">Self-Refine</span>（永远是它）</div>';
+          logS.scrollTop = logS.scrollHeight;
+          var pick = CALM_NAMES[Math.floor(Math.random() * CALM_NAMES.length)];
+          logC.innerHTML += '<div>步 ' + s + '：随机抽中 <span class="cur">' + pick + '</span></div>';
+          logC.scrollTop = logC.scrollHeight;
+          var frac = s / STEPS;
+          setBars(sBars, sVals, SINGLE_FINAL, frac);
+          setBars(cBars, cVals, CALM_FINAL, frac);
+          if(s === STEPS){
+            logS.innerHTML += '<div class="cur">→ 离开主场就崩：新组合档仅 45.84%</div>';
+            logC.innerHTML += '<div class="cur">→ 三档全部稳在 70%+</div>';
+          }
+        }, 650 * s));
+      })(step);
+    }
+  });
+  document.getElementById('duelReset').addEventListener('click', reset);
+  reset();
+})();
+
+/* ============ 动画3：GRPO 组内优势滑杆 ============ */
+(function(){
+  var G = 8, EPS = 0.01;
+  var slider = document.getElementById('grpoK');
+  var out = document.getElementById('grpoKOut');
+  var readout = document.getElementById('grpoReadout');
+  var cv = document.getElementById('grpoCanvas');
+  var ctx = cv.getContext('2d');
+
+  function fit(){
+    var dpr = window.devicePixelRatio || 1;
+    var w = cv.clientWidth, h = cv.clientHeight;
+    cv.width = w * dpr; cv.height = h * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function draw(){
+    fit();
+    var k = parseInt(slider.value, 10);
+    out.textContent = k + ' / ' + G;
+    var mu = k / G;
+    var sigma = Math.sqrt(mu * (1 - mu));
+    var aC = (1 - mu) / (sigma + EPS);
+    var aW = (0 - mu) / (sigma + EPS);
+    var w = cv.clientWidth, h = cv.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+    var mid = h / 2;
+    ctx.strokeStyle = '#33507f'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(w, mid); ctx.stroke();
+    var bw = Math.min(70, w / G - 24);
+    var scale = h * 0.36;
+    for(var i = 0; i < G; i++){
+      var correct = i < k;
+      var a = correct ? aC : aW;
+      var x = (w / G) * i + (w / G - bw) / 2;
+      var bh = Math.max(2, Math.abs(a) / 2.2 * scale);
+      ctx.fillStyle = correct ? '#2bc48a' : '#ff6b6b';
+      if(a >= 0){ ctx.fillRect(x, mid - bh, bw, bh); }
+      else { ctx.fillRect(x, mid, bw, bh); }
+      ctx.fillStyle = '#9db4dd'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(correct ? 'R=1' : 'R=0', x + bw / 2, h - 8);
+      ctx.fillStyle = correct ? '#7fe3bb' : '#ffa8a8';
+      var ly = a >= 0 ? mid - bh - 6 : mid + bh + 14;
+      ctx.fillText('Â=' + a.toFixed(2), x + bw / 2, ly);
+    }
+    if(k === 0 || k === G){
+      readout.innerHTML = 'μ = ' + mu.toFixed(2) + '，σ = 0 → <b style="color:#ffd97a">全对或全错：组内没有对比，优势全部归零，这一步几乎学不到信号。</b>这正是 GRPO 依赖「有对有错」的原因。';
+    } else {
+      readout.innerHTML = 'μ = ' + mu.toFixed(3) + '，σ = ' + sigma.toFixed(3) +
+        ' → 答对轨迹 Â = <b style="color:#7fe3bb">+' + aC.toFixed(3) + '</b>（被表扬），答错轨迹 Â = <b style="color:#ffa8a8">' + aW.toFixed(3) + '</b>（被压制）。k 越接近一半，对比越强烈。';
+    }
+  }
+  slider.addEventListener('input', draw);
+  window.addEventListener('resize', draw);
+  draw();
+})();
+
+/* ============ 动画4：ADAPTIVE 权重滑杆 ============ */
+(function(){
+  var s1 = document.getElementById('nuCot');
+  var s2 = document.getElementById('nuCritic');
+  var o1 = document.getElementById('nuCotOut');
+  var o2 = document.getElementById('nuCriticOut');
+  var readout = document.getElementById('adaptReadout');
+  var cv = document.getElementById('adaptCanvas');
+  var ctx = cv.getContext('2d');
+
+  function clipW(x){ return Math.min(10, Math.max(0.1, x)); }
+  function draw(){
+    var dpr = window.devicePixelRatio || 1;
+    cv.width = cv.clientWidth * dpr; cv.height = cv.clientHeight * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var n1 = parseFloat(s1.value), n2 = parseFloat(s2.value);
+    o1.textContent = n1.toFixed(1); o2.textContent = n2.toFixed(1);
+    var mean = (n1 + n2) / 2;
+    var w1 = clipW(Math.pow(mean / n1, 1.0));
+    var w2 = clipW(Math.pow(mean / n2, 1.0));
+    var w = cv.clientWidth, h = cv.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+    var rows = [
+      {name:'COT', nu:n1, wt:w1, color:'#1783ff'},
+      {name:'CRITIC', nu:n2, wt:w2, color:'#f7b731'}
+    ];
+    ctx.font = '13px sans-serif';
+    rows.forEach(function(r, i){
+      var y = 34 + i * 88;
+      ctx.fillStyle = '#9db4dd'; ctx.textAlign = 'left';
+      ctx.fillText(r.name + '  梯度范数 ν = ' + r.nu.toFixed(1), 16, y);
+      ctx.fillStyle = '#223a63';
+      ctx.fillRect(16, y + 8, w - 130, 10);
+      ctx.fillStyle = '#5b7dbb';
+      ctx.fillRect(16, y + 8, (w - 130) * r.nu / 8, 10);
+      ctx.fillStyle = '#9db4dd';
+      ctx.fillText('权重 w = (ν̄/ν)¹ = ' + r.wt.toFixed(2), 16, y + 44);
+      ctx.fillStyle = '#223a63';
+      ctx.fillRect(16, y + 52, w - 130, 10);
+      ctx.fillStyle = r.color;
+      ctx.fillRect(16, y + 52, (w - 130) * Math.min(r.wt, 2) / 2, 10);
+    });
+    readout.innerHTML = 'ν̄ = ' + mean.toFixed(2) + ' → COT 权重 <b style="color:#8fb8ff">' + w1.toFixed(2) +
+      '</b>，CRITIC 权重 <b style="color:#ffd97a">' + w2.toFixed(2) + '</b>。谁的梯度范数持续偏大，谁的更新权重就被压小——嗓门大的被调低音量。';
+  }
+  s1.addEventListener('input', draw);
+  s2.addEventListener('input', draw);
+  window.addEventListener('resize', draw);
+  draw();
+})();
+
+/* ============ 结果三档条形图 ============ */
+(function(){
+  var DATA = [
+    {name:'基座模型（零训练）', v:[30.97, 43.39, 58.07], c:'#48566a'},
+    {name:'CoT 基线', v:[71.04, 67.85, 74.91], c:'#9aa7bd'},
+    {name:'Self-Refine 基线', v:[36.30, 45.84, 53.50], c:'#9aa7bd'},
+    {name:'辩论 基线', v:[55.37, 55.82, 69.83], c:'#9aa7bd'},
+    {name:'Step-back 基线', v:[71.11, 68.31, 74.10], c:'#9aa7bd'},
+    {name:'CALM-MIXED', v:[73.45, 70.31, 75.69], c:'#1783ff'},
+    {name:'CALM-SINGLE', v:[71.49, 65.78, 75.46], c:'#2bc48a'},
+    {name:'CALM-UNIFORM', v:[73.20, 69.22, 73.51], c:'#f7b731'},
+    {name:'CALM-ADAPTIVE', v:[73.72, 70.68, 69.88], c:'#a55eea'}
+  ];
+  var box = document.getElementById('tierBars');
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('.tier-tab'));
+  function render(tier){
+    box.innerHTML = '';
+    DATA.forEach(function(d){
+      var row = document.createElement('div');
+      row.className = 'bar-row';
+      row.innerHTML = '<span>' + d.name + '</span>' +
+        '<div class="scorebar"><i style="background:' + d.c + '"></i></div>' +
+        '<b>' + d.v[tier].toFixed(2) + '</b>';
+      box.appendChild(row);
+    });
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){
+        Array.prototype.forEach.call(box.querySelectorAll('.scorebar i'), function(el, i){
+          el.style.width = (DATA[i].v[tier] / 80 * 100) + '%';
+        });
+      });
+    });
+  }
+  tabs.forEach(function(t){
+    t.addEventListener('click', function(){
+      var tier = parseInt(t.getAttribute('data-tier'), 10);
+      tabs.forEach(function(x){
+        x.classList.add('ghost');
+        x.style.borderColor = 'var(--line)';
+        x.style.color = 'var(--ink-soft)';
+      });
+      t.classList.remove('ghost');
+      t.style.borderColor = '';
+      t.style.color = '';
+      render(tier);
+    });
+  });
+  render(0);
+})();
+
+/* ============ 入场淡入 ============ */
+(function(){
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){ e.target.classList.add('show'); io.unobserve(e.target); }
+    });
+  }, {threshold: 0.08});
+  document.querySelectorAll('.fade-up').forEach(function(el){ io.observe(el); });
+})();
+</script>
+</body>
+</html>

@@ -11,6 +11,10 @@
 | 📄 论文 | 看懂「规划物理学」：解剖智能体的长程规划能力如何长出、塑形、合体 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/agentic-distillation/) |
 | 📄 论文 | 看懂奖励模型的「记性」：反事实记忆解剖 RLHF 考官的三大病灶 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/reward-model-memory/) |
 | 📄 论文 | 看懂 PIVOT：一排 query 拼一次单，稀疏注意力索引提速 4.8× 而精度不掉 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/pivot-sparse-attention/) |
+| 📄 论文（多模态大模型） | 看懂 CADER：先掂量把握再决定要不要翻录像，长视频问答的置信度分诊台 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/cader-long-video/) |
+| 📄 论文（LLM 智能体） | 看懂 MemChain：检索到 ≠ 用得上，143 个 token 的「呈堂证供」打赢 3,491 个 token 的原始记忆 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/memchain-agent-memory/) |
+| 📄 论文（AI 安全与对齐） | 看懂不可见推理：大模型用一串「废话 token」偷偷思考，盯着思维链的监控器什么都没看见 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/invisible-reasoning/) |
+| 📄 论文（推理与思维链） | 看懂 CALM：别只练一套拳法——训练时轮流换「指挥」，让大模型学会配合任何推理时控制器 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/inference-time-controllers/) |
 
 ## 目录结构
 
@@ -27,8 +31,16 @@
 │   │   └── index.html           # 长程规划「物理学」论文交互解读（单文件，零依赖）
 │   ├── reward-model-memory/
 │   │   └── index.html           # 奖励模型记忆机制论文交互解读（单文件，零依赖）
-│   └── pivot-sparse-attention/
-│       └── index.html           # PIVOT 稀疏注意力索引论文交互解读（单文件，零依赖）
+│   ├── pivot-sparse-attention/
+│   │   └── index.html           # PIVOT 稀疏注意力索引论文交互解读（单文件，零依赖）
+│   ├── cader-long-video/
+│   │   └── index.html           # CADER 长视频理解论文交互解读（单文件，零依赖）
+│   ├── memchain-agent-memory/
+│   │   └── index.html           # MemChain 智能体记忆论文交互解读（单文件，零依赖）
+│   ├── invisible-reasoning/
+│   │   └── index.html           # 不可见推理论文交互解读（单文件，零依赖）
+│   └── inference-time-controllers/
+│       └── index.html           # CALM 推理时控制器论文交互解读（单文件，零依赖）
 ├── README.md
 └── LICENSE                      # MIT
 ```
@@ -81,6 +93,42 @@
 - **核心方法 × 1 组对比动画**：DSA 逐 query 扫描 / PIVOT-Reuse / PIVOT-Refine 三模式扫描计数对比
 - **实验结果 × 1 组滑杆动画**：上下文 4K–256K 索引器加速比（图 4 全部 28 个实测数据点）、RULER 128K 精度对照
 - **局限与意义**：免训练即插即用替换 DSA 索引器，索引提速约 4.8× 而精度不掉
+
+### CADER 长视频理解论文解读（`papers/cader-long-video/index.html`，多模态大模型）
+
+基于 arXiv 论文《CADER: Confidence-Aware Dynamic Evidence Reasoning for Long-Video Understanding》（arXiv:2607.24582）制作的单文件交互页面，内容包括：
+
+- **概念基础 × 1 组交互动画**：帧采样与 token 预算、带温度 Softmax、logit margin 置信度（温度滑杆实时翻转「早退/进 Stage 2」判定）
+- **核心方法 × 3 组交互动画**：统一管线 vs CADER 分流对比、真实案例四步搜索流程动画、RGR vs 均匀采样帧密度对比
+- **实验结果**：五基准完整对比、逐部件消融、各基准早退率（38.6% 样本跳过工具流水线）、margin 校准分析
+- **局限与意义**：反思深度收益递减、路由依赖 backbone 校准、免训练随基座升级自动受益，所有关键结论均挂 ↗ 原文出处
+
+### MemChain 智能体记忆论文解读（`papers/memchain-agent-memory/index.html`，LLM 智能体）
+
+基于 arXiv 论文《MemChain: Learning Interpretable Memory Traces for Memory-Augmented LLM Agents》（arXiv:2607.24097，中科院自动化所等）制作的单文件交互页面，内容包括：
+
+- **概念基础 × 1 组对比动画**：「检索即证据」三大病灶（冗余/冲突/弱相关）vs MemChain 中介过滤
+- **核心方法 × 3 组交互动画**：五个记忆动作工作台（KEEP/DROP/MERGE/REFINE/ADD）、真实案例五步流程动画、TMPO 组相对优势滑杆演示
+- **实验结果**：LoCoMo 主表（69.80 总分 / 证据仅 143.3 token，约 24× 压缩）、LongMemEval-S 全子任务表、开源回答模型迁移与消融
+- **局限与意义**：证据成形首次成为显式、可训练、可审计的学习问题，所有关键结论均挂 ↗ 原文出处
+
+### 不可见推理论文解读（`papers/invisible-reasoning/index.html`，AI 安全与对齐）
+
+基于 arXiv 论文《Not All LLM Reasoning is Visible in the Chain-of-Thought》（arXiv:2607.22925，NYU/UMD/TogetherAI）制作的单文件交互页面，内容包括：
+
+- **核心发现 × 5 组交互动画**：13 个前沿模型仅靠语义无关的填充 token 最高提升 13 个百分点、「类型反转」现象、激活补丁按层恢复率、隐藏约束满足率对比
+- **机理解剖**：有用信号分布在整个填充序列、于第 0–30 层建立；激活补丁、线性探针、注意力掩码三重证据
+- **安全冲击**：Claude Opus 4.5 借填充 token 满足隐藏数学约束且不牺牲主任务——不可见推理可服务监控不可见的目的；RL/SFT 无法训练留存
+- **局限与意义**：对 CoT 可监控性（monitorability）的直接挑战，所有关键结论均挂 ↗ 原文出处
+
+### CALM 推理时控制器论文解读（`papers/inference-time-controllers/index.html`，推理与思维链）
+
+基于 arXiv 论文《Training Language Models to Cooperate with Inference-Time Controllers》（arXiv:2607.23771，UMass Amherst & MERL）制作的单文件交互页面，内容包括：
+
+- **核心问题**：后训练只针对单一固定交互模式优化，单控制器模型「换指挥」就断崖下跌（Debate 71.87% → CoT 40.86%）
+- **核心方法 × 4 组交互动画**：控制器 = 可复用推理模块的组合（6 种控制器流程动画）、单控制器 vs CALM 对比动画、GRPO 组内优势滑杆、ADAPTIVE 权重滑杆
+- **实验结果**：四种变体在「见过的控制器 / 旧模块新组合 / 全新模块」三档评测全部反超最强单控基线（73.72% vs 71.11%），并泛化到 MATH500/AMC23
+- **局限与意义**：无全能变体，多轮 RL 训练不稳定性未解决，所有关键结论均挂 ↗ 原文出处
 
 ## 许可证
 

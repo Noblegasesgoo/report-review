@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>看懂 MemChain：检索到 ≠ 用得上，给记忆智能体配一位「证据律师」</title>
+<style>
+  :root{
+    --blue:#1783ff; --blue-d:#0b5cc4; --red:#ff6b6b; --amber:#f7b731;
+    --purple:#a55eea; --green:#2bc48a; --ink:#1b2430; --ink-soft:#48566a;
+    --bg:#f6f8fc; --card:#ffffff; --line:#e4eaf3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.8}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+
+  /* ===== Hero ===== */
+  .hero{background:linear-gradient(160deg,#0a1a3f 0%,#103a8c 55%,#1783ff 100%);
+    color:#fff;padding:72px 0 56px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+    padding:4px 14px;border-radius:99px;font-size:13px;letter-spacing:1px;margin-bottom:18px}
+  .hero h1{font-size:clamp(26px,4.6vw,44px);line-height:1.3;margin-bottom:14px}
+  .hero p.sub{font-size:clamp(14px,1.8vw,18px);opacity:.88;max-width:860px}
+  .hero .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);
+    border-radius:16px;padding:14px 22px;min-width:150px}
+  .stat b{display:block;font-size:26px;font-weight:800}
+  .stat span{font-size:13px;opacity:.85}
+
+  /* ===== Nav ===== */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  nav.toc .inner{display:flex;gap:6px;overflow-x:auto;padding:10px 22px;max-width:1060px;margin:0 auto}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--ink-soft);text-decoration:none;
+    padding:6px 12px;border-radius:99px;transition:.2s}
+  nav.toc a:hover{background:#eaf2ff;color:var(--blue-d)}
+
+  /* ===== Sections ===== */
+  section.chapter{padding:56px 0 8px}
+  .chap-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  .chap-num{font-size:14px;font-weight:800;color:#fff;background:var(--blue);
+    border-radius:10px;padding:3px 12px;letter-spacing:1px}
+  .chap-head h2{font-size:clamp(21px,3vw,30px)}
+  .oneline{color:var(--blue-d);font-weight:600;margin:4px 0 22px;font-size:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:0 2px 14px rgba(20,50,110,.05)}
+  .card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card p{margin-bottom:12px;color:#2c3a4e}
+  .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
+    border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
+  .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
+  .keyfact{position:relative;background:#eef5ff;border-left:4px solid var(--blue);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";position:absolute;left:16px;top:12px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .demo-box{background:#0e1830;border-radius:18px;padding:22px;margin:16px 0;color:#dfe8ff;
+    position:relative;overflow:hidden}
+  .demo-title{color:#8fb8ff;font-size:13px;letter-spacing:2px;font-weight:700;margin-bottom:14px;text-transform:uppercase}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:99px;padding:9px 22px;font-size:14px;
+    cursor:pointer;font-weight:600;transition:.2s;box-shadow:0 4px 14px rgba(23,131,255,.35)}
+  .btn:hover{background:var(--blue-d);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);box-shadow:none;color:#dfe8ff}
+  .btn.ghost.active{background:rgba(23,131,255,.22);border-color:#6db4ff;color:#fff}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border-radius:12px;overflow:hidden}
+  table.tbl th{background:#103a8c;color:#fff;padding:10px 12px;text-align:left;font-weight:600}
+  table.tbl td{padding:10px 12px;border-bottom:1px solid var(--line)}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl tr:nth-child(even) td{background:#f7faff}
+  .hl{color:var(--blue-d);font-weight:700}
+  .tbl-scroll{overflow-x:auto}
+
+  /* ===== 公式（纯 HTML/CSS，无 MathJax）===== */
+  .formula{background:#0e1830;border-radius:14px;padding:20px 22px;margin:14px 0;color:#eaf1ff;
+    font-size:clamp(15px,2.2vw,19px);text-align:center;overflow-x:auto;line-height:2;
+    font-family:"STIX Two Math","Cambria Math",Georgia,serif}
+  .formula .op{color:#8fb8ff}
+  .formula .cond{font-size:.82em;color:#9db4dd}
+  .frac{display:inline-flex;flex-direction:column;vertical-align:middle;margin:0 2px;line-height:1.4}
+  .frac .num{border-bottom:1.5px solid currentColor;padding:0 7px}
+  .frac .den{padding:0 7px}
+  .fnote{font-size:13px;color:#7f92b8;margin-top:10px;text-align:center;line-height:1.7;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  .formula var{font-style:italic}
+
+  /* ===== 结果条形图 ===== */
+  .scorebar{height:10px;border-radius:99px;background:#e7edf6;overflow:hidden;margin:4px 0 12px}
+  .scorebar i{display:block;height:100%;border-radius:99px;width:0;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+  .bar-row{display:grid;grid-template-columns:190px 1fr 84px;gap:12px;align-items:center;margin-bottom:10px;font-size:14px}
+  @media(max-width:640px){.bar-row{grid-template-columns:120px 1fr 64px}}
+  .bar-row b{text-align:right;font-variant-numeric:tabular-nums}
+
+  .caption{font-size:12.5px;color:#7f92b8;margin-top:8px;line-height:1.6}
+
+  /* ===== 记忆卡片 & 演示舞台 ===== */
+  .mem-grid{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+  .mem-chip{background:#16203c;border:1px solid #2c3d66;border-radius:12px;
+    padding:10px 14px;font-size:13px;line-height:1.6;flex:1 1 200px;transition:all .6s ease;position:relative}
+  .mem-chip .mid{color:#6db4ff;font-weight:700;font-size:12px;display:block;margin-bottom:2px;
+    font-family:ui-monospace,Menlo,monospace}
+  .mem-chip.bad{border-color:#7a4a4a}
+  .mem-chip .flag{position:absolute;top:-8px;right:-6px;font-size:11px;background:var(--red);color:#fff;
+    border-radius:99px;padding:1px 9px;font-weight:700}
+  .mem-chip .flag.warn{background:var(--amber);color:#4a3500}
+  .mem-chip.dropped{opacity:.22;filter:grayscale(1);transform:scale(.94)}
+  .mem-chip.kept{border-color:var(--green);box-shadow:0 0 0 1px var(--green)}
+  .stage-row{display:grid;grid-template-columns:1fr 56px 1fr;gap:10px;align-items:center;margin:12px 0}
+  @media(max-width:720px){.stage-row{grid-template-columns:1fr}}
+  .stage-arrow{text-align:center;font-size:26px;color:#6db4ff}
+  @media(max-width:720px){.stage-arrow{transform:rotate(90deg)}}
+  .sink{border:1.5px dashed #3a5078;border-radius:14px;padding:14px;min-height:120px;font-size:13.5px;line-height:1.7}
+  .sink h5{color:#8fb8ff;font-size:12px;letter-spacing:1px;margin-bottom:8px}
+  .ev-line{background:rgba(43,196,138,.12);border:1px solid rgba(43,196,138,.45);border-radius:10px;
+    padding:8px 12px;margin:6px 0;font-size:13.5px}
+  .ev-line .cite{color:#7ee0b8;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+  .tok-meter{margin-top:12px;font-size:13.5px}
+  .tok-meter .tbar{height:12px;border-radius:99px;background:#1a2547;overflow:hidden;margin:4px 0 2px}
+  .tok-meter .tbar i{display:block;height:100%;width:0;border-radius:99px;
+    background:linear-gradient(90deg,var(--amber),var(--red));transition:width 1.2s cubic-bezier(.4,0,.2,1)}
+  .tok-meter .tbar i.good{background:linear-gradient(90deg,var(--green),#7ee0b8)}
+
+  /* ===== 流程步骤 ===== */
+  .pipe-steps{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+  .pipe-tab{flex:1 1 130px;text-align:center;font-size:13px;padding:8px 6px;border-radius:10px;
+    border:1px solid #2c3d66;color:#9db4dd;transition:.3s;cursor:default}
+  .pipe-tab.on{background:rgba(23,131,255,.22);border-color:#6db4ff;color:#fff;font-weight:700}
+  .pipe-tab.done{border-color:var(--green);color:#7ee0b8}
+  .pipe-pane{background:#0a1326;border-radius:12px;padding:16px;margin-top:10px;font-size:14px;line-height:1.8;min-height:150px}
+  .trace-step{border-left:3px solid var(--blue);padding:6px 12px;margin:8px 0;font-size:13.5px}
+  .trace-step b{color:#8fb8ff}
+  .act-pill{display:inline-block;border-radius:99px;padding:2px 12px;font-size:12.5px;font-weight:700;margin:2px 4px 2px 0}
+  .act-keep{background:rgba(43,196,138,.2);color:#7ee0b8;border:1px solid var(--green)}
+  .act-drop{background:rgba(255,107,107,.18);color:#ffa3a3;border:1px solid var(--red)}
+  .act-merge{background:rgba(165,94,234,.2);color:#cfa5f5;border:1px solid var(--purple)}
+  .act-refine{background:rgba(247,183,49,.2);color:#ffd97a;border:1px solid var(--amber)}
+  .act-add{background:rgba(23,131,255,.2);color:#8fb8ff;border:1px solid var(--blue)}
+
+  /* ===== TMPO 优势演示 ===== */
+  .ro-row{display:grid;grid-template-columns:86px 1fr 120px;gap:12px;align-items:center;margin-bottom:12px;font-size:14px}
+  @media(max-width:640px){.ro-row{grid-template-columns:70px 1fr 96px}}
+  .ro-bar{height:22px;border-radius:8px;background:#1a2547;position:relative;overflow:hidden}
+  .ro-bar i{position:absolute;top:0;bottom:0;left:50%;width:0;transition:all .9s cubic-bezier(.4,0,.2,1);border-radius:4px}
+  .ro-bar i.pos{background:linear-gradient(90deg,#1f7a56,var(--green))}
+  .ro-bar i.neg{background:linear-gradient(90deg,var(--red),#a33)}
+  .ro-bar .zero{position:absolute;left:50%;top:0;bottom:0;width:1.5px;background:#5b6f9c}
+  .ro-num{font-variant-numeric:tabular-nums;text-align:right;font-weight:700}
+
+  /* ===== 来源标注 ===== */
+  .src{color:var(--blue-d);text-decoration:none;font-size:.8em;font-weight:600;
+    border-bottom:1px dashed #9db8e8;padding:0 1px;white-space:nowrap}
+  .src:hover{color:var(--blue);border-bottom-style:solid;background:#eaf2ff;border-radius:4px}
+  .src::after{content:"↗";font-size:.85em;margin-left:1px}
+  .demo-box .src, .formula .src{color:#8fb8ff;border-bottom-color:#3a5078}
+  .demo-box .src:hover{color:#cfe2ff;background:rgba(23,131,255,.15)}
+
+  footer{margin-top:64px;padding:34px 0 46px;color:#7f8ca3;font-size:13px;text-align:center;
+    border-top:1px solid var(--line);line-height:2}
+  footer a{color:var(--blue-d)}
+  .fade-up{opacity:0;transform:translateY(26px);transition:all .7s cubic-bezier(.3,.7,.3,1)}
+  .fade-up.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">arXiv 论文交互解读 · LLM 智能体记忆</span>
+    <h1>看懂 MemChain：检索到 ≠ 用得上，给记忆智能体配一位「证据律师」</h1>
+    <p class="sub">记忆增强智能体的惯例是：检索到相关记忆，就原样塞给回答模型。中科院自动化所与 Memorax AI 团队指出，这批记忆往往冗余、过时、互相打架——于是他们在「检索」和「回答」之间安插了一个<b>可训练的检索后记忆策略</b>：先列证据计划，再排出带引用的证据链，最后用 KEEP / DROP / MERGE / REFINE / ADD 五个动作，把一摞候选记忆裁剪成一份紧凑、可溯源的「呈堂证供」。</p>
+    <div class="stats">
+      <div class="stat"><b>69.80%</b><span>LoCoMo 总分（GPT-4.1-mini 答题），超最强基线 6.10 个点</span></div>
+      <div class="stat"><b>143.3 tok</b><span>喂给回答模型的证据长度，SimpleMem 要 3,491.0（约 24× 压缩）</span></div>
+      <div class="stat"><b>+19.09 pp</b><span>Qwen3-14B 冻结答题时达 80.26%，领先幅度最大</span></div>
+      <div class="stat"><b>0.83 s</b><span>每题记忆侧延迟，含检索与证据组装</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="toc"><div class="inner">
+  <a href="#ch0">🧠 热身：记忆智能体与「检索即证据」</a>
+  <a href="#ch1">📦 概念基础</a>
+  <a href="#ch2">⚖️ 核心方法：MemChain</a>
+  <a href="#ch3">📊 实验结果</a>
+  <a href="#ch4">⚖️ 局限与意义</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ============ CH0 热身 ============ -->
+<section class="chapter" id="ch0">
+  <div class="chap-head"><span class="chap-num">第 0 章</span><h2>热身：记忆智能体，和「检索即证据」的隐患</h2></div>
+  <p class="oneline">智能体能记住三个月前你说的话，靠的是记忆系统；但「记得」和「会用」之间，还隔着一道没人管的工序。</p>
+
+  <div class="card fade-up">
+    <h3>🗄️ 记忆增强智能体：给大模型配一个「档案柜」</h3>
+    <p>大语言模型本身的上下文窗口有限，跨会话、长周期地记住用户的事实、偏好和经历，就要靠<b>长期记忆系统</b>：把历史交互写成一条条带时间戳的记忆，存进记忆池 <var>M</var>；提问时由<b>检索器 R</b> 捞出一批可能相关的候选记忆 <var>C</var><sub>q</sub>；最后交给<b>回答模型 F</b> 生成答案（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §1、§3</a>）。Mem0、A-Mem、Zep 等系统都是这条路线（<a class="src" href="https://arxiv.org/abs/2504.19413" target="_blank" rel="noopener">Mem0</a>、<a class="src" href="https://arxiv.org/abs/2502.12110" target="_blank" rel="noopener">A-Mem</a>）。</p>
+    <div class="analogy">像给老板配了一位秘书和一个档案柜：老板（回答模型）每收到一个问题，秘书（检索器）就去档案柜里把「看着相关」的文件抱来。问题出在下一步——</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>⚠️ 「检索即证据」：把整摞卷宗原样扔给法官</h3>
+    <p>绝大多数系统的惯例是 <b>retrieval-as-evidence</b>：检索回来的候选集 <var>C</var><sub>q</sub> 直接当作最终上下文喂给回答模型。这隐含了一个未经验证的假设——<b>检回来的记忆天然适合推理</b>。实际上，这批候选记忆可能是（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §1、§3</a>）：</p>
+    <div class="mem-grid" style="color:#dfe8ff">
+      <div class="mem-chip" style="background:#eef5ff;border-color:#cfe0fb;color:#2c3a4e"><span class="mid" style="color:var(--blue-d)">🔁 冗余</span>同一事实被记录了三次，内容近乎重复</div>
+      <div class="mem-chip" style="background:#fdf0f0;border-color:#f3caca;color:#2c3a4e"><span class="mid" style="color:#c0392b">⏳ 过时 / 冲突</span>「我住北京」（3 月） vs「我搬到上海」（6 月），两条都检回来了</div>
+      <div class="mem-chip" style="background:#fff8e6;border-color:#f3d98a;color:#2c3a4e"><span class="mid" style="color:#a97b00">🕸️ 弱相关</span>关键词命中但答非所问，需要跨记录拼接才能用</div>
+    </div>
+    <p>于是回答模型要<b>自己</b>当场完成去重、时间更新、冲突裁决、跨记录关联——证据成形的过程完全是隐式的，系统既没说哪些候选被保留，也没说它们如何支撑最终答案（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §1</a>）。论文把这个缺口概括成一句话：</p>
+    <div class="keyfact"><b>相关性 ≠ 充分性（Relevance is not sufficiency）</b>：一条候选可以命中查询，却缺少解读另一条记录所需的时间限定词或跨记录关系。真正待解决的不是「能不能检到」，而是「检回来的候选能否被转化为对问题充分、时间一致、来源可溯的证据」（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §3</a>）。</div>
+    <div class="analogy">开庭时，秘书把档案柜里所有带关键词的卷宗——包括作废的旧合同、内容打架的两份证词、只沾边的旁证——整摞扔给法官。法官当然能断案，但既慢又容易看花眼。MemChain 要做的是那位<b>证据律师</b>：庭前先筛一遍，只呈上有编号、有出处、互相咬合的关键证词。</div>
+
+    <div class="demo-box">
+      <div class="demo-title">🎬 对比动画 · 两种记忆接口（卡片为示意，token 数为论文表 1 实测平均值）</div>
+      <div id="cmpStage">
+        <div class="mem-grid" id="cmpMems">
+          <div class="mem-chip"><span class="mid">m1</span>5 月 7 日，Caroline 参加了互助小组<span class="flag warn">重复信息</span></div>
+          <div class="mem-chip"><span class="mid">m2</span>5 月 8 日，Caroline 说小组让她感到被接纳<span class="flag warn">重复信息</span></div>
+          <div class="mem-chip"><span class="mid">m3</span>7 月 18 日，Caroline 加入了相关活动团体<span class="flag">日期冲突</span></div>
+          <div class="mem-chip"><span class="mid">m4</span>6 月 26 日，Caroline 参加了游行活动<span class="flag">弱相关</span></div>
+        </div>
+        <div class="stage-row">
+          <div class="sink">
+            <h5 id="cmpLeftTitle">① retrieval-as-evidence：整摞直接投喂</h5>
+            <div id="cmpLeftBody">4 条候选记忆（含重复、冲突、弱相关）全部进入回答模型，靠模型自己现场甄别。</div>
+            <div class="tok-meter">上下文长度（SimpleMem 方案实测均值）
+              <div class="tbar"><i id="cmpBarA"></i></div>
+              <b id="cmpTokA" style="color:#ffd97a">3,491.0 tokens</b>
+            </div>
+          </div>
+          <div class="stage-arrow">⇄</div>
+          <div class="sink">
+            <h5 id="cmpRightTitle">② MemChain：先过「证据律师」</h5>
+            <div id="cmpRightBody">点击播放，看候选记忆被裁成带引用的证据。</div>
+            <div class="tok-meter">上下文长度（MemChain 实测均值）
+              <div class="tbar"><i id="cmpBarB" class="good"></i></div>
+              <b id="cmpTokB" style="color:#7ee0b8">— tokens</b>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="cmpPlay">▶ 播放：MemChain 过滤过程</button>
+        <button class="btn ghost" id="cmpReset">↺ 重置</button>
+      </div>
+      <div class="caption">动画演示：冗余被合并、冲突/弱相关被 DROP，只留下带引用编号的证据。token 对比取自论文表 1（SimpleMem 3,491.0 vs MemChain 143.3，GPT-4.1-mini 块）。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH1 概念基础 ============ -->
+<section class="chapter" id="ch1">
+  <div class="chap-head"><span class="chap-num">第 1 章</span><h2>概念基础：记忆流水线、候选边界与「冻结」回答模型</h2></div>
+  <p class="oneline">三个预备概念：记忆系统分三段、候选集是封闭边界、回答模型全程不动。</p>
+
+  <div class="card fade-up">
+    <h3>① 记忆系统的三段流水线，MemChain 只动最后一段</h3>
+    <p>论文把记忆系统的干预点归为三个阶段（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §2</a>）：</p>
+    <table class="tbl">
+      <tr><th>阶段</th><th>做什么</th><th>代表工作</th><th>MemChain 的态度</th></tr>
+      <tr><td><b>记忆构建</b></td><td>写什么、怎么压缩、何时遗忘</td><td><a class="src" href="https://arxiv.org/abs/2504.19413" target="_blank" rel="noopener">Mem0</a>、<a class="src" href="https://arxiv.org/abs/2601.02553" target="_blank" rel="noopener">SimpleMem</a>、<a class="src" href="https://arxiv.org/abs/2601.01885" target="_blank" rel="noopener">Agentic Memory</a></td><td>不动，保持原样</td></tr>
+      <tr><td><b>检索与组织</b></td><td>捞哪批候选、怎么排序</td><td><a class="src" href="https://arxiv.org/abs/2502.12110" target="_blank" rel="noopener">A-Mem</a>、GraphRAG 等</td><td>不动，保持原样</td></tr>
+      <tr><td><b>检索后处理</b></td><td>检回来之后、喂给回答模型之前</td><td>此前多为规则式压缩/摘要</td><td class="hl">✅ 唯一学习这段</td></tr>
+    </table>
+    <p style="margin-top:14px">给定问题 <var>q</var>，检索器返回一个有界的候选集（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §3 式 (1)</a>）：</p>
+    <div class="formula">
+      <var>C</var><sub><var>q</var></sub> = <var>R</var>(<var>q</var>, <var>M</var>)，&nbsp;&nbsp; |<var>C</var><sub><var>q</var></sub>| ≤ <var>K</var>
+      <div class="fnote">检索器 R 从记忆池 M 里捞出最多 K 条「可能相关」的记忆。论文实验中，每条策略输入最多 24 条记忆（附录 A.3）。</div>
+    </div>
+    <div class="analogy">像做菜：第一段是「种菜」（写入记忆），第二段是「买菜」（检索候选），第三段是「配菜」（下锅前的拣选、改刀、搭配）。前人都卷在前两段，MemChain 说：我只学配菜，菜篮子原封不动。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>② 两种接口的数学写法：直接投喂 vs 中介转化</h3>
+    <p>设 <var>F</var> 为<b>冻结</b>的回答模型（全程不训练）。「检索即证据」基线把候选集直接当上下文（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §3 式 (2)</a>）：</p>
+    <div class="formula">
+      <var>ŷ</var><sub>recall</sub> = <var>F</var>(<var>q</var>, <var>C</var><sub><var>q</var></sub>)
+      <div class="fnote">整摞候选原样进回答模型——冗余、冲突、时间更新全由 F 现场消化。</div>
+    </div>
+    <p>MemChain 在两者之间插入一个<b>可训练的中介策略</b> <var>f</var><sub>θ</sub>，产出紧凑、可溯源、面向回答的<b>主动记忆 E</b>（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §3 式 (3)</a>）：</p>
+    <div class="formula">
+      <var>E</var> = <var>f</var><sub>θ</sub>(<var>q</var>, <var>C</var><sub><var>q</var></sub>) = Proj<sub><var>E</var></sub>( <var>π</var><sub>θ</sub>(<var>q</var>, <var>C</var><sub><var>q</var></sub>) )，&nbsp;&nbsp; <var>ŷ</var><sub>med</sub> = <var>F</var>(<var>q</var>, <var>E</var>)
+      <div class="fnote">f<sub>θ</sub> 不是第二个模型，而是记忆策略 π<sub>θ</sub> 一次生成中的「证据投影」：策略产出结构化数据包，只有最后的 E 被取出来喂给 F。E 是临时的、随问随建的，不写回持久记忆 M。</div>
+    </div>
+    <div class="keyfact"><b>对照实验的巧妙之处</b>：所有方法拿到<b>完全相同</b>的候选集 <var>C</var><sub>q</sub>、回答提示词、评测裁判与解码配置——所以任何提升都只能来自「从 <var>C</var><sub>q</sub> 到 <var>E</var> 的转化」，而不能归功于多检了几条记忆（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §3、§5.1</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>③ 封闭候选边界与「每句证词都要有卷宗编号」</h3>
+    <p>MemChain 给自己戴上了一副「手铐」——<b>封闭候选边界</b>：每一条证据链引用、每一个动作来源、每一句最终证据，都必须指向候选集 <var>C</var><sub>q</sub> 里的 ID。形式上，每条最终证据 <var>e</var><sub>j</sub> 必须保留出处（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §3 式 (4)、§4.4 式 (11)</a>）：</p>
+    <div class="formula">
+      ∀<var>e</var><sub>j</sub> ∈ <var>E</var>，&nbsp;&nbsp; ∅ ≠ <var>P</var>(<var>e</var><sub>j</sub>) ⊆ IDs(<var>C</var><sub><var>q</var></sub>)
+      <div class="fnote">P(e<sub>j</sub>) 是支撑证据 e<sub>j</sub> 的候选 ID 集合：不许是空集（每句证词必有出处），也不许超出候选集（不许凭空编记忆）。策略可以选择、重排、合并、精炼被引记录，但既不能引入未引用的记忆，也不能把 E 写回 M。</div>
+    </div>
+    <div class="analogy">法庭上，律师每说一句证词，法官都会问：「出自哪份卷宗？」答不上编号，这句证词直接作废。MemChain 的记忆因此<b>可审计</b>——这是它名字里「interpretable（可解释）」的底气。</div>
+  </div>
+</section>
+
+<!-- ============ CH2 核心方法 ============ -->
+<section class="chapter" id="ch2">
+  <div class="chap-head"><span class="chap-num">第 2 章</span><h2>核心方法：MemChain 的四段数据包、五个动作与两阶段训练</h2></div>
+  <p class="oneline">一次生成，四段结构：先列计划，再排证据链，然后执行动作，最后交出证据。</p>
+
+  <div class="card fade-up">
+    <h3>🧾 一次自回归生成，产出四段「工作底稿」</h3>
+    <p>MemChain 的策略 <var>π</var><sub>θ</sub>（默认 Qwen3-4B）拿到问题 <var>q</var> 和候选集 <var>C</var><sub>q</sub> 后，<b>逐 token 一次性</b>生成一个序列化的结构化数据包（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §4.1 式 (5)</a>）：</p>
+    <div class="formula">
+      <var>o</var> = <var>π</var><sub>θ</sub>(<var>q</var>, <var>C</var><sub><var>q</var></sub>) = ( <var>z</var>, <var>T</var>, <var>A</var>, <var>E</var> )
+      <div class="fnote">z = 证据计划（要什么）；T = 带引用的证据链（材料怎么咬合）；A = 记忆动作序列（怎么裁剪）；E = 最终证据（呈堂证供）。z → T → A → E 是<b>同一次生成内部</b>的依赖顺序，不是四次模型调用。</div>
+    </div>
+    <div class="analogy">像律师的庭审文件夹：第一页是「取证清单」，中间是「证据链推演」，然后是「对每份卷宗的处置决定」，最后一页才是递给法官的「证据摘要」。法官只看到最后一页，但每一句都能翻回前几页对账。</div>
+
+    <div class="grid2" style="margin-top:16px">
+      <div>
+        <p><b>第 1 段：证据计划 <var>z</var></b>（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §4.2 式 (6)</a>）</p>
+        <div class="formula" style="font-size:15px">
+          <var>z</var> = ( <var>ι</var>, <var>D</var>, <var>h</var>, <var>η</var>, <var>b</var> )
+          <div class="fnote">ι 证据意图；D 相关记忆类型；h 时间范围（当前/近期/历史/不限）；η 问题特定的证据需求；b 最终证据条数的<b>软目标</b>（控长用，不是硬指标）。</div>
+        </div>
+      </div>
+      <div>
+        <p><b>第 2 段：证据链 <var>T</var></b>（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §4.3 式 (7)(8)</a>）</p>
+        <div class="formula" style="font-size:15px">
+          <var>T</var> = ( <var>t</var><sub>1</sub> … <var>t</var><sub>L</sub> )，<var>t</var><sub>ℓ</sub> = ( <var>ρ</var><sub>ℓ</sub>, <var>I</var><sub>ℓ</sub>, <var>u</var><sub>ℓ</sub>, <var>δ</var><sub>ℓ</sub> )，∅ ≠ <var>I</var><sub>ℓ</sub> ⊆ IDs(<var>C</var><sub><var>q</var></sub>)
+          <div class="fnote">每步 = 证据角色 + 引用的候选 ID + 有据陈述 + 与下一步的关系（支持 / 对比 / 时间更新 / 裁决）。每一步都必须引用至少一条候选记忆。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>✋ 第 3 段：五个记忆动作，像修图一样裁剪记忆</h3>
+    <p>在证据链 <var>T</var> 的指引下，策略从固定动作词表里挑选动作（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §4.4 式 (9)(10)、附录表 7</a>）：</p>
+    <div class="formula">
+      <var>V</var><sub>act</sub> = { KEEP, DROP, MERGE, REFINE, ADD }，&nbsp;&nbsp; <var>a</var><sub>k</sub> = ( <var>v</var><sub>k</sub>, <var>I</var><sub>k</sub>, <var>γ</var><sub>k</sub>, <var>ẽ</var><sub>k</sub> )
+      <div class="fnote">每个动作 = 动作标签 + 目标/支撑候选 ID + 一句简短理由 + 可选的改写后证据。KEEP / MERGE / REFINE / ADD 会产出最终证据，DROP 不产出。ADD 被严格限制为「从被引候选可验证的推导」（日期、时长、比较、跨记录关系），不许无中生有。</div>
+    </div>
+    <div class="demo-box">
+      <div class="demo-title">🛠️ 动作工作台 · 点击动作按钮，亲手裁剪候选记忆</div>
+      <div style="font-size:13.5px;color:#9db4dd;margin-bottom:6px">问题：「Caroline 什么时候参加的互助小组？」候选记忆如下：</div>
+      <div class="mem-grid">
+        <div class="mem-chip" id="wm1"><span class="mid">m1</span>5 月 7 日 Caroline 参加互助小组，称体验很有力量</div>
+        <div class="mem-chip" id="wm2"><span class="mid">m2</span>5 月 8 日 Caroline 说小组让她感到被接纳（长文，约 60 词）</div>
+        <div class="mem-chip" id="wm34"><span class="mid">m3 / m4</span>7 月的活动团体、6 月的游行——事件不同，日期不答本题</div>
+      </div>
+      <div class="btn-row">
+        <button class="btn ghost act-btn" data-act="keep">KEEP m1</button>
+        <button class="btn ghost act-btn" data-act="refine">REFINE m2</button>
+        <button class="btn ghost act-btn" data-act="drop">DROP m3+m4</button>
+        <button class="btn ghost act-btn" data-act="merge">MERGE m1+m2</button>
+        <button class="btn ghost act-btn" data-act="add">ADD 推导</button>
+        <button class="btn ghost" id="wsReset">↺ 重置</button>
+      </div>
+      <div class="sink" style="margin-top:14px">
+        <h5>📋 呈交回答模型的证据 E（带引用）</h5>
+        <div id="wsEvidence" style="min-height:34px;color:#7f92b8">还没有证据——点上面的动作按钮试试。注意 DROP 不会产出证据。</div>
+      </div>
+      <div class="caption">交互演示，复刻论文附录 C 图 6 案例的动作逻辑；「ADD 推导」演示论文允许的「可验证推导」类动作（如由日期推时长）。</div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔍 完整走一遍：论文附录里的真实案例</h3>
+    <p>论文附录 C（图 6）给出了一个端到端例子：问题「Caroline 什么时候去的互助小组？」，检索器返回 4 条候选（含干扰项）。点下面的「下一步」，跟着策略从候选走到答案（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文附录 C 图 6</a>）。</p>
+    <div class="demo-box">
+      <div class="demo-title">🎬 流程动画 · MemChain 推理五步（论文图 6 案例）</div>
+      <div class="pipe-steps" id="pipeTabs">
+        <div class="pipe-tab on">① 候选 C<sub>q</sub></div>
+        <div class="pipe-tab">② 证据计划 z</div>
+        <div class="pipe-tab">③ 证据链 T</div>
+        <div class="pipe-tab">④ 动作 A</div>
+        <div class="pipe-tab">⑤ 证据 E → 答案</div>
+      </div>
+      <div class="pipe-pane" id="pipePane"></div>
+      <div class="btn-row">
+        <button class="btn ghost" id="pipePrev">◀ 上一步</button>
+        <button class="btn" id="pipeNext">下一步 ▶</button>
+        <button class="btn ghost" id="pipeAuto">▶ 自动播放</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🏋️ 两阶段训练：先「临摹」结构，再「实战」拿奖励</h3>
+    <p>检索器和回答模型全程冻结，只训练策略 <var>π</var><sub>θ</sub>。训练分两步（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §4.5</a>）：</p>
+    <p><b>第一阶段 · 监督式证据链学习（SFT）</b>：用教师模型生成的参考数据包 <var>o</var>* = (<var>z</var>*, <var>T</var>*, <var>A</var>*, <var>E</var>*) 做标准模仿学习（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §4.5 式 (12)、附录 A.3</a>）：</p>
+    <div class="formula" style="font-size:16px">
+      <var>L</var><sub>SFT</sub>(θ) = − <span style="font-size:1.3em">Σ</span><sub><var>t</var></sub> log <var>π</var><sub>θ</sub>( <var>o</var>*<sub><var>t</var></sub> | <var>q</var>, <var>C</var><sub><var>q</var></sub>, <var>o</var>*<sub>&lt;<var>t</var></sub> )
+      <div class="fnote">逐 token 模仿教师的数据包，学会「格式合规、动作合法、引用有效、改写有据」。训练集 5,882 条 + 验证集 310 条，全部为自生成数据，与评测基准完全隔离（附录 A.3）。SFT 教会了结构，但不直接优化「答得对不对」。</div>
+    </div>
+    <p><b>第二阶段 · TMPO（证据链引导的记忆策略优化）</b>：沿用 <a class="src" href="https://arxiv.org/abs/2402.03300" target="_blank" rel="noopener">GRPO</a> 式「同题采样一组 + 组内相对优势」，但奖励是看整条证据链的多信号打分。对同一个问题采样 <var>G</var> 份数据包，每份的奖励为（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §4.5、附录 B.2 式 (15)(16)</a>）：</p>
+    <div class="formula" style="font-size:16px">
+      <var>m</var><sub><var>g</var></sub> = 0.35<var>j</var><sub><var>g</var></sub> + 0.25<var>v</var><sub><var>g</var></sub> + 0.20<var>i</var><sub><var>g</var></sub> + 0.20<var>h</var><sub><var>g</var></sub>，&nbsp;&nbsp;
+      <var>R</var><sub><var>g</var></sub> = <var>m</var><sub><var>g</var></sub> · ( 0.65<var>c</var><sub><var>g</var></sub> + 0.15<var>s</var><sub><var>g</var></sub> + 0.15<var>t</var><sub><var>g</var></sub> + 0.05<var>e</var><sub><var>g</var></sub> )
+      <div class="fnote">m<sub>g</sub> 是<b>结构有效性闸门</b>（JSON 严格、模式合法、引用 ID 有效、证据链完整），格式崩了，答得再好也被压分；括号里是质量分：c 答案正确性（权重最高）、s 多次采样的答案稳定性、t 引用记忆的查全查准、e 最终证据是否被证据链支撑。所有分量 ∈ [0,1]。</div>
+    </div>
+    <p>组内奖励做标准化得到优势，再用<b>序列级重要性比率</b>做截断策略更新（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §4.5 式 (14)</a>）：</p>
+    <div class="formula" style="font-size:16px">
+      Â<sub><var>g</var></sub> = <span class="frac"><span class="num"><var>R</var><sub><var>g</var></sub> − μ<sub>𝒢(q)</sub></span><span class="den">σ<sub>𝒢(q)</sub> + ϵ<sub>adv</sub></span></span>，&nbsp;&nbsp;
+      <var>J</var><sub>TMPO</sub> = <span class="frac"><span class="num">1</span><span class="den"><var>G</var></span></span> <span style="font-size:1.3em">Σ</span><sub><var>g</var></sub> min( ρ<sub><var>g</var></sub>Â<sub><var>g</var></sub>, ρ̄<sub><var>g</var></sub>Â<sub><var>g</var></sub> ) − β<var>D</var><sub>KL</sub> + λ<var>H</var>
+      <div class="fnote">同一个问题的 G 份答卷互相比较：比同组平均好就加分（Â&gt;0），比平均差就减分。ρ 是新旧策略的序列级概率比，截断在 [1−ϵ<sub>low</sub>, 1+ϵ<sub>high</sub>]；KL 项把策略拴在 SFT 模型附近，熵项鼓励探索。训练超参：组大小 G=3、批大小 32、学习率 2×10⁻⁷（附录表 6）。</div>
+    </div>
+    <div class="analogy">SFT 像「临摹字帖」——先把笔画格式学对；TMPO 像「模拟法庭打分」——同一个案子派 3 位实习律师各写一份证据摘要，评委从「格式是否合规」「法官采纳没有」「引用是否扎实」几个维度打分，<b>谁比同组同事强谁就升职</b>。没人需要知道绝对满分长什么样，组内排名就够了。</div>
+    <div class="demo-box">
+      <div class="demo-title">🎚️ 数值流 · 组相对优势：同一个问题，3 份答卷互相 PK（示意）</div>
+      <div id="tmpoRows"></div>
+      <div id="tmpoStat" style="font-size:13.5px;color:#9db4dd;margin:6px 0"></div>
+      <div class="btn-row">
+        <button class="btn ghost tmpo-scn active" data-scn="mix">场景 A：有强有弱</button>
+        <button class="btn ghost tmpo-scn" data-scn="allGood">场景 B：全员优秀</button>
+        <button class="btn ghost tmpo-scn" data-scn="oneStar">场景 C：一枝独秀</button>
+        <button class="btn ghost tmpo-scn" data-scn="badFmt">场景 D：格式崩盘</button>
+      </div>
+      <div class="caption">滑杆可调每份答卷的奖励 R（=结构闸门 m × 质量分）。观察：全员一样好时优势都≈0（组内没有可学的差距）；格式崩盘（m 很低）时即使答案对，奖励也被压下去。标准化 ε=0.01，仅为演示。论文超参：G=3、KL 系数 0.006、熵系数 0.001（附录表 6）。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH3 实验结果 ============ -->
+<section class="chapter" id="ch3">
+  <div class="chap-head"><span class="chap-num">第 3 章</span><h2>实验结果：更少 token，更高分数</h2></div>
+  <p class="oneline">两个长程记忆基准、五种冻结回答模型——MemChain 用 143 个 token 的证据打赢了 3,491 个 token 的候选集。</p>
+
+  <div class="card fade-up">
+    <h3>🧪 实验设置：严格隔离的对照</h3>
+    <p><b>数据集</b>：<a class="src" href="https://arxiv.org/abs/2402.17753" target="_blank" rel="noopener">LoCoMo</a>（超长对话记忆问答，1,540 道非对抗题：282 单跳 / 321 多跳 / 96 时序 / 841 开放域）与 <a class="src" href="https://arxiv.org/abs/2410.10813" target="_blank" rel="noopener">LongMemEval-S</a>（500 道助手记忆题）。<b>基线</b>：检索系 Mem0、A-Mem、<a class="src" href="https://arxiv.org/abs/2601.14287" target="_blank" rel="noopener">CoM</a>、<a class="src" href="https://arxiv.org/abs/2601.02553" target="_blank" rel="noopener">SimpleMem</a>；训练系 <a class="src" href="https://arxiv.org/abs/2601.01885" target="_blank" rel="noopener">Mem-α</a>、<a class="src" href="https://arxiv.org/abs/2601.05488" target="_blank" rel="noopener">MemBuilder</a>（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §5.1</a>）。</p>
+    <div class="keyfact">所有方法使用<b>同一候选集 C<sub>q</sub>、同一回答提示词、同一裁判（开源 LoCoMo-Refined judge）、同一解码配置</b>；默认配置 = Qwen3-4B 策略 + GPT-4.1-mini 冻结回答模型。训练数据（5,882 条）与两个测试集完全不相交（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §5.1、附录 A.3/A.4</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🏆 LoCoMo 主结果：总分第一，token 砍掉约 24×</h3>
+    <p>GPT-4.1-mini 冻结答题（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文表 1</a>）：</p>
+    <div class="tbl-scroll">
+    <table class="tbl">
+      <tr><th>方法</th><th>单跳</th><th>多跳</th><th>时序</th><th>开放域</th><th>总分 ↑</th><th>Token ↓</th><th>记忆侧耗时 ↓</th></tr>
+      <tr><td>Mem0</td><td>29.12</td><td>16.31</td><td>10.59</td><td>19.79</td><td>20.15</td><td>618.3</td><td>1.12 s</td></tr>
+      <tr><td>A-Mem</td><td>21.63</td><td>18.75</td><td>17.76</td><td>49.82</td><td>35.96</td><td>970.7</td><td>0.93 s</td></tr>
+      <tr><td>CoM</td><td>41.13</td><td>48.91</td><td>45.83</td><td>75.02</td><td>61.49</td><td>1,301.3</td><td>4.25 s</td></tr>
+      <tr><td>SimpleMem</td><td>41.49</td><td>50.78</td><td>47.92</td><td>77.88</td><td>63.70</td><td>3,491.0</td><td>15.74 s</td></tr>
+      <tr><td>Mem-α</td><td>13.83</td><td>2.49</td><td>17.71</td><td>9.51</td><td>9.35</td><td>835.4</td><td>1.06 s</td></tr>
+      <tr><td>MemBuilder</td><td>28.37</td><td>15.89</td><td>28.12</td><td>53.03</td><td>39.22</td><td>3,851.1</td><td>2.93 s</td></tr>
+      <tr><td>MemChain（SFT）</td><td>47.52</td><td>53.27</td><td>47.92</td><td>82.05</td><td class="hl">67.42</td><td class="hl">153.0</td><td class="hl">0.83 s</td></tr>
+      <tr><td><b>MemChain（SFT+TMPO）</b></td><td><b>48.58</b></td><td><b>58.70</b></td><td><b>49.71</b></td><td><b>83.71</b></td><td class="hl">69.80</td><td class="hl">143.3</td><td class="hl">0.83 s</td></tr>
+    </table>
+    </div>
+    <p style="margin-top:14px">总分 <b>69.80</b>，比最强基线 SimpleMem（63.70）高 <b>+6.10 个百分点</b>；同时喂给回答模型的证据只有 <b>143.3</b> token，是 SimpleMem 3,491.0 的约 <b>1/24</b>。换 GPT-4o 答题结论不变（MemChain 63.81 vs SimpleMem 57.92）。</p>
+    <div class="demo-box" style="background:#fff;border:1px solid var(--line);color:var(--ink)">
+      <div class="demo-title" style="color:var(--blue-d)">📊 准确分 vs 上下文开销（条形长按比例，数据为论文表 1）</div>
+      <div id="costBars"></div>
+      <div class="caption" style="color:#7f8ca3">蓝色 = LoCoMo 总分（%）；橙色 = 喂给回答模型的 token 数（对数比例）。注意 MemChain 双优：分数最高、token 最短、耗时也最短（0.83 s，含检索与证据组装，附录口径）。</div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📈 LongMemEval-S：时序与知识更新题型上拉开差距</h3>
+    <p>子任务平均准确率（%）（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文表 2</a>）：</p>
+    <div class="tbl-scroll">
+    <table class="tbl">
+      <tr><th>回答模型</th><th>方法</th><th>时序推理</th><th>多会话</th><th>知识更新</th><th>单用户</th><th>单助手</th><th>单偏好</th><th>平均 ↑</th></tr>
+      <tr><td rowspan="4">GPT-4.1-mini</td><td>全上下文</td><td>27.06</td><td>30.08</td><td>41.03</td><td>47.14</td><td>32.14</td><td>60.00</td><td>39.57</td></tr>
+      <tr><td>Mem0</td><td>40.60</td><td>50.37</td><td>69.23</td><td>87.14</td><td>48.21</td><td>63.33</td><td>59.81</td></tr>
+      <tr><td>Mem-α</td><td>9.02</td><td>16.54</td><td>20.51</td><td>31.43</td><td>64.29</td><td>23.33</td><td>23.00</td></tr>
+      <tr><td><b>MemChain</b></td><td><b>50.38</b></td><td><b>66.17</b></td><td><b>75.64</b></td><td>85.71</td><td><b>96.43</b></td><td>46.67</td><td class="hl">68.40</td></tr>
+      <tr><td rowspan="4">GPT-4.1</td><td>全上下文</td><td>62.41</td><td>60.90</td><td>61.54</td><td>68.57</td><td>57.14</td><td>20.00</td><td>59.60</td></tr>
+      <tr><td>Mem0</td><td>43.61</td><td>54.89</td><td>75.64</td><td>54.29</td><td>39.29</td><td>83.33</td><td>58.51</td></tr>
+      <tr><td>Mem-α</td><td>9.02</td><td>18.05</td><td>16.67</td><td>32.86</td><td>66.07</td><td>23.33</td><td>23.20</td></tr>
+      <tr><td><b>MemChain</b></td><td><b>75.19</b></td><td><b>64.66</b></td><td><b>78.21</b></td><td><b>92.86</b></td><td><b>98.21</b></td><td>63.33</td><td class="hl">78.20</td></tr>
+    </table>
+    </div>
+    <div class="keyfact" style="margin-top:14px">增益最大的题型是<b>时序推理、多会话、知识更新、单助手</b>——正是「需要跨记录对齐时间线、裁决冲突」的题型，印证了证据链中介的价值（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §5.2</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔁 迁移与骨架：4B 小策略，带得动各种回答模型</h3>
+    <p>同一个 Qwen3-4B 策略，换成开源回答模型（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文表 3</a>），SFT+TMPO 总分：</p>
+    <div class="demo-box" style="background:#fff;border:1px solid var(--line);color:var(--ink)">
+      <div class="demo-title" style="color:var(--blue-d)">📊 冻结回答模型越大，MemChain 领先越多（LoCoMo 总分 %）</div>
+      <div id="transferBars"></div>
+      <div class="caption" style="color:#7f8ca3">三个尺寸下 MemChain 均全场第一；Qwen3-14B 时达 80.26，比最强基线高 19.09 个点。数据为论文表 3。</div>
+    </div>
+    <p>策略本身多大合适？（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文表 4</a>）Qwen3-1.7B / 4B / 8B 策略在 SFT+TMPO 后分别为 <b>60.97 / 69.80 / 71.22</b>，记忆侧耗时 0.52 / 0.83 / 1.08 s；换 S1-Base-8B 骨架也能到 69.87。<b>TMPO 在每个骨架上都稳定加分</b>（如 Qwen3-4B：67.42 → 69.80）。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>✂️ 消融实验：拆哪一块最疼？</h3>
+    <p>固定 Qwen3-4B SFT+TMPO 策略、GPT-4.1-mini 答题（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §5.3 表 5</a>）：</p>
+    <div class="demo-box" style="background:#fff;border:1px solid var(--line);color:var(--ink)">
+      <div class="demo-title" style="color:var(--blue-d)">📊 拆掉一个组件，LoCoMo 总分掉多少（数据为论文表 5）</div>
+      <div id="ablaBars"></div>
+      <div class="caption" style="color:#7f8ca3">去掉证据链（T）掉 13.96 个点，是结构性组件里最疼的；只靠提示词不训练（Prompt-only）掉 20.45 个点——光靠格式说明教不会模型整理证据。</div>
+    </div>
+    <p>三个结论：① <b>证据计划</b>提供「选什么」的目标，去掉 −6.21；② <b>证据链</b>保住跨记录的证据路径，去掉 −13.96，是最大单项跌幅；③ <b>训练</b>本身贡献巨大：纯提示词策略只有 49.35，SFT 拉到 67.42，TMPO 再推到 69.80（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §5.3</a>）。</p>
+  </div>
+</section>
+
+<!-- ============ CH4 局限与意义 ============ -->
+<section class="chapter" id="ch4">
+  <div class="chap-head"><span class="chap-num">第 4 章</span><h2>局限与意义：配菜师再好，也做不出没买到的菜</h2></div>
+  <p class="oneline">两条作者自己点名的边界，以及这项工作给智能体记忆研究补上的那块拼图。</p>
+
+  <div class="card fade-up">
+    <h3>⚠️ 局限（论文 §7 原文口径）</h3>
+    <p><b>① 跳不出候选边界</b>：MemChain 在检索回来的候选集 <var>C</var><sub>q</sub> 内部工作，<b>无法找回上游检索器漏掉的证据</b>——检索 recall 是它的天花板。未来方向是把检索和证据中介联合优化（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §6、§7</a>）。</p>
+    <p><b>② token 账本的口径</b>：143.3 token 的降幅描述的是<b>「传给冻结回答模型的上下文」</b>，不是整个记忆系统的总成本——策略本身做一次结构化推理也要花算力（只是记忆侧延迟仍最低：0.83 s）。读这张成绩单时要记住这个口径（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §7</a>）。</p>
+    <div class="analogy">配菜师刀工再好，也变不出采购员没买回来的食材；而且配菜本身也要工时——只是比起让大厨（回答模型）在一堆烂叶子里翻找，还是省得多。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🌟 意义：把「证据成形」从隐式变成显式、可训练、可审计</h3>
+    <p>MemChain 的贡献不止是一个分数：它把记忆系统里长期被跳过的一环——<b>检索之后的证据成形</b>——变成了一个明确、可优化、可审计的学习问题（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文 §1、§6</a>）：</p>
+    <p>· <b>显式</b>：保留哪些记忆、如何改写、如何互相支撑，全部写在计划/证据链/动作里，不再是回答模型的「黑盒内功」；<br>· <b>可训练</b>：SFT + TMPO 两阶段，让「整理证据」这件事第一次有了直接的优化目标（下游答案质量）；<br>· <b>可审计</b>：每句证据都带候选 ID 出处，错误可以追溯到具体环节；<br>· <b>即插即用</b>：检索器、记忆写入、回答模型全部不动，4B 小策略即可夹在中间生效，且随回答模型变强同步受益。</p>
+    <div class="keyfact">一句话总结：<b>记忆系统的下一战不在「检得更全」，而在「检回来之后用得更好」</b>——MemChain 是给这一环装上的第一个可学习、可解释的引擎。代码已开源：<a class="src" href="https://github.com/mayiwen0212/MemChain" target="_blank" rel="noopener">GitHub ↗</a>（<a class="src" href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">论文摘要</a>）。</div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    本页面为 arXiv 论文《MemChain: Learning Interpretable Memory Traces for Memory-Augmented LLM Agents》的中文通俗交互解读，<br>
+    全部技术结论与实验数字以原论文为准：<a href="https://arxiv.org/abs/2607.24097" target="_blank" rel="noopener">arXiv:2607.24097</a> ·
+    <a href="https://arxiv.org/pdf/2607.24097" target="_blank" rel="noopener">PDF</a> ·
+    <a href="https://github.com/mayiwen0212/MemChain" target="_blank" rel="noopener">代码开源</a><br>
+    原作者：Yiwen Ma、Songjun Tu、Qichao Zhang 等（中科院自动化所 / 国科大 / Memorax AI）。页面中的生活化比喻仅用于帮助理解，动画中标注「示意」的演示为交互化简模型。<br>
+    单文件 HTML · 零外部依赖 · 公式为手写 HTML/CSS · 动画为原生 JS
+  </div>
+</footer>
+
+<script>
+/* ================= 通用：入场 & 条形图动画 ================= */
+(function(){
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(!e.isIntersecting) return;
+      e.target.classList.add('show');
+      e.target.querySelectorAll('.scorebar i[data-w], .jsbar').forEach(function(b){
+        b.style.width = b.getAttribute('data-w') + '%';
+      });
+      io.unobserve(e.target);
+    });
+  }, {threshold:.18});
+  document.querySelectorAll('.fade-up').forEach(function(el){ io.observe(el); });
+})();
+
+/* 构造条形行：label / 数值 / 宽度% / 颜色 */
+function barRow(label, val, wPct, color, note){
+  return '<div class="bar-row"><span>' + label + (note ? ' <span style="color:#98a6bd;font-size:12px">' + note + '</span>' : '') +
+    '</span><div class="scorebar"><i class="jsbar" data-w="' + wPct + '" style="background:' + color + '"></i></div><b>' + val + '</b></div>';
+}
+
+/* ================= 实验结果条形图（真实数据） ================= */
+(function(){
+  /* LoCoMo 分数 vs token（表 1，GPT-4.1-mini 块） */
+  var rows = [
+    ['Mem0', 20.15, 618.3], ['A-Mem', 35.96, 970.7], ['CoM', 61.49, 1301.3],
+    ['SimpleMem', 63.70, 3491.0], ['Mem-α', 9.35, 835.4], ['MemBuilder', 39.22, 3851.1],
+    ['MemChain', 69.80, 143.3]
+  ];
+  var maxLog = Math.log(3851.1);
+  var html = '';
+  rows.forEach(function(r){
+    var isOurs = r[0] === 'MemChain';
+    var c1 = isOurs ? 'linear-gradient(90deg,#0b5cc4,#1783ff)' : '#9db8e8';
+    var tokW = Math.max(2, Math.round(Math.log(r[2]) / maxLog * 100));
+    html += barRow(r[0], r[1].toFixed(2) + '%', r[1], c1, isOurs ? '← 本文' : '');
+    html += barRow('　└ token', r[2].toLocaleString('en-US'), tokW,
+      isOurs ? 'linear-gradient(90deg,#2bc48a,#7ee0b8)' : 'linear-gradient(90deg,#f7b731,#ff6b6b)');
+  });
+  document.getElementById('costBars').innerHTML = html;
+
+  /* 开源回答模型迁移（表 3，SFT+TMPO） */
+  var tr = [
+    ['Qwen3-1.7B', 68.05, 44.03, '最强基线 CoM'],
+    ['Qwen3-8B', 75.00, 58.83, '最强基线 SimpleMem'],
+    ['Qwen3-14B', 80.26, 61.17, '最强基线 SimpleMem']
+  ];
+  var th = '';
+  tr.forEach(function(r){
+    th += barRow(r[0] + ' · MemChain', r[1].toFixed(2) + '%', r[1], 'linear-gradient(90deg,#0b5cc4,#1783ff)');
+    th += barRow('　└ ' + r[3], r[2].toFixed(2) + '%', r[2], '#c6d3ea');
+  });
+  document.getElementById('transferBars').innerHTML = th;
+
+  /* 消融（表 5） */
+  var ab = [
+    ['完整 MemChain', 69.80, '—'], ['去掉证据计划 z', 63.59, '−6.21'],
+    ['去掉证据链 T', 55.84, '−13.96'], ['只提示不训练', 49.35, '−20.45']
+  ];
+  var ah = '';
+  ab.forEach(function(r, i){
+    var c = i === 0 ? 'linear-gradient(90deg,#2bc48a,#7ee0b8)' : 'linear-gradient(90deg,#f7b731,#ff6b6b)';
+    ah += barRow(r[0], r[1].toFixed(2) + '%', r[1], c, r[2] === '—' ? '' : r[2] + ' pp');
+  });
+  document.getElementById('ablaBars').innerHTML = ah;
+})();
+
+/* ================= 动画 1：retrieval-as-evidence vs MemChain ================= */
+(function(){
+  var mems = document.querySelectorAll('#cmpMems .mem-chip');
+  var played = false;
+  function reset(){
+    played = false;
+    mems.forEach(function(m){ m.classList.remove('kept','dropped'); });
+    document.getElementById('cmpBarA').style.width = '0%';
+    document.getElementById('cmpBarB').style.width = '0%';
+    document.getElementById('cmpTokB').textContent = '— tokens';
+    document.getElementById('cmpRightBody').innerHTML = '点击播放，看候选记忆被裁成带引用的证据。';
+  }
+  document.getElementById('cmpReset').addEventListener('click', reset);
+  document.getElementById('cmpPlay').addEventListener('click', function(){
+    if(played) return; played = true;
+    document.getElementById('cmpBarA').style.width = '100%';
+    setTimeout(function(){ mems[0].classList.add('kept'); }, 500);
+    setTimeout(function(){ mems[1].classList.add('kept'); }, 1000);
+    setTimeout(function(){ mems[2].classList.add('dropped'); mems[3].classList.add('dropped'); }, 1500);
+    setTimeout(function(){
+      document.getElementById('cmpRightBody').innerHTML =
+        '<div class="ev-line">Caroline 于 2023 年 5 月 7 日参加了互助小组 <span class="cite">[KEEP m1]</span></div>' +
+        '<div class="ev-line">次日反馈积极，佐证同一事件 <span class="cite">[REFINE m2]</span></div>' +
+        '<div style="color:#ffa3a3;font-size:12.5px;margin-top:6px">m3、m4 日期冲突/弱相关 → DROP，不呈交</div>';
+      document.getElementById('cmpBarB').style.width = '6%';
+      document.getElementById('cmpTokB').textContent = '143.3 tokens';
+    }, 2200);
+  });
+})();
+
+/* ================= 动画 2：动作工作台 ================= */
+(function(){
+  var ev = document.getElementById('wsEvidence');
+  var used = {};
+  var out = [];
+  var defs = {
+    keep:   {chip:'wm1',  cls:'kept',    line:'Caroline 于 2023 年 5 月 7 日参加互助小组', cite:'[KEEP m1]'},
+    refine: {chip:'wm2',  cls:'kept',    line:'跟进佐证：小组带来被接纳感（60 词长文压缩为一句）', cite:'[REFINE m2]'},
+    drop:   {chip:'wm34', cls:'dropped', line:null, note:'m3、m4 已丢弃——DROP 不产出任何证据', cite:'[DROP m3,m4]'},
+    merge:  {chip:null,   cls:null,      line:'合并版：5 月 7 日参加小组，次日反馈积极（两条互证）', cite:'[MERGE m1+m2]'},
+    add:    {chip:null,   cls:null,      line:'可验证推导：参加日与跟进反馈相隔 1 天', cite:'[ADD ← m1,m2]'}
+  };
+  function render(){
+    if(!out.length){ ev.innerHTML = '还没有证据——点上面的动作按钮试试。注意 DROP 不会产出证据。'; ev.style.color = '#7f92b8'; return; }
+    ev.style.color = '#dfe8ff';
+    ev.innerHTML = out.map(function(o){
+      if(o.note) return '<div style="color:#ffa3a3;font-size:12.5px;margin:6px 0">🗑️ ' + o.note + ' <span class="cite" style="color:#ffa3a3">' + o.cite + '</span></div>';
+      return '<div class="ev-line">' + o.line + ' <span class="cite">' + o.cite + '</span></div>';
+    }).join('');
+  }
+  document.querySelectorAll('.act-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var k = btn.getAttribute('data-act');
+      if(used[k]) return; used[k] = true;
+      btn.classList.add('active');
+      var d = defs[k];
+      if(d.chip) document.getElementById(d.chip).classList.add(d.cls);
+      out.push(d.line ? {line:d.line, cite:d.cite} : {note:d.note, cite:d.cite});
+      render();
+    });
+  });
+  document.getElementById('wsReset').addEventListener('click', function(){
+    used = {}; out = [];
+    document.querySelectorAll('.act-btn').forEach(function(b){ b.classList.remove('active'); });
+    ['wm1','wm2','wm34'].forEach(function(id){
+      document.getElementById(id).classList.remove('kept','dropped');
+    });
+    render();
+  });
+})();
+
+/* ================= 动画 3：流程动画（论文图 6 案例） ================= */
+(function(){
+  var panes = [
+    '<b style="color:#8fb8ff">问题：</b>Caroline 什么时候去的互助小组？<br><b style="color:#8fb8ff">检索器返回 4 条候选：</b><br>' +
+    '· <b>m1</b> 5 月 7 日参加互助小组，称体验很有力量<br>· <b>m2</b> 5 月 8 日说小组让她感到被接纳<br>' +
+    '· <b>m3</b> 7 月 18 日加入相关活动团体<br>· <b>m4</b> 6 月 26 日参加游行活动<br>' +
+    '<span style="color:#9db4dd;font-size:13px">m3、m4 都带「活动」关键词，是典型的干扰项。</span>',
+    '<b style="color:#8fb8ff">证据计划 z：</b><br>· 意图 ι：事实查找（fact lookup）<br>· 证据需求 η：找到<b>直接说明参加日期</b>的那条记忆<br>' +
+    '<span style="color:#9db4dd;font-size:13px">先想清楚「要什么」，再去翻候选——避免被关键词命中但不答题的干扰项带偏。</span>',
+    '<b style="color:#8fb8ff">证据链 T（每步都带引用）：</b>' +
+    '<div class="trace-step"><b>c1 · 种子证据</b>：m1 直接说明 Caroline 于 2023-05-07 参加互助小组 <span class="cite" style="color:#7ee0b8">[m1]</span></div>' +
+    '<div class="trace-step"><b>c2 · 支持</b>：m2 佐证同一事件（但不用作答案日期） <span class="cite" style="color:#7ee0b8">[m2]</span></div>' +
+    '<div class="trace-step"><b>裁决</b>：m3、m4 是更晚/不同类型的事件 → 判定为干扰项，排除</div>',
+    '<b style="color:#8fb8ff">记忆动作 A：</b><br>' +
+    '<span class="act-pill act-keep">KEEP m1</span> 直接锁定事件与日期<br>' +
+    '<span class="act-pill act-refine">REFINE m2</span> 压缩为一句跟进佐证<br>' +
+    '<span class="act-pill act-drop">DROP m3, m4</span> 冲突日期 + 不同事件类型，丢弃',
+    '<b style="color:#8fb8ff">最终证据 E（唯一喂给冻结回答模型的内容）：</b>' +
+    '<div class="ev-line">Caroline 于 2023 年 5 月 7 日参加了互助小组 <span class="cite">[m1]</span></div>' +
+    '<b style="color:#7ee0b8">回答模型输出：2023 年 5 月 7 日 ✅</b><br>' +
+    '<span style="color:#9db4dd;font-size:13px">从 4 条原始候选到 1 句带引用的证据——这就是「检索后中介」的完整闭环。</span>'
+  ];
+  var tabs = document.querySelectorAll('#pipeTabs .pipe-tab');
+  var pane = document.getElementById('pipePane');
+  var cur = 0, timer = null;
+  function show(i){
+    cur = Math.max(0, Math.min(panes.length - 1, i));
+    pane.innerHTML = panes[cur];
+    tabs.forEach(function(t, k){
+      t.classList.toggle('on', k === cur);
+      t.classList.toggle('done', k < cur);
+    });
+  }
+  function stopAuto(){ if(timer){ clearInterval(timer); timer = null; document.getElementById('pipeAuto').textContent = '▶ 自动播放'; } }
+  document.getElementById('pipeNext').addEventListener('click', function(){ stopAuto(); show(cur + 1); });
+  document.getElementById('pipePrev').addEventListener('click', function(){ stopAuto(); show(cur - 1); });
+  document.getElementById('pipeAuto').addEventListener('click', function(){
+    if(timer){ stopAuto(); return; }
+    show(0);
+    this.textContent = '⏸ 停止';
+    timer = setInterval(function(){
+      if(cur >= panes.length - 1){ stopAuto(); return; }
+      show(cur + 1);
+    }, 2400);
+  });
+  show(0);
+})();
+
+/* ================= 动画 4：TMPO 组相对优势 ================= */
+(function(){
+  var box = document.getElementById('tmpoRows');
+  var stat = document.getElementById('tmpoStat');
+  var EPS = 0.01;
+  var vals = [0.90, 0.50, 0.20];
+  var scn = {
+    mix: [0.90, 0.50, 0.20],
+    allGood: [0.85, 0.85, 0.85],
+    oneStar: [0.95, 0.30, 0.25],
+    badFmt: [0.18, 0.60, 0.62]
+  };
+  box.innerHTML = vals.map(function(v, i){
+    return '<div class="ro-row"><span>答卷 #' + (i+1) + '</span>' +
+      '<input type="range" min="0" max="1" step="0.05" value="' + v + '" data-i="' + i + '" style="accent-color:var(--amber)">' +
+      '<span class="ro-num" id="roNum' + i + '"></span></div>' +
+      '<div class="ro-row" style="margin-top:-8px"><span style="color:#7f92b8;font-size:12px">优势 Â</span>' +
+      '<div class="ro-bar"><div class="zero"></div><i id="roBar' + i + '"></i></div><span class="ro-num" id="roAdv' + i + '" style="font-size:13px"></span></div>';
+  }).join('');
+  function update(){
+    var mu = vals.reduce(function(a,b){ return a+b; }, 0) / vals.length;
+    var sigma = Math.sqrt(vals.reduce(function(a,b){ return a + (b-mu)*(b-mu); }, 0) / vals.length);
+    vals.forEach(function(v, i){
+      var adv = (v - mu) / (sigma + EPS);
+      var bar = document.getElementById('roBar' + i);
+      var w = Math.min(50, Math.abs(adv) / 3 * 50);
+      bar.className = adv >= 0 ? 'pos' : 'neg';
+      if(adv >= 0){ bar.style.left = '50%'; bar.style.width = w + '%'; }
+      else { bar.style.left = (50 - w) + '%'; bar.style.width = w + '%'; }
+      document.getElementById('roNum' + i).textContent = 'R = ' + v.toFixed(2);
+      var advEl = document.getElementById('roAdv' + i);
+      advEl.textContent = (adv >= 0 ? '+' : '') + adv.toFixed(2);
+      advEl.style.color = adv > 0.05 ? '#7ee0b8' : (adv < -0.05 ? '#ffa3a3' : '#9db4dd');
+    });
+    stat.innerHTML = '组内均值 μ = <b style="color:#ffd97a">' + mu.toFixed(3) + '</b>，标准差 σ = <b style="color:#ffd97a">' + sigma.toFixed(3) + '</b>　→　Â<sub>g</sub> = (R<sub>g</sub> − μ) / (σ + 0.01)';
+  }
+  box.querySelectorAll('input[type=range]').forEach(function(s){
+    s.addEventListener('input', function(){
+      vals[+s.getAttribute('data-i')] = parseFloat(s.value);
+      document.querySelectorAll('.tmpo-scn').forEach(function(b){ b.classList.remove('active'); });
+      update();
+    });
+  });
+  document.querySelectorAll('.tmpo-scn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.tmpo-scn').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      vals = scn[btn.getAttribute('data-scn')].slice();
+      box.querySelectorAll('input[type=range]').forEach(function(s){
+        s.value = vals[+s.getAttribute('data-i')];
+      });
+      update();
+    });
+  });
+  update();
+})();
+</script>
+</body>
+</html>
