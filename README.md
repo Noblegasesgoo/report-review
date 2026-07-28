@@ -48,6 +48,6 @@
 
 ## 许可证
 
-[MIT License](LICENSE) © Noblegasesgoo
+[MIT License](LICENSE)
 
 页面内容基于各厂商公开发布的技术报告与论文整理，通俗类比仅用于帮助理解，技术细节以原始报告/论文为准。
