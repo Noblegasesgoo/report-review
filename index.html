@@ -159,6 +159,71 @@
 
   /* 跑马灯数字 */
   .big-num{font-size:clamp(34px,5vw,52px);font-weight:800;color:var(--blue-d);line-height:1.1}
+
+  /* ===== 数学基础章节 ===== */
+  .formula{background:#0a1326;border-radius:14px;padding:20px 18px;margin:16px 0;overflow-x:auto;
+    color:#e8f0ff}
+  .formula .mjx-chtml{color:#e8f0ff !important}
+  .formula small{display:block;color:#7f92b8;margin-top:10px;line-height:1.7}
+  .slider-row{display:flex;align-items:center;gap:14px;margin:14px 0;flex-wrap:wrap}
+  .slider-row input[type=range]{flex:1;min-width:160px;accent-color:var(--amber);height:6px}
+  .slider-val{background:var(--amber);color:#5c4400;font-weight:800;font-size:14px;border-radius:8px;
+    padding:3px 12px;min-width:86px;text-align:center}
+  canvas.plot{width:100%;height:280px;background:#0a1326;border-radius:14px;display:block}
+  canvas.plot-tall{height:300px}
+  .legend-row{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:13px;color:#b9c9e8}
+  .legend-row i{display:inline-block;width:14px;height:4px;border-radius:2px;margin-right:6px;vertical-align:middle}
+
+  /* Softmax 投票箱 */
+  .vote-stage{display:flex;gap:14px;align-items:flex-end;justify-content:center;min-height:200px;
+    padding-top:10px;flex-wrap:wrap}
+  .vote-col{width:92px;text-align:center}
+  .vote-bar{margin:0 auto;width:64px;background:linear-gradient(180deg,var(--blue),#6db4ff);
+    border-radius:8px 8px 0 0;height:4px;transition:height 1s cubic-bezier(.4,0,.2,1);position:relative}
+  .vote-bar span{position:absolute;top:-26px;left:50%;transform:translateX(-50%);font-size:13px;
+    font-weight:800;color:#ffd97a;white-space:nowrap}
+  .vote-name{margin-top:8px;font-size:12.5px;color:#9db4dd}
+  .vote-logit{font-size:12px;color:#7f92b8;margin-top:2px}
+
+  /* 注意力加权调酒 */
+  .word-row{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+  .word-chip{padding:6px 14px;border-radius:99px;background:#2a3c5f;border:1px solid #3a5078;
+    font-size:13.5px;color:#9db4dd;transition:all .5s}
+  .word-chip.hot{background:rgba(247,183,49,.18);border-color:var(--amber);color:#ffd97a;
+    box-shadow:0 0 12px rgba(247,183,49,.35)}
+  .mix-stage{display:flex;gap:22px;align-items:center;flex-wrap:wrap;margin-top:14px}
+  .mix-glass{width:120px;height:150px;border:3px solid rgba(255,255,255,.5);border-top:none;
+    border-radius:0 0 16px 16px;position:relative;overflow:hidden;background:rgba(255,255,255,.05)}
+  .mix-liquid{position:absolute;left:0;right:0;bottom:0;height:0;transition:height 1.2s cubic-bezier(.5,0,.2,1)}
+  .mix-label{text-align:center;font-size:12.5px;color:#9db4dd;margin-top:8px;max-width:130px}
+
+  /* 词嵌入地图 */
+  .map-wrap{position:relative}
+  .map-dot{position:absolute;width:10px;height:10px;border-radius:50%;transform:translate(-50%,-50%);
+    transition:all .3s}
+  .map-lbl{position:absolute;transform:translate(-50%,0);font-size:12px;color:#dfe8ff;
+    white-space:nowrap;background:rgba(10,19,38,.75);padding:1px 8px;border-radius:99px;pointer-events:none}
+
+  /* 梯度数值流动画 */
+  .grad-num{font-size:clamp(18px,3.4vw,26px);font-weight:800;font-variant-numeric:tabular-nums;
+    transition:color .3s;text-align:center}
+  .grad-arrow{font-size:22px;color:#5a7bb5;text-align:center}
+  .grad-col{flex:1;min-width:100px}
+
+  /* 量化像素对比 */
+  .quant-pane{flex:1;min-width:260px;background:#0a1326;border-radius:14px;padding:14px}
+  .quant-pane h4{color:#8fb8ff;font-size:14px;margin-bottom:10px;text-align:center}
+
+  /* 嵌入向量条 */
+  .emb-vec{display:flex;gap:4px;flex-wrap:wrap;margin:10px 0}
+  .emb-cell{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:700;color:#fff;transition:all .3s}
+
+  .toc-note{font-size:12px;color:#8fb8ff}
+  @media(max-width:640px){
+    .vote-col{width:70px}.vote-bar{width:48px}
+    .mix-glass{width:90px;height:110px}
+  }
 </style>
 </head>
 <body>
@@ -183,6 +248,7 @@
 <!-- ============ NAV ============ -->
 <nav class="toc"><div class="inner">
   <a href="#ch0">🧠 先建立直觉</a>
+  <a href="#chmath">🧮 数学基础</a>
   <a href="#ch1">🍜 发明一：LatentMoE</a>
   <a href="#ch2">🔦 发明二：混合注意力</a>
   <a href="#ch3">📚 发明三：注意力残差</a>
@@ -221,6 +287,174 @@
       </div>
     </div>
     <div class="keyfact">对照：2022 年的 GPT-3 上下文只有 2048 token（约半页文档）。四年间，前沿模型的「工作记忆」扩大了约 <b>500 倍</b>。</div>
+  </div>
+</section>
+
+<!-- ============ 数学基础 ============ -->
+<section class="chapter" id="chmath">
+  <div class="chap-head"><span class="chap-num">数学基础</span><h2>八个数学积木：从「词变数字」到「越大越聪明」</h2></div>
+  <p class="oneline">看不懂公式没关系——每个公式旁边都有一个可以拖、可以点的动图。理解这八块积木，后面所有发明你都看懂了原理。</p>
+
+  <!-- 1. 词嵌入 -->
+  <div class="card fade-up">
+    <h3>① 词嵌入 Embedding：把每个词变成一串「特征坐标」</h3>
+    <p>计算机只认识数字，所以第一步是把每个词翻译成一串数字（向量）。这串数字不是随机的，而是模型从海量文本里学出的「特征坐标」——含义相近的词，坐标也相近。K3 的词表有 <b>163,840</b> 个词，每个词对应一个 <b>7168 维</b>的向量。</p>
+    <div class="formula"><span style="font-family:Georgia,serif;font-style:italic;font-size:16.5px;line-height:1.9;display:inline-block"><span style="font-style:normal">“猫”</span>&nbsp;&nbsp;⟶&nbsp;&nbsp;[&thinsp;0.21,&nbsp; -0.58,&nbsp; 0.94,&nbsp; …&thinsp;] ∈ <span style="font-style:normal">R</span><sup style="font-size:.7em">7168</sup></span>
+      <small>读懂这个公式：箭头读作「被映射成」，R⁷¹⁶⁸ 表示「7168 个实数组成的坐标」。一个词 = 高维空间里的一个点。</small>
+    </div>
+    <div class="demo-box">
+      <div class="demo-title">交互 · 把「词义地图」压扁到二维看看</div>
+      <p style="font-size:14px;color:#b9c9e8">下面是 12 个词的二维投影（真实模型有 7168 维）。点击按钮打乱/归位，观察「意思近的词总是凑在一起」：</p>
+      <div class="map-wrap" style="height:340px">
+        <canvas id="emb-canvas" style="width:100%;height:100%"></canvas>
+      </div>
+      <div class="btn-row">
+        <button class="btn" onclick="embShuffle()">🔀 随机打乱</button>
+        <button class="btn" onclick="embReset()">🧭 按语义归位</button>
+      </div>
+      <p style="font-size:13px;color:#9db4dd;margin-top:10px" id="emb-desc">蓝色=动物家族，绿色=水果家族，红色=交通工具。语义相近的词在向量空间里也是「邻居」——这就是模型「理解」词义的方式。</p>
+    </div>
+    <div class="analogy">就像给每个人发一张「性格坐标卡」：横轴是内向↔外向，纵轴是理性↔感性。性格像的人坐标卡也接近——机器就是用这种方式「知道」猫和狗比猫和汽车更相似。</div>
+  </div>
+
+  <!-- 2. 注意力机制 -->
+  <div class="card fade-up">
+    <h3>② 注意力 Attention：输出 = 所有人的意见 × 各自的重要性权重</h3>
+    <p>注意力机制是 Transformer 的心脏，公式只有一行：</p>
+    <div class="formula"><span style="font-family:Georgia,serif;font-style:italic;font-size:16.5px;line-height:1.9;display:inline-block"><span style="font-style:normal">Attention</span>(Q,K,V) = <span style="font-style:normal">softmax</span>(<span style="display:inline-block;vertical-align:middle;text-align:center;margin:0 3px"><span style="display:block;border-bottom:1.5px solid currentColor;padding:0 4px">QK<sup style="font-size:.7em">ᵀ</sup></span><span style="display:block;padding:0 4px">√(d<sub style="font-size:.7em">k</sub>)</span></span>) V</span>
+      <small>逐块翻译：Q（Query 查询）=「我想找什么」；K（Key 键）=「我是什么」；V（Value 值）=「我携带的信息」。QKᵀ 计算「每个词和其他词的相关度」，÷√dₖ 防止数值太大，softmax 把相关度变成加起来等于 1 的权重，最后乘以 V —— 按权重把大家的信息加权混合。</small>
+    </div>
+    <div class="demo-box">
+      <div class="demo-title">交互 · 点击一个词，看它「最关注」谁</div>
+      <p style="font-size:14px;color:#b9c9e8">句子：「那只<b style="color:#ffd97a">猫</b>追<b style="color:#ffd97a">老鼠</b>，因为它饿了」。点任意词，看它给每个词分配多少注意力（右侧酒杯按权重「倒出」混合信息）：</p>
+      <div class="word-row" id="attn-words"></div>
+      <div class="mix-stage">
+        <div>
+          <div class="mix-glass"><div class="mix-liquid" id="mix-liquid" style="background:linear-gradient(180deg,#f7b731,#e08e0b)"></div></div>
+          <div class="mix-label">加权混合后的新表示<br>= Σ (权重 × 信息)</div>
+        </div>
+        <div style="flex:1;min-width:220px" id="attn-detail">
+          <p style="font-size:14px;color:#b9c9e8">点击上面的词开始 ↩</p>
+        </div>
+      </div>
+    </div>
+    <div class="analogy">开一个项目评审会：你是主持人（Query），每个人先自报岗位（Key），你按「和我议题的相关度」给每人分配发言权（softmax 权重），最后会议纪要 = 每个人发言内容（Value）× 发言权的加总。职位不重要的也在场，只是权重接近 0。</div>
+    <div class="keyfact">K3 有 <b>96 个注意力头</b>——相当于同时开 96 场不同主题的评审会（有的关注语法、有的关注指代、有的关注数字），最后把 96 份会议纪要拼接起来。注意力隐藏维度 7168，每头维度 128（KDA）/ MLA 部分用 576 维潜向量压缩 KV 缓存。</div>
+  </div>
+
+  <!-- 3. Softmax -->
+  <div class="card fade-up">
+    <h3>③ Softmax：把任意分数变成「加起来等于 1 的概率」</h3>
+    <p>注意力和 MoE 路由都需要「权重」，而 softmax 就是把一组任意分数（logits）转换成权重的标准机器：</p>
+    <div class="formula"><span style="font-family:Georgia,serif;font-style:italic;font-size:16.5px;line-height:1.9;display:inline-block"><span style="font-style:normal">softmax</span>(z<sub style="font-size:.7em">i</sub>) = <span style="display:inline-block;vertical-align:middle;text-align:center;margin:0 3px"><span style="display:block;border-bottom:1.5px solid currentColor;padding:0 4px">e<sup style="font-size:.7em">z<sub style="font-size:.7em">i</sub></sup></span><span style="display:block;padding:0 4px">∑<sub style="font-size:.7em">j</sub> e<sup style="font-size:.7em">z<sub style="font-size:.7em">j</sub></sup></span></span></span>
+      <small>读懂：e 的 zᵢ 次方让每个分数变成正数且「强者更强」（指数放大差距），再除以所有人的总和，就得到加起来恰好等于 1（100%）的比例。分母 Σ 读作「全部加起来」。</small>
+    </div>
+    <div class="demo-box">
+      <div class="demo-title">交互 · 拖滑杆给三个候选人加分，看概率怎么变</div>
+      <p style="font-size:14px;color:#b9c9e8">想象注意力要给「猫 / 老鼠 / 它」三个词分配权重，拖动任意词的原始分（logit）：</p>
+      <div class="slider-row"><span style="width:70px;font-size:14px">🐱 猫</span><input type="range" min="0" max="10" step="0.1" value="6" id="lz0" oninput="softmaxDemo()"><span class="slider-val" id="lv0">6.0</span></div>
+      <div class="slider-row"><span style="width:70px;font-size:14px">🐭 老鼠</span><input type="range" min="0" max="10" step="0.1" value="3" id="lz1" oninput="softmaxDemo()"><span class="slider-val" id="lv1">3.0</span></div>
+      <div class="slider-row"><span style="width:70px;font-size:14px">👉 它</span><input type="range" min="0" max="10" step="0.1" value="1" id="lz2" oninput="softmaxDemo()"><span class="slider-val" id="lv2">1.0</span></div>
+      <div class="vote-stage" id="vote-stage"></div>
+      <p style="font-size:13px;color:#9db4dd;text-align:center;margin-top:8px">注意：把「猫」从 6 加到 8，它的份额增长远超 33%——指数函数让「领先者通吃」，分差越大马太效应越强。</p>
+    </div>
+  </div>
+
+  <!-- 4. 激活函数 -->
+  <div class="card fade-up">
+    <h3>④ 激活函数：神经网络的「开关」，以及 K3 的自研改良版 SiTU-GLU</h3>
+    <p>没有激活函数，多少层神经网络叠起来都等价于一层——只是线性变换的重复。<b>激活函数负责引入「弯曲」</b>，让网络能拟合任意复杂的规律。K3 前馈网络用的是门控结构 GLU 家族：一路做「门」（决定放多少信息通过），一路做「内容」，两者相乘：</p>
+    <div class="formula"><span style="font-family:Georgia,serif;font-style:italic;font-size:16.5px;line-height:1.9;display:inline-block"><span style="font-style:normal">SiTU-GLU</span>(x) = <span style="display:inline-block;vertical-align:middle;text-align:center"><span style="display:block">β<sub style="font-size:.7em">1</sub> tanh(<span style="display:inline-block;vertical-align:middle;text-align:center;margin:0 3px"><span style="display:block;border-bottom:1.5px solid currentColor;padding:0 4px">x</span><span style="display:block;padding:0 4px">β<sub style="font-size:.7em">1</sub></span></span>) · σ(x)</span><span style="display:block;font-size:.72em;color:#8fb8ff;border-top:1px solid #5a7bb5;padding-top:1px">门分支（被限速）</span></span> × <span style="display:inline-block;vertical-align:middle;text-align:center"><span style="display:block">β<sub style="font-size:.7em">2</sub> tanh(<span style="display:inline-block;vertical-align:middle;text-align:center;margin:0 3px"><span style="display:block;border-bottom:1.5px solid currentColor;padding:0 4px">x</span><span style="display:block;padding:0 4px">β<sub style="font-size:.7em">2</sub></span></span>)</span><span style="display:block;font-size:.72em;color:#8fb8ff;border-top:1px solid #5a7bb5;padding-top:1px">内容分支（被限速）</span></span>,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;β₁=4,&nbsp;β₂=25</span>
+      <small>读懂：tanh 是把任何输入压到 (-1, 1) 的 S 形曲线，x/β 再乘 β 让曲线在原点附近几乎不变、但大数值被「封顶」。σ(x) 是 sigmoid，把任意数压到 (0,1) 当开关用。两支各戴一个「限速帽」，乘积永远不会超过 β₁β₂=100。</small>
+    </div>
+    <div class="demo-box">
+      <div class="demo-title">交互 · 拖动滑杆，看三代激活函数的形状差异</div>
+      <p style="font-size:14px;color:#b9c9e8">拖动输入 <b style="color:#ffd97a">x</b> 的值，观察三条曲线：GLU（灰，基本不工作）、SwiGLU（橙，无上限放飞）、<b style="color:#ff6b6b">SiTU-GLU（红，K3 的选择，封顶 100）</b>：</p>
+      <div class="slider-row"><span style="width:70px;font-size:14px">输入 x</span><input type="range" min="-10" max="100" step="0.5" value="30" id="act-x" oninput="actDemo()"><span class="slider-val" id="act-xv">30</span></div>
+      <canvas class="plot plot-tall" id="act-canvas"></canvas>
+      <div class="legend-row">
+        <span><i style="background:#5a7bb5"></i>GLU：门较弱，输出被压低（示意）</span>
+        <span><i style="background:#f7b731"></i>SwiGLU：x·σ(x)，无上限 📈</span>
+        <span><i style="background:#ff6b6b"></i>SiTU-GLU：K3 自研，封顶 100 🧢</span>
+      </div>
+      <p style="font-size:13px;color:#9db4dd;margin-top:8px" id="act-readout"></p>
+    </div>
+    <div class="analogy">SwiGLU 像一辆没有限速器的车：绝大多数时候没问题，但 2.8 万亿参数的「超长车队」里只要一辆车飙到失控（激活值爆炸），整个训练就翻车。SiTU-GLU 给每辆车装了电子限速——市内（小数值区）驾驶感受和原来一模一样，上了高速最多开 100 km/h。</div>
+    <div class="keyfact">为什么要费这个劲？报告 §2.3 解释：LatentMoE 的路由路径串了近 4 个矩阵乘法（W↓→专家→W↑），在 2.8T 规模下激活值会滚雪球式膨胀。SiTU-GLU + 上行投影前的 RMSNorm 这对组合，把数值爆炸从源头掐灭，是「896 专家 × 2.8T 参数」能训练成功的关键前提。</div>
+  </div>
+
+  <!-- 5. 梯度爆炸 -->
+  <div class="card fade-up">
+    <h3>⑤ 梯度爆炸与 RMSNorm：为什么要给数值「上保险」</h3>
+    <p>训练时，误差信号（梯度）要从最后一层逐层传回第一层，每层都要乘一次权重矩阵。如果这些乘数的「平均水平」略大于 1，连乘 93 次就是天文数字——这就是<b>梯度爆炸</b>。指数增长的威力是反直觉的：</p>
+    <div class="formula"><span style="font-family:Georgia,serif;font-style:italic;font-size:16.5px;line-height:1.9;display:inline-block">1.1<sup style="font-size:.7em">93</sup> ≈ 7,000,&nbsp;&nbsp;&nbsp;&nbsp;1.2<sup style="font-size:.7em">93</sup> ≈ 2.3×10<sup style="font-size:.7em">7</sup>,&nbsp;&nbsp;&nbsp;&nbsp;1.05<sup style="font-size:.7em">93</sup> ≈ 94</span>
+      <small>每层只放大 10%（×1.1），93 层后就是 7 千倍；每层放大 20%，就是 2300 万倍。而只放大 5% 就能控制在 94 倍——这就是为什么「每层平均缩一点点」的归一化如此重要。</small>
+    </div>
+    <div class="demo-box">
+      <div class="demo-title">交互 · 选择每层的「膨胀系数」，看 93 层后变成多少</div>
+      <div class="slider-row"><span style="width:110px;font-size:14px">每层乘数 r</span><input type="range" min="0.9" max="1.3" step="0.01" value="1.1" id="grad-r" oninput="gradDemo()"><span class="slider-val" id="grad-rv">1.10</span></div>
+      <div style="display:flex;gap:10px;align-items:center;margin:18px 0;flex-wrap:wrap" id="grad-flow"></div>
+      <p style="font-size:13.5px;color:#b9c9e8;text-align:center" id="grad-result"></p>
+      <p style="font-size:13px;color:#9db4dd;margin-top:8px;text-align:center">💡 把 r 拖到 1.2 以上，数字会变成「💥」——K3 的 SiTU-GLU 和 RMSNorm 干的就是把 r 牢牢按在 1 附近。</p>
+    </div>
+    <div class="analogy">传话游戏里每个人把音量调高 20%：传到第 93 个人时已经是震耳欲聋的噪音。RMSNorm（均方根归一化）相当于每传一个人就把音量校准回标准值——不管传多少手，音量始终如一。K3 在 LatentMoE 上行投影前、AttnRes 的键上、以及每个子层入口都放了这道「音量校准」。</div>
+  </div>
+
+  <!-- 6. MoE 路由数学 -->
+  <div class="card fade-up">
+    <h3>⑥ MoE 路由的数学：一次「加权和」怎么省下 97% 的算力</h3>
+    <p>每个 token 到来时，路由器先算它与 896 个专家的「匹配分」，softmax 之后只保留前 16 名（Top-16），输出是这 16 个专家意见的加权和，再加 2 个共享专家的「保底意见」：</p>
+    <div class="formula"><span style="font-family:Georgia,serif;font-style:italic;font-size:16.5px;line-height:1.9;display:inline-block">y = ∑<sub style="font-size:.7em">j=1</sub><sup style="font-size:.7em">2</sup> E<sup style="font-size:.7em"><span style="font-style:normal">shared</span></sup><sub style="font-size:.7em">j</sub>(x)&nbsp;&nbsp;+&nbsp;&nbsp;W<sup style="font-size:.7em">↑</sup>&thinsp;<span style="font-style:normal">RMSNorm</span>(∑<sub style="font-size:.7em">i∈<span style="font-style:normal">Top16</span>(x)</sub> p<sub style="font-size:.7em">i</sub> E<sup style="font-size:.7em"><span style="font-style:normal">routed</span></sup><sub style="font-size:.7em">i</sub>(W<sup style="font-size:.7em">↓</sup>x))</span>
+      <small>读懂：W↓ 先把 7168 维的病历压成 3584 维摘要卡；Top16(x) 是「这个 token 选中的 16 个专家」；pᵢ 是各自的权重（softmax 算出）；Σ 加总后经 RMSNorm 校准音量，最后 W↑ 还原回 7168 维。</small>
+    </div>
+    <div class="demo-box">
+      <div class="demo-title">交互 · 拖动专家数量，看「激活比例」如何影响算力</div>
+      <div class="slider-row"><span style="width:130px;font-size:14px">专家总数 N</span><input type="range" min="8" max="896" step="8" value="896" id="moe-n" oninput="moeMath()"><span class="slider-val" id="moe-nv">896</span></div>
+      <div class="slider-row"><span style="width:130px;font-size:14px">每 token 激活 k</span><input type="range" min="1" max="32" step="1" value="16" id="moe-k" oninput="moeMath()"><span class="slider-val" id="moe-kv">16</span></div>
+      <canvas class="plot" id="moe-canvas" style="height:220px"></canvas>
+      <p style="font-size:13.5px;color:#b9c9e8;text-align:center;margin-top:8px" id="moe-result"></p>
+    </div>
+    <div class="analogy">大公司决策：896 名顾问全部雇佣（参数全存着，见多识广），但每个项目只请 16 个最对口的顾问开会（计算只花 16 份钱）。「雇佣成本」决定能力上限，「开会成本」决定运行速度——MoE 让两者解耦，这是 2.8T 模型能跑得起的根本原因。</div>
+    <div class="keyfact">还有一个隐藏难题：896 个专家怎么保证「雨露均沾」？如果路由器总把 token 派给少数几个「明星专家」，其他专家永远得不到训练就废了。K3 的 <b>Quantile Balancing（分位数均衡）</b>用直方图在线估计每个专家的负载分位数，动态微调路由偏置——不需要额外的负载均衡损失项，就不会干扰主任务的学习。</div>
+  </div>
+
+  <!-- 7. 量化数学 -->
+  <div class="card fade-up">
+    <h3>⑦ 量化的数学：4 位二进制如何装下一个浮点数</h3>
+    <p>FP16 用 16 位存一个数（约 6.5 万种取值），MXFP4 只用 4 位（<b>16 种取值</b>）。秘诀在于<b>分组缩放</b>：每 32 个数共享一个「缩放系数 s」，存储的是「档位数 + s」，读取时用 档位 × s 还原：</p>
+    <div class="formula"><span style="font-family:Georgia,serif;font-style:italic;font-size:16.5px;line-height:1.9;display:inline-block">ŵ = s · q,&nbsp;&nbsp;&nbsp;&nbsp;q ∈ {-7,-6,…,7}&nbsp;(4 bit),&nbsp;&nbsp;&nbsp;&nbsp;s = <span style="display:inline-block;vertical-align:middle;text-align:center;margin:0 3px"><span style="display:block;border-bottom:1.5px solid currentColor;padding:0 4px"><span style="font-style:normal">max</span>|w<sub style="font-size:.7em"><span style="font-style:normal">group</span></sub>|</span><span style="display:block;padding:0 4px">7</span></span>&nbsp;(每 32 个数一个)</span>
+      <small>读懂：一组权重里最大的那个决定缩放系数 s，组内每个数只需记下「我是最大值的七几分之几」（4 位足够）。存储从 16 bit/数 → 4 bit/数 + 每 32 个数 8 bit 的 s，综合压缩约 3.6 倍。</small>
+    </div>
+    <div class="demo-box">
+      <div class="demo-title">交互 · 同一张照片，16 位 vs 4 位「画质」对比</div>
+      <p style="font-size:14px;color:#b9c9e8">权重就像图像的像素：左边是 FP16（细腻），右边是 4 位（只有 16 个灰度档）。拖动「压缩强度」看损失何时肉眼可见：</p>
+      <div class="slider-row"><span style="width:130px;font-size:14px">量化位数</span><input type="range" min="1" max="8" step="1" value="4" id="quant-bits" oninput="quantMath()"><span class="slider-val" id="quant-bitsv">4 bit</span></div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div class="quant-pane"><h4>原始（FP16）</h4><canvas id="qimg-orig" style="width:100%;border-radius:8px"></canvas></div>
+        <div class="quant-pane"><h4>量化后 <span id="qimg-lbl">(4 bit = 16 档)</span></h4><canvas id="qimg-quant" style="width:100%;border-radius:8px"></canvas></div>
+      </div>
+      <p style="font-size:13.5px;color:#b9c9e8;text-align:center;margin-top:10px" id="quant-result"></p>
+    </div>
+    <div class="analogy">音乐从录音室母带（FP16）转成 MP3（MXFP4）：砍掉人耳不敏感的细节，文件小 4 倍，听起来几乎一样。K3 的 QAT（量化感知训练）更进一步——让歌手<b>提前知道会转成 MP3</b>，直接在 MP3 音质下排练，最终效果和母带演出几乎无差。</div>
+    <div class="keyfact">量化的「免死金牌」名单：注意力层、共享专家、路由器、视觉塔、lm_head 全部保持 BF16——这些组件对精度敏感且参数占比小。只有占参数大头的 896 个路由专家吃 4 位压缩，这就是「1.56 TB 权重 = 5.6 TB 的 28%」的由来。</div>
+  </div>
+
+  <!-- 8. Scaling Law -->
+  <div class="card fade-up">
+    <h3>⑧ Scaling Law：AI 界的「摩尔定律」，以及 2.5× 效率提升的含义</h3>
+    <p>大模型界最可靠的规律：模型损失（Loss，越小越聪明）随训练算力（FLOPs）呈<b>幂律下降</b>——在对数坐标系里是一条笔直的斜线。这意味着「多烧算力就更聪明」是可以预测的：</p>
+    <div class="formula"><span style="font-family:Georgia,serif;font-style:italic;font-size:16.5px;line-height:1.9;display:inline-block">L(C) = a · C<sup style="font-size:.7em">-b</sup> + c&nbsp;&nbsp;&nbsp;&nbsp;⇒&nbsp;&nbsp;&nbsp;&nbsp;log L = -b log C + log a</span>
+      <small>读懂：C 是算力，指数 b 决定「烧钱变聪明的速率」，c 是不可约损失。取对数后变成直线，斜率是 -b。K3 的架构改进 = 把整条线<b>往下平移</b>——同样的算力，Loss 更低。</small>
+    </div>
+    <div class="demo-box">
+      <div class="demo-title">交互 · K2 vs K3：同样的算力预算，谁学得更聪明</div>
+      <p style="font-size:14px;color:#b9c9e8">下面按报告 §3.2 的缩放结论绘制示意曲线（对数坐标）。拖动「算力预算」滑杆，看两条线的差距——<b style="color:#ff6b6b">红色 K3 整条线在蓝色 K2 下方</b>，任意算力下 Loss 都更低：</p>
+      <div class="slider-row"><span style="width:130px;font-size:14px">算力预算（对数）</span><input type="range" min="18" max="26" step="0.1" value="23" id="scale-c" oninput="scaleDemo()"><span class="slider-val" id="scale-cv">10^23</span></div>
+      <canvas class="plot" id="scale-canvas"></canvas>
+      <p style="font-size:13.5px;color:#b9c9e8;text-align:center;margin-top:8px" id="scale-result"></p>
+    </div>
+    <div class="analogy">两家快递公司：K2 公司每花 100 元油费送 100 单，K3 公司换了更好的路线规划（架构改进），同样 100 元油费能送 250 单。「2.5× 扩展效率」就是说：达到同样的智能水平，K3 只需要 K2 的 40% 训练算力——省下的钱直接变成了更低的 API 价格。</div>
+    <div class="keyfact">报告的 Scaling Law 研究还得到一个工程结论：余弦衰减（cosine decay）学习率调度稳定优于其他方案，因此 K3 预训练沿用——先让学习率从高点按余弦曲线平滑降到低点，像飞机降落而不是垂直坠落。</div>
   </div>
 </section>
 
@@ -706,6 +940,315 @@ function distillReset(){
   const st=dStage.querySelector('.student');st.style.transform='translateX(-50%)';
   document.getElementById('distill-desc').textContent='9 位专科教练（3 领域 × 3 思考档位）→ 1 个统一模型';
 }
+
+/* ============ 数学基础: ① 词嵌入地图 ============ */
+const embWords=[
+  ['🐱 猫',.20,.28,'#1783ff'],['🐶 狗',.27,.22,'#1783ff'],['🐯 老虎',.16,.36,'#1783ff'],['🦁 狮子',.24,.42,'#1783ff'],
+  ['🍎 苹果',.72,.20,'#2bc48a'],['🍌 香蕉',.80,.28,'#2bc48a'],['🍇 葡萄',.68,.30,'#2bc48a'],
+  ['🚗 汽车',.30,.78,'#ff6b6b'],['🚌 公交',.40,.84,'#ff6b6b'],['🚲 自行车',.22,.86,'#ff6b6b'],
+  ['😊 开心',.76,.70,'#a55eea'],['😢 难过',.84,.78,'#a55eea']
+];
+const embHome=embWords.map(w=>[w[1],w[2]]);
+function embDraw(){
+  const cv=document.getElementById('emb-canvas');
+  const dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,W,H);
+  embWords.forEach((w,i)=>{
+    const x=w[1]*W, y=w[2]*H;
+    ctx.beginPath();ctx.arc(x,y,7,0,7);
+    ctx.fillStyle=w[3];ctx.fill();
+    ctx.font='12px sans-serif';ctx.fillStyle='#dfe8ff';
+    ctx.textAlign='center';
+    ctx.fillText(w[0],x,y+22);
+  });
+}
+function embShuffle(){
+  embWords.forEach(w=>{w[1]=.08+Math.random()*.84;w[2]=.10+Math.random()*.78;});
+  embDraw();
+  document.getElementById('emb-desc').textContent='打乱后：词义信息消失了。再点「按语义归位」——训练就是不断把词「挪回」正确邻居附近的过程。';
+}
+function embReset(){
+  embWords.forEach((w,i)=>{w[1]=embHome[i][0];w[2]=embHome[i][1];});
+  embDraw();
+  document.getElementById('emb-desc').textContent='蓝色=动物家族，绿色=水果家族，红色=交通工具。语义相近的词在向量空间里也是「邻居」——这就是模型「理解」词义的方式。';
+}
+embDraw();
+
+/* ============ 数学基础: ② 注意力加权混合 ============ */
+const attnWords=['那只','猫','追','老鼠','，','因为','它','饿了'];
+// 每个词作为 query 时，对 8 个词的注意力权重（手工设计的合理值，和为 1）
+const attnW=[
+  [.30,.40,.05,.10,.01,.04,.08,.02],
+  [.08,.42,.10,.22,.01,.05,.10,.02],
+  [.10,.28,.30,.25,.01,.03,.02,.01],
+  [.06,.20,.08,.48,.01,.08,.06,.03],
+  [.10,.15,.10,.15,.40,.05,.03,.02],
+  [.05,.12,.04,.10,.01,.45,.15,.08],
+  [.04,.38,.03,.12,.01,.10,.28,.04],
+  [.05,.25,.02,.08,.01,.12,.35,.12]
+];
+(function buildAttnWords(){
+  const row=document.getElementById('attn-words');
+  attnWords.forEach((w,i)=>{
+    const c=document.createElement('div');c.className='word-chip';c.textContent=w;
+    c.style.cursor='pointer';
+    c.onclick=()=>attnPick(i);
+    row.appendChild(c);
+  });
+})();
+function attnPick(qi){
+  const chips=document.querySelectorAll('#attn-words .word-chip');
+  chips.forEach((c,i)=>{
+    const w=attnW[qi][i];
+    if(w>=0.25)c.classList.add('hot');else c.classList.remove('hot');
+    c.style.transform='scale('+(1+w*0.5)+')';
+  });
+  // 酒杯液面 = 最大权重
+  const maxW=Math.max(...attnW[qi]);
+  document.getElementById('mix-liquid').style.height=(maxW*130)+'px';
+  // 明细条
+  let html='<p style="font-size:14px;color:#dfe8ff;margin-bottom:8px">「<b style="color:#ffd97a">'+attnWords[qi]+'</b>」的注意力分配：</p>';
+  attnWords.forEach((w,i)=>{
+    const pct=Math.round(attnW[qi][i]*100);
+    html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12.5px;color:#9db4dd">'+
+      '<span style="width:44px;text-align:right">'+w+'</span>'+
+      '<div style="flex:1;height:8px;background:#1a2740;border-radius:99px;overflow:hidden">'+
+      '<div style="height:100%;width:'+pct+'%;background:'+(pct>=25?'#f7b731':'#3a6ea8')+';border-radius:99px;transition:width .5s"></div></div>'+
+      '<span style="width:38px">'+pct+'%</span></div>';
+  });
+  html+='<p style="font-size:12.5px;color:#7f92b8;margin-top:8px">新表示 = 各词信息 × 以上权重求和。注意「它」自动给了「猫」最高权重——模型学会了指代消解。</p>';
+  document.getElementById('attn-detail').innerHTML=html;
+}
+
+/* ============ 数学基础: ③ Softmax 投票箱 ============ */
+function softmaxDemo(){
+  const z=[0,1,2].map(i=>parseFloat(document.getElementById('lz'+i).value));
+  z.forEach((v,i)=>document.getElementById('lv'+i).textContent=v.toFixed(1));
+  const e=z.map(v=>Math.exp(v)), S=e.reduce((a,b)=>a+b,0);
+  const p=e.map(v=>v/S);
+  const names=['🐱 猫','🐭 老鼠','👉 它'];
+  const stage=document.getElementById('vote-stage');
+  stage.innerHTML='';
+  p.forEach((pi,i)=>{
+    const col=document.createElement('div');col.className='vote-col';
+    col.innerHTML='<div class="vote-bar" style="height:4px"><span>'+(pi*100).toFixed(1)+'%</span></div>'+
+      '<div class="vote-name">'+names[i]+'</div><div class="vote-logit">logit='+z[i].toFixed(1)+'</div>';
+    stage.appendChild(col);
+    requestAnimationFrame(()=>{
+      col.querySelector('.vote-bar').style.height=Math.max(4,pi*160)+'px';
+    });
+  });
+}
+softmaxDemo();
+
+/* ============ 数学基础: ④ 激活函数曲线 ============ */
+function sigmoid(x){return 1/(1+Math.exp(-x));}
+function glu(x){return x*sigmoid(x)*0.55;}            // GLU：门较弱，输出被压一半（示意）
+function swiglu(x){return x*sigmoid(x);}              // SwiGLU：无上限（Swish 门分支形式）
+function situ(x){const b1=4,b2=25;return b1*Math.tanh(x/b1)*sigmoid(x)*b2*Math.tanh(x/b2);}
+function actDemo(){
+  const xNow=parseFloat(document.getElementById('act-x').value);
+  document.getElementById('act-xv').textContent=xNow.toFixed(0);
+  const cv=document.getElementById('act-canvas');
+  const dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,W,H);
+  const X0=-10,X1=100,Y0=-40,Y1=260;
+  const px=x=>(x-X0)/(X1-X0)*W, py=y=>H-(y-Y0)/(Y1-Y0)*H;
+  // 网格
+  ctx.strokeStyle='#1a2740';ctx.lineWidth=1;
+  for(let y=0;y<=250;y+=50){ctx.beginPath();ctx.moveTo(0,py(y));ctx.lineTo(W,py(y));ctx.stroke();
+    ctx.fillStyle='#5a7bb5';ctx.font='11px sans-serif';ctx.textAlign='left';ctx.fillText(y,4,py(y)-3);}
+  ctx.beginPath();ctx.moveTo(0,py(0));ctx.lineTo(W,py(0));ctx.strokeStyle='#3a5078';ctx.stroke();
+  // y=100 封顶线
+  ctx.setLineDash([6,5]);ctx.strokeStyle='rgba(255,107,107,.6)';
+  ctx.beginPath();ctx.moveTo(0,py(100));ctx.lineTo(W,py(100));ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='rgba(255,107,107,.8)';ctx.font='12px sans-serif';ctx.textAlign='right';
+  ctx.fillText('SiTU 上限 |f(x)| ≤ 100',W-8,py(100)-6);
+  // 曲线
+  function draw(fn,color,wd){
+    ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=wd;
+    for(let x=X0;x<=X1;x+=0.5){
+      const y=fn(x);
+      if(x===X0)ctx.moveTo(px(x),py(y));else ctx.lineTo(px(x),py(y));
+    }
+    ctx.stroke();
+  }
+  draw(glu,'#5a7bb5',2);
+  draw(swiglu,'#f7b731',2);
+  draw(situ,'#ff6b6b',3);
+  // 当前点
+  [['GLU',glu,'#5a7bb5'],['SwiGLU',swiglu,'#f7b731'],['SiTU',situ,'#ff6b6b']].forEach(([n,fn,c])=>{
+    const y=fn(xNow);
+    ctx.beginPath();ctx.arc(px(xNow),py(y),5,0,7);ctx.fillStyle=c;ctx.fill();
+  });
+  ctx.fillStyle='#dfe8ff';ctx.font='12px sans-serif';ctx.textAlign='left';
+  // 标注放在点位右下方，避免遮挡红色曲线
+  ctx.fillText('x = '+xNow.toFixed(0),px(xNow)+12,py(situ(xNow))+18);
+  document.getElementById('act-readout').innerHTML=
+    '当 x = <b style="color:#ffd97a">'+xNow.toFixed(0)+'</b>：GLU 输出 '+glu(xNow).toFixed(1)+
+    '，SwiGLU 输出 '+swiglu(xNow).toFixed(1)+'（随 x 无限增长 📈），<b style="color:#ff6b6b">SiTU-GLU 输出 '+
+    situ(xNow).toFixed(1)+'</b>（被「限速帽」压住 🧢）——x 越大差距越明显。';
+}
+actDemo();
+
+/* ============ 数学基础: ⑤ 梯度爆炸 ============ */
+function gradDemo(){
+  const r=parseFloat(document.getElementById('grad-r').value);
+  document.getElementById('grad-rv').textContent=r.toFixed(2);
+  const flow=document.getElementById('grad-flow');
+  flow.innerHTML='';
+  const show=[1,10,30,60,93];
+  let v=1,exploded=false;
+  const vals={};
+  for(let l=1;l<=93;l++){v*=r;if(show.includes(l))vals[l]=v;}
+  show.forEach((l,i)=>{
+    const col=document.createElement('div');col.className='grad-col';
+    let val=vals[l],txt,cls;
+    if(val>1e6){txt='💥 '+val.toExponential(1);cls='#ff6b6b';exploded=true;}
+    else if(val>1000){txt=val.toExponential(1);cls='#f7b731';}
+    else{txt=val.toFixed(1);cls='#2bc48a';}
+    col.innerHTML='<div class="grad-num" style="color:'+cls+'">'+txt+'</div>'+
+      '<div style="text-align:center;font-size:12px;color:#7f92b8">第 '+l+' 层</div>';
+    flow.appendChild(col);
+    if(i<show.length-1){
+      const a=document.createElement('div');a.className='grad-arrow';a.textContent='×r →';
+      flow.appendChild(a);
+    }
+  });
+  const final=Math.pow(r,93);
+  let msg;
+  if(r<1)msg='r &lt; 1：信号越传越弱（梯度消失），93 层后只剩 '+final.toExponential(1)+' —— 后面几层几乎学不到东西 😴';
+  else if(final>1e5)msg='r = '+r.toFixed(2)+'：93 层后放大到 '+final.toExponential(1)+' 倍 —— 数值溢出，训练直接崩溃 💥';
+  else msg='r = '+r.toFixed(2)+'：93 层后约 '+final.toFixed(1)+' 倍 —— 处于可控范围 ✅（K3 的归一化设计把 r 稳定在 ≈1）';
+  document.getElementById('grad-result').innerHTML=msg;
+}
+gradDemo();
+
+/* ============ 数学基础: ⑥ MoE 路由数学 ============ */
+function moeMath(){
+  const N=parseInt(document.getElementById('moe-n').value);
+  const k=Math.min(parseInt(document.getElementById('moe-k').value),N);
+  document.getElementById('moe-nv').textContent=N;
+  document.getElementById('moe-kv').textContent=k;
+  const ratio=k/N;
+  const cv=document.getElementById('moe-canvas');
+  const dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,W,H);
+  // 画 N 个格子（示意，最多画 100 格）
+  const show=Math.min(N,100);
+  const cols=20,rows=Math.ceil(show/cols);
+  const gw=W/cols, gh=(H-60)/rows;
+  for(let i=0;i<show;i++){
+    const c=i%cols,r=Math.floor(i/cols);
+    const on=i<Math.round(k/N*show);
+    ctx.fillStyle=on?'#f7b731':'#2a3c5f';
+    ctx.fillRect(c*gw+2,r*gh+2,gw-4,gh-4);
+  }
+  ctx.fillStyle='#dfe8ff';ctx.font='bold 15px sans-serif';ctx.textAlign='center';
+  ctx.fillText('激活比例 = '+k+' / '+N+' = '+(ratio*100).toFixed(1)+'%',W/2,H-30);
+  document.getElementById('moe-result').innerHTML=
+    '每个 token 只花 <b style="color:#ffd97a">'+(ratio*100).toFixed(1)+'%</b> 的计算量，却享用全部 '+N+
+    ' 个专家的知识储备。K3 的实际配置：<b>16 / 896 ≈ 1.8%</b> 激活（加上 2 个共享专家和注意力层，整体激活 104B/2.8T ≈ 3.7%）。';
+}
+moeMath();
+
+/* ============ 数学基础: ⑦ 量化像素对比 ============ */
+function drawTestImage(){
+  const cv=document.getElementById('qimg-orig');
+  const S=180;cv.width=S;cv.height=S;
+  const ctx=cv.getContext('2d');
+  // 渐变 + 圆 + 文字模拟"信息"
+  const g=ctx.createLinearGradient(0,0,S,S);
+  g.addColorStop(0,'#1783ff');g.addColorStop(.5,'#a55eea');g.addColorStop(1,'#ff6b6b');
+  ctx.fillStyle=g;ctx.fillRect(0,0,S,S);
+  ctx.beginPath();ctx.arc(S*.62,S*.4,S*.22,0,7);
+  ctx.fillStyle='rgba(255,255,255,.85)';ctx.fill();
+  ctx.beginPath();ctx.arc(S*.3,S*.68,S*.15,0,7);
+  ctx.fillStyle='rgba(255,220,80,.9)';ctx.fill();
+  ctx.fillStyle='#fff';ctx.font='bold 20px sans-serif';ctx.fillText('W',S*.56,S*.45);
+  return ctx.getImageData(0,0,S,S);
+}
+const qimgOrig=drawTestImage();
+function quantMath(){
+  const bits=parseInt(document.getElementById('quant-bits').value);
+  document.getElementById('quant-bitsv').textContent=bits+' bit';
+  document.getElementById('qimg-lbl').textContent='('+bits+' bit = '+Math.pow(2,bits)+' 档)';
+  const cv=document.getElementById('qimg-quant');
+  cv.width=qimgOrig.width;cv.height=qimgOrig.height;
+  const ctx=cv.getContext('2d');
+  const img=new ImageData(new Uint8ClampedArray(qimgOrig.data),qimgOrig.width,qimgOrig.height);
+  const lv=Math.pow(2,bits)-1;
+  for(let i=0;i<img.data.length;i+=4){
+    // 每 32 个像素一组，组内按最大值缩放（模拟 MXFP4 的 group scale）
+    if((i/4)%32===0){
+      let mx=1;
+      for(let j=i;j<Math.min(i+32*4,img.data.length);j+=4)mx=Math.max(mx,img.data[j],img.data[j+1],img.data[j+2]);
+      img._scale=mx/lv;
+    }
+    for(let c=0;c<3;c++){
+      const q=Math.round(img.data[i+c]/img._scale);
+      img.data[i+c]=q*img._scale;
+    }
+  }
+  ctx.putImageData(img,0,0);
+  const err=bits>=7?'几乎无损 ✅':bits>=4?'仔细看渐变处有轻微色带，但主体完好 ✅（K3 的选择：4 bit + QAT 训练补偿）':bits>=2?'明显色块化，信息损失较大 ⚠️':'基本无法辨认 ❌';
+  document.getElementById('quant-result').innerHTML=
+    '<b style="color:#ffd97a">'+bits+' bit</b>（'+Math.pow(2,bits)+' 档）：'+err+
+    '<br><span style="font-size:12.5px;color:#7f92b8">存储对比：FP16 需要 16 bit/数 → '+bits+' bit/数 ≈ 体积 × '+(bits/16).toFixed(2)+'</span>';
+}
+quantMath();
+
+/* ============ 数学基础: ⑧ Scaling Law ============ */
+function scaleDemo(){
+  const logC=parseFloat(document.getElementById('scale-c').value);
+  document.getElementById('scale-cv').textContent='10^'+logC.toFixed(1);
+  const cv=document.getElementById('scale-canvas');
+  const dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,W,H);
+  // 示意幂律：L = a*C^-b + c（对数-对数直线）
+  // 取 b=0.115，K3 线下移 0.046 → logC 轴上偏移 ≈0.4 → 10^0.4 ≈ 2.5× 等效算力增益
+  const L2=lC=>2.9-0.115*(lC-18);          // K2
+  const L3=lC=>2.854-0.115*(lC-18);        // K3：线下移，斜率相同（示意）
+  const X0=18,X1=26,Y0=1.2,Y1=3.0;
+  const px=x=>(x-X0)/(X1-X0)*W, py=y=>H-(y-Y0)/(Y1-Y0)*H;
+  ctx.strokeStyle='#1a2740';
+  for(let y=1.5;y<=3;y+=0.5){ctx.beginPath();ctx.moveTo(0,py(y));ctx.lineTo(W,py(y));ctx.stroke();
+    ctx.fillStyle='#5a7bb5';ctx.font='11px sans-serif';ctx.textAlign='left';ctx.fillText('Loss '+y.toFixed(1),4,py(y)-3);}
+  for(let x=18;x<=26;x+=2){ctx.fillStyle='#5a7bb5';ctx.textAlign='center';ctx.fillText('10^'+x,px(x),H-6);}
+  function line(fn,c,wd){ctx.beginPath();ctx.strokeStyle=c;ctx.lineWidth=wd;
+    for(let x=X0;x<=X1;x+=0.1){if(x===X0)ctx.moveTo(px(x),py(fn(x)));else ctx.lineTo(px(x),py(fn(x)));}
+    ctx.stroke();}
+  line(L2,'#1783ff',3);line(L3,'#ff6b6b',3);
+  // 当前点
+  ctx.beginPath();ctx.arc(px(logC),py(L2(logC)),6,0,7);ctx.fillStyle='#1783ff';ctx.fill();
+  ctx.beginPath();ctx.arc(px(logC),py(L3(logC)),6,0,7);ctx.fillStyle='#ff6b6b';ctx.fill();
+  // 图例
+  ctx.font='13px sans-serif';ctx.textAlign='left';
+  ctx.fillStyle='#1783ff';ctx.fillText('— Kimi K2 缩放曲线',W-190,24);
+  ctx.fillStyle='#ff6b6b';ctx.fillText('— Kimi K3 缩放曲线',W-190,44);
+  // 反向求 K2 达到 K3 同 loss 需要的算力（两条线平行，偏移恒为 0.4 个 log 单位）
+  const target=L3(logC);
+  const lCneed=(2.9-target)/0.115+18;
+  const gain=Math.pow(10,lCneed-logC);
+  document.getElementById('scale-result').innerHTML=
+    '算力 10<sup>'+logC.toFixed(1)+'</sup> FLOPs 时：K2 的 Loss ≈ <b style="color:#1783ff">'+L2(logC).toFixed(2)+
+    '</b>，K3 的 Loss ≈ <b style="color:#ff6b6b">'+L3(logC).toFixed(2)+'</b>（越低越聪明）。<br>'+
+    'K2 要达到 K3 同等水平需要 10<sup>'+lCneed.toFixed(1)+'</sup> FLOPs —— 多花 <b style="color:#ffd97a">'+
+    gain.toFixed(1)+'× 算力</b>。这就是报告口径「K3 架构改进 ≈ 2.5× 等效算力增益」的含义。';
+}
+scaleDemo();
 </script>
 </body>
 </html>
