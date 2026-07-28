@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>看懂 Kimi K3 · 2.8 万亿参数的开源模型是怎么炼成的</title>
+<style>
+  :root{
+    --blue:#1783ff; --blue-d:#0b5cc4; --red:#ff6b6b; --amber:#f7b731;
+    --purple:#a55eea; --green:#2bc48a; --ink:#1b2430; --ink-soft:#48566a;
+    --bg:#f6f8fc; --card:#ffffff; --line:#e4eaf3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.8}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+
+  /* ===== Hero ===== */
+  .hero{background:linear-gradient(160deg,#0a1a3f 0%,#103a8c 55%,#1783ff 100%);
+    color:#fff;padding:72px 0 56px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+    padding:4px 14px;border-radius:99px;font-size:13px;letter-spacing:1px;margin-bottom:18px}
+  .hero h1{font-size:clamp(26px,4.6vw,44px);line-height:1.3;margin-bottom:14px}
+  .hero p.sub{font-size:clamp(14px,1.8vw,18px);opacity:.88;max-width:760px}
+  .hero .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);
+    border-radius:16px;padding:14px 22px;min-width:150px}
+  .stat b{display:block;font-size:26px;font-weight:800}
+  .stat span{font-size:13px;opacity:.85}
+
+  /* ===== Nav ===== */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  nav.toc .inner{display:flex;gap:6px;overflow-x:auto;padding:10px 22px;max-width:1060px;margin:0 auto}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--ink-soft);text-decoration:none;
+    padding:6px 12px;border-radius:99px;transition:.2s}
+  nav.toc a:hover{background:#eaf2ff;color:var(--blue-d)}
+
+  /* ===== Sections ===== */
+  section.chapter{padding:56px 0 8px}
+  .chap-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  .chap-num{font-size:14px;font-weight:800;color:#fff;background:var(--blue);
+    border-radius:10px;padding:3px 12px;letter-spacing:1px}
+  .chap-head h2{font-size:clamp(21px,3vw,30px)}
+  .oneline{color:var(--blue-d);font-weight:600;margin:4px 0 22px;font-size:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:0 2px 14px rgba(20,50,110,.05)}
+  .card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card p{margin-bottom:12px;color:#2c3a4e}
+  .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
+    border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
+  .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
+  .keyfact{display:flex;gap:12px;align-items:flex-start;background:#eef5ff;border-left:4px solid var(--blue);
+    border-radius:0 12px 12px 0;padding:12px 16px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";flex-shrink:0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .demo-box{background:#0e1830;border-radius:18px;padding:22px;margin:16px 0;color:#dfe8ff;
+    position:relative;overflow:hidden}
+  .demo-title{color:#8fb8ff;font-size:13px;letter-spacing:2px;font-weight:700;margin-bottom:14px;text-transform:uppercase}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:99px;padding:9px 22px;font-size:14px;
+    cursor:pointer;font-weight:600;transition:.2s;box-shadow:0 4px 14px rgba(23,131,255,.35)}
+  .btn:hover{background:var(--blue-d);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);box-shadow:none;color:#dfe8ff}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border-radius:12px;overflow:hidden}
+  table.tbl th{background:#103a8c;color:#fff;padding:10px 12px;text-align:left;font-weight:600}
+  table.tbl td{padding:10px 12px;border-bottom:1px solid var(--line)}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl tr:nth-child(even) td{background:#f7faff}
+  .hl{color:var(--blue-d);font-weight:700}
+
+  /* ===== 动画: MoE 专家餐厅 ===== */
+  .expert-stage{position:relative;height:280px}
+  .expert{position:absolute;width:34px;height:34px;border-radius:10px;background:#2a3c5f;
+    border:1px solid #3a5078;display:flex;align-items:center;justify-content:center;
+    font-size:11px;color:#5a7bb5;transition:all .5s}
+  .expert.on{background:var(--amber);border-color:#ffd97a;color:#5c4400;
+    box-shadow:0 0 16px rgba(247,183,49,.7)}
+  .expert.shared{background:var(--green);border-color:#6fe3b4;color:#064c33}
+  .token-ball{position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;
+    box-shadow:0 0 12px #fff;transition:all 1s cubic-bezier(.5,0,.3,1);z-index:5}
+  .router-badge{position:absolute;left:50%;top:8px;transform:translateX(-50%);
+    background:var(--red);color:#fff;font-size:12px;font-weight:700;border-radius:99px;padding:4px 14px;z-index:6}
+
+  /* ===== 动画: 注意力对比 ===== */
+  .attn-stage{display:flex;gap:24px;flex-wrap:wrap}
+  .attn-pane{flex:1;min-width:280px;background:#0a1326;border-radius:14px;padding:14px}
+  .attn-pane h4{color:#8fb8ff;font-size:14px;margin-bottom:10px;text-align:center}
+  .attn-canvas{position:relative;height:190px}
+  .dot{position:absolute;width:12px;height:12px;border-radius:50%;background:#3a5078}
+  .dot.me{background:var(--red);box-shadow:0 0 10px var(--red)}
+  .link{position:absolute;height:2px;background:rgba(247,183,49,.75);transform-origin:left center;
+    transition:opacity .3s;pointer-events:none}
+  .link.blue{background:rgba(23,131,255,.55)}
+
+  /* ===== 动画: 残差图书馆 ===== */
+  .lib-stage{position:relative;height:230px}
+  .layer-shelf{position:absolute;left:0;right:0;height:30px;background:#2a3c5f;border:1px solid #3a5078;
+    border-radius:8px;display:flex;align-items:center;padding:0 12px;font-size:12px;color:#9db4dd}
+  .lib-arrow{position:absolute;left:86%;width:3px;background:var(--amber);opacity:0;transition:opacity .3s}
+  .lib-arrow::after{content:"";position:absolute;bottom:-6px;left:-4.5px;border:6px solid transparent;border-top-color:var(--amber)}
+  .lib-cur{position:absolute;left:86%;transform:translateX(-50%);background:var(--red);color:#fff;
+    font-size:11px;padding:2px 10px;border-radius:99px;z-index:4}
+
+  /* ===== 动画: 量化行李箱 ===== */
+  .suitcase-stage{display:flex;gap:30px;align-items:flex-end;justify-content:center;min-height:190px;flex-wrap:wrap}
+  .case{width:130px;border-radius:14px 14px 8px 8px;position:relative;text-align:center;
+    display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:12px;color:#fff;font-weight:700;
+    transition:height 1.2s cubic-bezier(.6,0,.3,1)}
+  .case small{font-weight:400;font-size:12px;opacity:.9}
+  .case .bar{position:absolute;top:-14px;left:24px;right:24px;height:8px;border-radius:4px;background:rgba(255,255,255,.35)}
+  .case.fp16{background:linear-gradient(180deg,#5a7bb5,#3a5078)}
+  .case.fp4{background:linear-gradient(180deg,#2bc48a,#178a5e)}
+
+  /* ===== 动画: 蒸馏 ===== */
+  .distill-stage{position:relative;height:250px}
+  .teacher{position:absolute;width:84px;height:84px;border-radius:50%;background:#2a3c5f;
+    border:2px solid #3a5078;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-size:11px;color:#9db4dd;text-align:center;transition:all .5s;z-index:3}
+  .teacher b{font-size:13px;color:#dfe8ff}
+  .student{position:absolute;left:50%;top:96px;transform:translateX(-50%);width:120px;height:120px;
+    border-radius:50%;background:linear-gradient(135deg,var(--blue),#6db4ff);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;color:#fff;font-weight:800;z-index:3;
+    box-shadow:0 0 30px rgba(23,131,255,.5)}
+  .beam{position:absolute;height:3px;background:linear-gradient(90deg,var(--amber),transparent);
+    transform-origin:left center;opacity:0;transition:opacity .4s}
+  .beam::after{content:"";position:absolute;right:-3px;top:-2.5px;width:8px;height:8px;border-radius:50%;
+    background:var(--amber);animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.3}}
+
+  /* ===== 动画: 上下文图书馆标尺 ===== */
+  .ctx-bar{position:relative;height:64px;background:#0a1326;border-radius:12px;margin-top:14px;overflow:hidden}
+  .ctx-fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:12px;
+    background:linear-gradient(90deg,var(--blue),var(--purple));transition:width 1.8s cubic-bezier(.5,0,.2,1)}
+  .ctx-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:#fff;font-weight:700;font-size:15px;z-index:2;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+  .ctx-marks{display:flex;justify-content:space-between;font-size:11.5px;color:#7f92b8;margin-top:6px}
+
+  /* ===== 进度条动画 ===== */
+  .scorebar{height:10px;border-radius:99px;background:#e7edf6;overflow:hidden;margin:4px 0 12px}
+  .scorebar i{display:block;height:100%;border-radius:99px;width:0;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+
+  .badge{display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:99px;margin-left:8px}
+  .badge.open{background:#e3f8ee;color:#0c8a5a}
+  .badge.closed{background:#ffe9e9;color:#c0392b}
+
+  footer{margin-top:64px;padding:34px 0 46px;color:#7f8ca3;font-size:13px;text-align:center;
+    border-top:1px solid var(--line)}
+  .fade-up{opacity:0;transform:translateY(26px);transition:all .7s cubic-bezier(.3,.7,.3,1)}
+  .fade-up.show{opacity:1;transform:none}
+
+  /* 跑马灯数字 */
+  .big-num{font-size:clamp(34px,5vw,52px);font-weight:800;color:var(--blue-d);line-height:1.1}
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">技术报告通俗解读 · 基于 Moonshot AI《Kimi K3: Open Frontier Intelligence》47 页技术报告</span>
+    <h1>看懂 Kimi K3：<br>2.8 万亿参数的「开源大脑」是怎么炼成的</h1>
+    <p class="sub">不需要任何 AI 背景。我们用餐厅、图书馆、快递分拣中心这些生活场景，
+      配上可以点着玩的动画，把这份技术报告里最重要的 6 个发明讲清楚。</p>
+    <div class="stats">
+      <div class="stat"><b>2.8T</b><span>总参数（全球首个开源 3T 级模型）</span></div>
+      <div class="stat"><b>104B</b><span>每次实际激活（约 3.7%）</span></div>
+      <div class="stat"><b>100万</b><span>上下文长度（约 10 本长篇小说）</span></div>
+      <div class="stat"><b>1.56TB</b><span>开放权重大小（免费下载）</span></div>
+      <div class="stat"><b>2.5×</b><span>比上一代 K2 的训练效率提升</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="toc"><div class="inner">
+  <a href="#ch0">🧠 先建立直觉</a>
+  <a href="#ch1">🍜 发明一：LatentMoE</a>
+  <a href="#ch2">🔦 发明二：混合注意力</a>
+  <a href="#ch3">📚 发明三：注意力残差</a>
+  <a href="#ch4">🧳 发明四：MXFP4 量化</a>
+  <a href="#ch5">🎓 发明五：九师蒸馏</a>
+  <a href="#ch6">👁️ 发明六：原生视觉</a>
+  <a href="#ch7">🏗️ 幕后基建</a>
+  <a href="#ch8">📊 成绩与账单</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ============ CH0 ============ -->
+<section class="chapter" id="ch0">
+  <div class="chap-head"><span class="chap-num">热身</span><h2>先建立一个直觉：参数、激活与上下文</h2></div>
+  <p class="oneline">K3 的全部巧思，都围绕一个问题：如何让「脑容量」巨大，但「每次思考的电费」很小？</p>
+
+  <div class="card fade-up">
+    <h3>🧠 大脑很大，但每次只用一点点</h3>
+    <p>大模型的「参数」可以理解成大脑里存储知识的<b>神经元连接</b>。K3 有 <b>2.8 万亿</b>个参数——如果每个参数是一粒米，这些米能装满约 <b>22 个标准集装箱</b>。但巧妙的是：回答你的每一个字（token）时，它只动用其中 <b>1040 亿（104B）</b>个参数，约占总量的 <b>3.7%</b>。</p>
+    <div class="analogy">一家拥有 896 名专科医生的大型医院，来看病的每位病人只需要 16 位相关专科医生会诊 + 2 位全科医生兜底。医院总编制很大（什么疑难杂症都能看），但每次出诊的团队很小（效率高、费用低）。这就是「混合专家模型」（MoE）的核心思想。</div>
+    <div class="keyfact">技术报告原文：K3 每层有 <b>896 个路由专家</b>，每个 token 激活 <b>16 个</b>，另有 <b>2 个共享专家</b>，稀疏度高达 56 倍。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📖 「上下文」是它的工作记忆：100 万字同时摊在桌上</h3>
+    <p>「100 万 token 上下文」意味着模型能<b>同时</b>「看着」约 75 万个汉字（约 10 本长篇小说）来回答问题。下面的动画给你一个直观感受——点开看看这到底是多大的信息量：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互 · 100 万 token 是什么概念</div>
+      <p style="font-size:14px;color:#b9c9e8" id="ctx-desc">点击下方按钮，看看 100 万 token 能装下什么：</p>
+      <div class="ctx-bar"><div class="ctx-fill" id="ctx-fill"></div><div class="ctx-label" id="ctx-label">点击开始</div></div>
+      <div class="ctx-marks"><span>0</span><span>25万</span><span>50万</span><span>75万</span><span>100万 token</span></div>
+      <div class="btn-row">
+        <button class="btn" onclick="ctxDemo()">▶ 播放对比</button>
+        <button class="btn ghost" onclick="ctxReset()">重置</button>
+      </div>
+    </div>
+    <div class="keyfact">对照：2022 年的 GPT-3 上下文只有 2048 token（约半页文档）。四年间，前沿模型的「工作记忆」扩大了约 <b>500 倍</b>。</div>
+  </div>
+</section>
+
+<!-- ============ CH1 ============ -->
+<section class="chapter" id="ch1">
+  <div class="chap-head"><span class="chap-num">发明 1</span><h2>Stable LatentMoE：896 位专家的「分诊台」</h2></div>
+  <p class="oneline">技术报告 §2.3 —— 用「专科餐厅」的方式组织 2.8 万亿参数，并且让它在极端稀疏下依然训练得稳。</p>
+
+  <div class="card fade-up">
+    <h3>🍜 一家有 896 个档口的美食广场</h3>
+    <p>传统的大模型像一个<b>什么菜都自己做的巨型厨房</b>：不管客人点寿司还是麻辣烫，整个厨房全部开火。K3 的做法是建一个<b>美食广场</b>：896 个专科档口（路由专家）各管一类「菜式」（知识/技能），加上 2 个「家常菜档口」（共享专家）处理所有订单都需要的基础工序。每来一个 token（可以粗略理解为一个字），<b>分诊台（Router）</b>看一眼内容，只叫 16 个最相关的档口开工。</p>
+    <div class="demo-box">
+      <div class="demo-title">交互 · 点一个「字」，看哪些专家被叫起来干活</div>
+      <p style="font-size:14px;color:#b9c9e8" id="moe-desc">当前 token：<b id="moe-token" style="color:#ffd97a">（点击下方按钮投喂）</b> —— 黄色为被激活的 16 个路由专家，绿色为 2 个共享专家（每单必到），灰色格代表 896 位待命的专家（示意图只画 96 格）。</p>
+      <div class="expert-stage" id="expert-stage">
+        <div class="router-badge">🚦 Router 分诊台</div>
+        <div class="token-ball" id="token-ball" style="left:49%;top:40px;opacity:0"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" onclick="feedToken()">▶ 投喂一个 token</button>
+      </div>
+    </div>
+    <div class="analogy">LatentMoE 还多了一道聪明工序：病人病历（token 信息，维度 7168）先被压缩成一张<b>摘要卡片</b>（潜空间，维度 3584）再分发给专家。专家之间传递的是卡片而不是整箱病历，通信量直接减半——专家数量翻倍也不怕「快递堵车」。</div>
+    <div class="keyfact">报告还提到两个「稳定器」：<b>SiTU-GLU</b> 激活函数给数值装上「限速器」（输出永远不会超过 β₁β₂=100，防止训练时数值爆炸），<b>Quantile Balancing（分位数均衡）</b> 像一个聪明的调度员，确保 896 个档口的客流量大致均匀，不出现「网红档口排长队、其他档口没生意」。</div>
+  </div>
+</section>
+
+<!-- ============ CH2 ============ -->
+<section class="chapter" id="ch2">
+  <div class="chap-head"><span class="chap-num">发明 2</span><h2>混合注意力：KDA + Gated MLA，「阅读灯」与「探照灯」</h2></div>
+  <p class="oneline">技术报告 §2.1 —— 93 层网络里，69 层用省电的线性注意力（KDA），24 层用全局注意力（MLA），比例 3:1。</p>
+
+  <div class="card fade-up">
+    <h3>🔦 读一本 100 万字的书，不可能每一页都反复通读</h3>
+    <p>经典的「全注意力」机制要求：每写一个新字，都要回头把前面<b>所有字</b>重新比对一遍。读 100 万字的书时，这就像每读一句都要把整本书重翻一遍——准确但极其昂贵。<b>KDA（Kimi Delta Attention）</b>换了个思路：它像人类阅读一样<b>边读边记笔记</b>，把前文压缩成一份不断更新的「阅读笔记」（循环状态），新内容来了只需对照笔记，成本从「平方级」降为「线性级」。更妙的是它有<b>逐通道遗忘门</b>——笔记里每一栏都有独立的「橡皮擦」，该忘的忘、该留的留。</p>
+    <div class="demo-box">
+      <div class="demo-title">交互 · 全注意力 vs KDA：一个新词要「打招呼」多少次？</div>
+      <div class="attn-stage">
+        <div class="attn-pane">
+          <h4>全注意力（MLA 层）：和所有人握手 🤝</h4>
+          <div class="attn-canvas" id="full-attn"></div>
+          <p style="text-align:center;font-size:13px;color:#9db4dd" id="full-count">连线数：0</p>
+        </div>
+        <div class="attn-pane">
+          <h4>KDA 层：只更新一份「阅读笔记」 📝</h4>
+          <div class="attn-canvas" id="kda-attn"></div>
+          <p style="text-align:center;font-size:13px;color:#9db4dd" id="kda-count">连线数：0</p>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" onclick="attnDemo()">▶ 播放对比</button>
+        <button class="btn ghost" onclick="attnReset()">重置</button>
+      </div>
+    </div>
+    <p>但「只记笔记」有代价：笔记是压缩过的，难免丢细节。所以 K3 每 3 层 KDA 就插入 1 层 <b>Gated MLA</b>（全局注意力）——就像读书时每读三章停下来，<b>翻回原文核对一遍关键情节</b>。MLA 本身也做了「瘦身」：它把每个词的档案压缩成一个低维「潜向量」存放（KV 缓存大幅减小），K3 还给它加了一道<b>输出闸门</b>（full-rank output gate），过滤无关信息。</p>
+    <div class="analogy">写论文时的你：大部分时间靠摘抄的笔记快速写作（KDA，快且省），写到关键论证处翻回原始文献逐字核对（MLA，慢但准）。两者 3:1 搭配，速度与准确性兼得。</div>
+    <div class="keyfact">另一个神来之笔：K3 的所有 MLA 层<b>完全不用位置编码（NoPE）</b>——「顺序感」全部由 KDA 的遗忘/衰减机制隐式提供。所以当上下文扩展到 100 万 token 时，<b>不需要</b>像其他模型那样重新调校位置编码参数（RoPE 外推/YaRN），直接就能用。</div>
+  </div>
+</section>
+
+<!-- ============ CH3 ============ -->
+<section class="chapter" id="ch3">
+  <div class="chap-head"><span class="chap-num">发明 3</span><h2>注意力残差 AttnRes：给 93 层楼装上「直达电梯」</h2></div>
+  <p class="oneline">技术报告 §2.2 —— 深层网络的信息不再只能逐层接力，每层都能「回头点名」之前的任何一层。</p>
+
+  <div class="card fade-up">
+    <h3>📚 传话游戏的终结者</h3>
+    <p>传统深层网络的信息传递像<b>传话游戏</b>：第 1 层的发现要传给第 93 层，必须经过中间 91 层逐层转述（残差连接只是简单相加），传到后面早就失真了。<b>AttnRes（注意力残差）</b>的做法是：每层开工前，先对前面所有层的成果「<b>点一遍名</b>」——用一个学出来的「伪查询」给每个前序层打分（softmax 权重），<b>想要谁的成果就直接调取谁的</b>，加权汇总后再开工。93 层被分成若干「区块」（block），区块内部先打包汇总，控制内存开销。</p>
+    <div class="demo-box">
+      <div class="demo-title">交互 · 看第 8 层如何「点名」调取历史成果</div>
+      <div class="lib-stage" id="lib-stage"></div>
+      <div class="btn-row">
+        <button class="btn" onclick="libDemo()">▶ 播放点名过程</button>
+        <button class="btn ghost" onclick="libReset()">重置</button>
+      </div>
+      <p style="font-size:13px;color:#9db4dd;margin-top:10px" id="lib-desc">黄色箭头粗细代表调取权重 α——第 8 层可以跳过中间层，直接从嵌入层和第 1~2 区块「拿资料」。</p>
+    </div>
+    <div class="analogy">传统残差 = 公司里的「层层上报」，董事长看到的报告已经被 90 个经理改写了一遍；AttnRes = 董事长手里有一部<b>直线电话簿</b>，可以直接打给任何一个一线员工，并且知道该重点听谁的。</div>
+    <div class="keyfact">这项技术最初作为论文《Attention Residuals》于 2026 年 3 月公开，一度被撤回引发社区关注，K3 是它的首次大规模工业验证。报告还披露：K3 的推理草稿模型（EAGLE-3 投机解码）正是融合第 1、4 和最后一个 AttnRes 区块的低/中/高层特征来「猜」下一个词，实现加速。</div>
+  </div>
+</section>
+
+<!-- ============ CH4 ============ -->
+<section class="chapter" id="ch4">
+  <div class="chap-head"><span class="chap-num">发明 4</span><h2>MXFP4 量化：把 5.6TB 的行李压进 1.56TB 的箱子</h2></div>
+  <p class="oneline">技术报告 §4.1.4 —— 不是训练完再「有损压缩」，而是训练时就戴着「镣铐」练武，出生即量化。</p>
+
+  <div class="card fade-up">
+    <h3>🧳 搬家时，真空压缩袋能省 3/4 空间</h3>
+    <p>神经网络的权重通常用 16 位浮点数（FP16）存储，2.8T 参数需要约 <b>5.6 TB</b> 硬盘和显存——这根本没有单台机器装得下。K3 的做法是把占参数大头的 <b>MoE 专家权重</b>用 <b>MXFP4</b> 格式存储——每个数字只用 <b>4 位</b>（16 个可能的数值档位），32 个数共享一个「缩放系数」。存储需求立刻降到约 <b>1.56 TB</b>。</p>
+    <div class="demo-box">
+      <div class="demo-title">交互 · 真空压缩：看权重体积如何缩小到 1/4 以下</div>
+      <div class="suitcase-stage">
+        <div class="case fp16" id="case16" style="height:160px">
+          <div class="bar"></div>FP16 原始精度<br><b style="font-size:22px">5.6 TB</b><small>未压缩 · 无法单机部署</small>
+        </div>
+        <div style="font-size:28px;color:#8fb8ff" id="case-arrow">➡️</div>
+        <div class="case fp4" id="case4" style="height:160px">
+          <div class="bar"></div>MXFP4 量化<br><b style="font-size:22px" id="case4-num">5.6 TB</b><small id="case4-sub">点按钮开始压缩…</small>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" onclick="quantDemo()">🗜️ 开始真空压缩</button>
+        <button class="btn ghost" onclick="quantReset()">重置</button>
+      </div>
+    </div>
+    <p>4 位精度会不会让模型变「笨」？关键在于<b>量化感知训练（QAT）</b>：K3 从微调（SFT）阶段开始，就在「权重已被量化」的条件下训练——模型学会了在 4 位的约束下工作，就像<strong>戴着沙袋练武的人，习惯了沙袋后摘掉也和常人无异</strong>。同时「要害部位」绝不动刀：注意力层、共享专家、路由器、视觉塔全部保持高精度，RL 阶段 rollout 与训练使用同一套量化方案，彻底消除「训练-推理不一致」。</p>
+    <div class="analogy">普通量化 = 拍完高清照片再用微信压缩，画质损失听天由命；量化感知训练 = 摄影师<b>直接用压缩后的画质取景构图</b>，从一开始就按最终效果调整，成品自然看不出损失。</div>
+    <div class="keyfact">MXFP4 是业界新标准：OpenAI 的 gpt-oss、Kimi K2.5、NVIDIA Nemotron 3 等均已采用。4 位格式天然适配 NVIDIA Blackwell 与 AMD MI400 系列的新硬件指令，权重读取量减少 → 推理吞吐几乎翻倍。</div>
+  </div>
+</section>
+
+<!-- ============ CH5 ============ -->
+<section class="chapter" id="ch5">
+  <div class="chap-head"><span class="chap-num">发明 5</span><h2>多教师 On-Policy 蒸馏：9 位「专科教练」带出一个全能选手</h2></div>
+  <p class="oneline">技术报告 §4.1.3 —— 先分头特训出 9 个专家模型，再把它们的功力「合」进同一个 K3。</p>
+
+  <div class="card fade-up">
+    <h3>🎓 奥运十项全能选手是怎么训练的？</h3>
+    <p>K3 的强化学习（RL）不是「一个模型练所有科目」，而是先分头培养 <b>9 位专科教练</b>：3 大领域（通用任务、通用智能体、编程智能体）× 3 档思考强度（low / high / max）。每个教练只精修自己的科目，练到极致。然后通过<b>多教师 On-Policy 蒸馏（MOPD）</b>：让「学生模型」自己上手做题，9 位教练在旁边随时纠正——学生保留自己解题的手感（on-policy），同时吸收所有教练的长处，最终<b>一个模型拥有九种功力</b>。</p>
+    <div class="demo-box">
+      <div class="demo-title">交互 · 看 9 位教练如何把功力注入一个学生模型</div>
+      <div class="distill-stage" id="distill-stage">
+        <div class="student">K3<br><small style="font-weight:400;font-size:12px">统一学生模型</small></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" onclick="distillDemo()">▶ 开始蒸馏</button>
+        <button class="btn ghost" onclick="distillReset()">重置</button>
+      </div>
+      <p style="font-size:13px;color:#9db4dd;margin-top:8px" id="distill-desc">9 位专科教练（3 领域 × 3 思考档位）→ 1 个统一模型</p>
+    </div>
+    <div class="analogy">就像培养一位全科医生：先让他分别跟心内科、外科、急诊科的主任各实习几年（专科 RL），最后通过「跟诊考核」把各科主任的诊疗思路内化成自己的本能（蒸馏）——而不是让 9 个主任挤在一张诊台前轮流抢话筒（模型合并）。</div>
+    <div class="keyfact">配套的 RL 环境同样是黑科技：<b>统一白盒环境</b>把 Kimi Code、Claude Code、Codex 等主流智能体框架全部「模块化拆解」，训练时随机拼装不同组合，防止模型只学会「在一种工具架下干活」；<b>部分 rollout（partial rollout）</b>机制则允许超长任务（一次任务可能调用上千次工具、积累百万 token）跨迭代「断点续跑」。</div>
+  </div>
+</section>
+
+<!-- ============ CH6 ============ -->
+<section class="chapter" id="ch6">
+  <div class="chap-head"><span class="chap-num">发明 6</span><h2>原生视觉 MoonViT-V2：文字和图像，在同一个脑子里处理</h2></div>
+  <p class="oneline">技术报告 §2.4 —— 视觉编码器从零开始用「下一个词预测」训练，与语言共用一条主干。</p>
+
+  <div class="card fade-up">
+    <h3>👁️ 不是「翻译器」，而是「母语者」</h3>
+    <p>许多多模态模型的视觉是「外挂」的：先由一个预训练好的图像模型（如 SigLIP）看图，再把结果「翻译」给语言模型——中间隔着一层转译，联合训练时还容易「互相干扰」（梯度不稳定）。K3 的 <b>MoonViT-V2</b>（4.01 亿参数，27 层）<b>完全从零开始</b>，用和语言模型同一个目标（预测下一个 token）训练：图像被切成 14×14 的小块，经视觉塔编码后直接混入文本的 token 流，<b>同一个大脑、同一条流水线</b>处理文字、图片和视频。</p>
+    <div class="analogy">外挂视觉 = 请一位不懂中文的外国美术顾问，你看画他描述，经翻译转述给决策者——信息每转一手就打折扣；原生视觉 = 决策者自己从小看着画长大，「看」和「说」对他来说是同一种语言。</div>
+    <p>这个设计支撑了 K3 最酷的能力之一：<b>vision-in-the-loop（视觉闭环）</b>。模型写完一段网页代码 → 自己「看一眼」渲染出来的截图 → 发现按钮歪了 → 回头改代码 → 再看一眼……全程不需要人类插手，也不需要切换到另一个模型。游戏开发、CAD 制图、UI 设计都是这样练出来的。</p>
+    <div class="keyfact">报告中一个反直觉的发现：用「从零训练」替代「SigLIP 预训练初始化」反而更稳——预训练视觉编码器接入大模型后梯度范数持续偏高且频繁尖刺，而从零训练的 MoonViT-V2 全程平稳。视觉预训练数据还大规模加入了「代码 + 渲染结果」配对数据（SVG、3D、网页、游戏、CAD 图纸）。</div>
+  </div>
+</section>
+
+<!-- ============ CH7 ============ -->
+<section class="chapter" id="ch7">
+  <div class="chap-head"><span class="chap-num">幕后</span><h2>看不见的基建：让 2.8 万亿参数「转得动」的三件神器</h2></div>
+  <p class="oneline">技术报告 §5 —— 模型只是冰山一角，水面下是同等重要的系统工程。这三件神器全部同步开源。</p>
+
+  <div class="grid2">
+    <div class="card fade-up">
+      <h3>⚖️ MoonEP · 完美的快递分拣中心</h3>
+      <p>训练 MoE 模型时，896 个专家分布在上百张 GPU 上，token 像快递包裹一样在 GPU 之间分发。问题是：热门专家会「爆仓」，冷门专家的 GPU 在「摸鱼」。MoonEP 的方案是给热门专家安排<b>动态替补分身</b>（冗余专家），让每张 GPU 的计算量、通信量几乎完全相等——官方证明这是无管线气泡下的<b>理论最优解</b>。它还做到了关键路径「零主机同步」：CPU 不下场指挥，GPU 之间用 device-side 操作自己协调，e2e 延迟最多降低 1.2 倍。</p>
+      <div class="analogy">双十一分拣中心：把「爆款商品区」复制几个一模一样的货架分给不同班组，保证每个班组搬运量完全相同，谁也不用加班、谁也不用闲着。</div>
+    </div>
+    <div class="card fade-up">
+      <h3>⚡ FlashKDA · 给发动机换涡轮</h3>
+      <p>KDA 是全新机制，通用 GPU 算子跑不快。团队用 CUTLASS 重写了专用内核：预填充（prefill）阶段比此前的 flash-linear-attention 基线快 <b>1.72~2.22 倍</b>；解码阶段配合「分裂式持久化解码」（SPD）+ CUDA Graph，把 100 万上下文、batch=64 的解码端到端提速 <b>1.76 倍</b>。</p>
+      <div class="analogy">同一辆车，换个发动机：车型（模型架构）没变，但百公里加速从 8 秒变 4 秒——省下的每一毫秒，乘以每天数十亿次调用就是巨额成本。</div>
+    </div>
+    <div class="card fade-up">
+      <h3>🏖️ AgentEnv · 会「存档读档」的练兵场</h3>
+      <p>训练智能体需要海量「练习任务」：在沙箱里真实地运行代码、浏览网页、操作软件。AgentEnv 基于 Firecracker 微虚拟机，沙箱<b>快照启动/恢复只要几十毫秒</b>，还能从一个运行中的沙箱「分叉」出最多 16 个副本做树搜索——模型可以「存档，试试 A 方案；读档，再试 B 方案」。百万 token 的超长任务因此可以跨训练迭代断点续跑。</p>
+      <div class="analogy">打游戏时的「即时存档」：Boss 战前存个档，失败了秒速读档换战术——而不是从新手村重打一遍。AgentEnv 把这个能力带给了 AI 训练，单个沙箱镜像可支撑 20 万并发实例。</div>
+    </div>
+    <div class="card fade-up">
+      <h3>🧊 KDA 感知前缀缓存 · 别让笔记白做</h3>
+      <p>KDA 的「阅读笔记」（循环状态）让传统的 KV 缓存复用方案失效——因为 KDA 状态是<b>顺序累积</b>的，不能从中间任意位置切一段复用。团队为 vLLM 贡献了专用方案：只在每个 KDA chunk 的边界处缓存状态，配合「近似前缀匹配」算法，让长上下文的重复请求（如智能体多轮工具调用）不必从头重算。</p>
+      <div class="analogy">看视频时的「章节书签」：不能随意拖进度条（状态必须顺序算），但在每一章的开头都做了书签——下次从最近的章节接着看，而不是从头再播一遍。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH8 ============ -->
+<section class="chapter" id="ch8">
+  <div class="chap-head"><span class="chap-num">成绩单</span><h2>跑分与账单：它到底强在哪、省在哪</h2></div>
+  <p class="oneline">官方口径：综合落后最强闭源模型（Claude Fable 5 / GPT-5.6 Sol），但领先其他所有参测模型——开源第一。</p>
+
+  <div class="card fade-up">
+    <h3>📊 与前沿模型同台竞技（官方模型卡数据节选）</h3>
+    <div style="overflow-x:auto">
+    <table class="tbl">
+      <tr><th>能力项</th><th>Kimi K3 <span class="badge open">开源</span></th><th>Claude Fable 5 <span class="badge closed">闭源</span></th><th>GPT-5.6 Sol <span class="badge closed">闭源</span></th><th>GLM-5.2 <span class="badge open">开源</span></th></tr>
+      <tr><td>GPQA Diamond（博士级推理）</td><td class="hl">93.5</td><td>92.6</td><td>94.1</td><td>91.2</td></tr>
+      <tr><td>Terminal-Bench 2.1（终端操作）</td><td class="hl">88.3</td><td>88.0</td><td>88.8</td><td>82.7</td></tr>
+      <tr><td>SWE-Marathon（超长程工程）</td><td class="hl">42.0 🥇</td><td>35.0</td><td>39.0</td><td>13.0</td></tr>
+      <tr><td>MCPMark-Verified（工具调用）</td><td class="hl">94.5 🥇</td><td>87.4</td><td>92.9</td><td>—</td></tr>
+      <tr><td>BrowseComp（智能检索）</td><td class="hl">91.2 🥇</td><td>88.0</td><td>90.4</td><td>—</td></tr>
+      <tr><td>OSWorld-Verified（操作电脑）</td><td class="hl">84.8</td><td>85.0</td><td>83.0</td><td>—</td></tr>
+      <tr><td>OmniDocBench（文档理解）</td><td class="hl">91.1 🥇</td><td>89.8</td><td>85.8</td><td>—</td></tr>
+      <tr><td>WebDev Arena（第三方 Elo）</td><td class="hl">1678 🥇（99 个模型第 1）</td><td>1634</td><td>1630</td><td>1592</td></tr>
+    </table>
+    </div>
+    <p style="margin-top:14px;font-size:14px;color:#5a6b85">🥇 = 该项六模型中最佳。完整 40+ 项基准见官方模型卡；第三方复测（Artificial Analysis 智能指数 57.1，580 个模型中第 4；Vals Index 74.7，第 2）与官方口径基本一致。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>💰 更重要的可能是账单：同样聪明的活，几分之一的价格</h3>
+    <p>技术报告专门有一节「成本效率」对比「每完成一个任务花多少钱」：</p>
+    <div style="margin:10px 0 18px">
+      <p style="font-size:14px;margin-bottom:2px">Kimi Code Bench 2.0：K3 得分仅低 Claude Fable 5 <b>4 分</b>，但单任务成本只有对方的 <b>38%</b></p>
+      <div class="scorebar"><i data-w="100" style="background:#c0392b"></i></div><p style="font-size:12px;color:#888">Claude Fable 5 成本 = 100%</p>
+      <div class="scorebar"><i data-w="38" style="background:var(--blue)"></i></div><p style="font-size:12px;color:#888">Kimi K3 成本 = 38%</p>
+      <p style="font-size:14px;margin:14px 0 2px">高努力档（high）的 K3 已打平 Claude Opus 4.8 的最高档成绩，成本约为其 <b>1/3</b></p>
+      <div class="scorebar"><i data-w="100" style="background:#c0392b"></i></div><p style="font-size:12px;color:#888">Claude Opus 4.8（max）成本 = 100%</p>
+      <div class="scorebar"><i data-w="33" style="background:var(--green)"></i></div><p style="font-size:12px;color:#888">Kimi K3（high）成本 ≈ 33%</p>
+    </div>
+    <div class="keyfact">成本优势的根源正是前面讲的四个发明：MoE 只激活 3.7% 参数 + KDA 让长上下文从平方变线性 + MXFP4 让显存和带宽需求降到 1/4 + 投机解码让生成提速。对普通用户的意义很直接：<b>在 Kimi 应用/API 里使用 K3，价格比顶级闭源模型便宜一大截；对企业则意味着可以下载权重自己部署，数据不出内网。</b></div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📜 最后：「开源」到什么程度？</h3>
+    <p>本次发布的是<b>开放权重 + 自定义许可证（Kimi K3 License）</b>，主体条款与 MIT 一致——可自由下载、修改、商用、再分发。只有两条附加限制：</p>
+    <table class="tbl" style="margin-top:10px">
+      <tr><th>情形</th><th>要求</th></tr>
+      <tr><td>你经营「模型即服务」（转售 K3 推理 API），且公司年收入超 <b>2000 万美元</b></td><td>需先与 Moonshot AI 另签协议</td></tr>
+      <tr><td>你的产品月活超 <b>1 亿</b>，或月收入超 2000 万美元</td><td>需在界面显著标注「Kimi K3」</td></tr>
+      <tr><td>内部使用 / 通过 Kimi 官方或认证伙伴使用 / 普通产品嵌入</td><td>✅ 完全自由，无任何额外条件</td></tr>
+    </table>
+    <p style="margin-top:14px">对绝大多数开发者、创业公司和企业自用场景而言，它等同于 MIT 级别的自由。</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    本页基于 Moonshot AI 官方《Kimi K3: Open Frontier Intelligence》技术报告（47 页）与 Hugging Face 模型卡整理制作 · 2026-07<br>
+    通俗类比仅用于帮助理解，技术细节以原报告为准 · 仓库地址：huggingface.co/moonshotai/Kimi-K3
+  </div>
+</footer>
+
+<script>
+/* ============ 入场动画 ============ */
+const io = new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('show');
+    e.target.querySelectorAll('.scorebar i').forEach(b=>b.style.width=b.dataset.w+'%');
+  }
+}),{threshold:.15});
+document.querySelectorAll('.fade-up').forEach(el=>io.observe(el));
+
+/* ============ CH0 上下文 ============ */
+const ctxScenes=[
+  ['📄 一份合同','约 2 千 token',3],
+  ['📚 一本长篇小说','约 10 万 token',12],
+  ['📚📚 十本长篇小说','约 75 万汉字',78],
+  ['🤯 K3 一次能同时看完：≈ 一个中型图书馆的书架','100 万 token',100]
+];
+let ctxIdx=0;
+function ctxDemo(){
+  if(ctxIdx>=ctxScenes.length) ctxIdx=0;
+  const [label,sub,w]=ctxScenes[ctxIdx];
+  document.getElementById('ctx-fill').style.width=w+'%';
+  document.getElementById('ctx-label').textContent=label;
+  document.getElementById('ctx-desc').innerHTML='当前装入：<b style="color:#ffd97a">'+sub+'</b>'+(ctxIdx===ctxScenes.length-1?' —— 这就是 100 万 token 的容量！':'');
+  ctxIdx++;
+}
+function ctxReset(){ctxIdx=0;document.getElementById('ctx-fill').style.width='0';
+  document.getElementById('ctx-label').textContent='点击开始';
+  document.getElementById('ctx-desc').textContent='点击下方按钮，看看 100 万 token 能装下什么：';}
+
+/* ============ CH1 MoE 专家 ============ */
+const stage=document.getElementById('expert-stage');
+const experts=[];
+(function buildExperts(){
+  const cols=12, rows=8, gw=34+8, gh=34+8;
+  const W=stage.clientWidth||900;
+  const startX=Math.max(0,(W-cols*gw)/2);
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const d=document.createElement('div');
+    d.className='expert';
+    d.style.left=(startX+c*gw)+'px';
+    d.style.top=(70+r*gh)+'px';
+    d.textContent='E'+(r*cols+c+1);
+    stage.appendChild(d);experts.push(d);
+  }
+  // 2 shared experts
+  experts[0].classList.add('shared');experts[0].textContent='共1';
+  experts[1].classList.add('shared');experts[1].textContent='共2';
+})();
+const moeTokens=['🐍 Python代码','🍜 川菜菜谱','⚖️ 法律条文','🧮 数学证明','🏥 医疗影像','🎮 游戏剧情','📈 财务报表','🌌 天文观测'];
+let moeTimer=null;
+function feedToken(){
+  clearTimeout(moeTimer);
+  const t=moeTokens[Math.floor(Math.random()*moeTokens.length)];
+  document.getElementById('moe-token').textContent=t;
+  const ball=document.getElementById('token-ball');
+  // reset
+  experts.forEach(e=>{if(!e.classList.contains('shared'))e.classList.remove('on');});
+  ball.style.transition='none';ball.style.left='49%';ball.style.top='40px';ball.style.opacity='1';
+  requestAnimationFrame(()=>{ball.style.transition='all 1s cubic-bezier(.5,0,.3,1)';
+    // pick 16 random (skip shared)
+    const pool=experts.slice(2);
+    const chosen=pool.sort(()=>Math.random()-.5).slice(0,16);
+    setTimeout(()=>chosen.forEach(e=>e.classList.add('on')),400);
+    // ball hops to a few chosen
+    let hop=0;
+    function doHop(){
+      if(hop>=4){return;}
+      const e=chosen[Math.floor(Math.random()*chosen.length)];
+      ball.style.left=(e.offsetLeft+8)+'px';
+      ball.style.top=(e.offsetTop+8)+'px';
+      hop++;moeTimer=setTimeout(doHop,600);
+    }
+    setTimeout(doHop,300);
+  });
+}
+
+/* ============ CH2 注意力对比 ============ */
+function buildDots(id,n){
+  const c=document.getElementById(id);c.innerHTML='';
+  const dots=[];
+  for(let i=0;i<n;i++){
+    const d=document.createElement('div');d.className='dot';
+    const x=15+i*(c.clientWidth-30)/(n-1);
+    d.style.left=(x-6)+'px';d.style.top='150px';d.dataset.x=x;d.dataset.y=156;
+    c.appendChild(d);dots.push(d);
+  }
+  return dots;
+}
+let fullDots,kdaDots;
+function drawLink(c,a,b,cls){
+  const l=document.createElement('div');l.className='link '+cls;
+  const x1=+a.dataset.x,y1=+a.dataset.y,x2=+b.dataset.x,y2=+b.dataset.y;
+  const len=Math.hypot(x2-x1,y2-y1);
+  l.style.left=x1+'px';l.style.top=y1+'px';l.style.width=len+'px';
+  l.style.transform=`rotate(${Math.atan2(y2-y1,x2-x1)}rad)`;
+  c.appendChild(l);return l;
+}
+function attnDemo(){
+  attnReset();
+  const fc=document.getElementById('full-attn'),kc=document.getElementById('kda-attn');
+  fullDots=buildDots('full-attn',14);kdaDots=buildDots('kda-attn',14);
+  // full attention: each new dot links to all previous
+  let i=1,fCount=0;
+  fullDots[0].classList.add('me');
+  const fi=setInterval(()=>{
+    if(i>=fullDots.length){clearInterval(fi);return;}
+    fullDots[i].classList.add('me');
+    for(let j=0;j<i;j++){drawLink(fc,fullDots[i],fullDots[j],'');fCount++;}
+    document.getElementById('full-count').textContent='连线数：'+fCount+'（随 token 数平方增长 💸）';
+    if(i>0)fullDots[i-1].classList.remove('me');
+    i++;
+  },420);
+  // kda: note state
+  const note=document.createElement('div');
+  note.className='dot me';note.style.left='50%';note.style.top='20px';
+  note.style.width='60px';note.style.height='26px';note.style.borderRadius='8px';
+  note.style.background='var(--green)';note.dataset.x=(kc.clientWidth/2+30);note.dataset.y=33;
+  kc.appendChild(note);
+  const nl=document.createElement('div');
+  nl.style.cssText='position:absolute;left:50%;top:48px;transform:translateX(-50%);font-size:10px;color:#6fe3b4';
+  nl.textContent='📒 阅读笔记';kc.appendChild(nl);
+  let k=0,kCount=0;
+  const ki=setInterval(()=>{
+    if(k>=kdaDots.length){clearInterval(ki);return;}
+    kdaDots[k].classList.add('me');
+    drawLink(kc,kdaDots[k],note,'blue');kCount++;
+    document.getElementById('kda-count').textContent='连线数：'+kCount+'（每个 token 只更新 1 次笔记，线性增长 ✅）';
+    if(k>0)kdaDots[k-1].classList.remove('me');
+    k++;
+  },420);
+}
+function attnReset(){
+  document.getElementById('full-attn').innerHTML='';
+  document.getElementById('kda-attn').innerHTML='';
+  document.getElementById('full-count').textContent='连线数：0';
+  document.getElementById('kda-count').textContent='连线数：0';
+}
+
+/* ============ CH3 AttnRes 图书馆 ============ */
+const libStage=document.getElementById('lib-stage');
+const libNames=['嵌入层（原始输入）','区块 1 汇总（第 1~3 层）','区块 2 汇总（第 4~6 层）','区块 3 汇总（第 7~9 层）'];
+(function buildLib(){
+  libNames.forEach((n,i)=>{
+    const s=document.createElement('div');s.className='layer-shelf';
+    s.style.top=(10+i*48)+'px';s.textContent='📦 '+n;s.id='shelf'+i;
+    libStage.appendChild(s);
+  });
+  const cur=document.createElement('div');cur.className='lib-cur';
+  cur.style.top=(10+4*48)+'px';cur.textContent='⏳ 第 8 层正在工作…';libStage.appendChild(cur);
+})();
+const libWeights=[0.45,0.30,0.20,0.05];
+function libDemo(){
+  libReset();
+  libNames.forEach((n,i)=>{
+    const a=document.createElement('div');a.className='lib-arrow';
+    a.style.top=(10+i*48+30)+'px';
+    a.style.height=(4*48-48*(i)+0)+'px';
+    a.style.width=(2+libWeights[i]*10)+'px';
+    libStage.appendChild(a);
+    setTimeout(()=>a.style.opacity='1',300+i*350);
+    setTimeout(()=>{
+      const s=document.getElementById('shelf'+i);
+      s.style.borderColor='var(--amber)';s.style.color='#ffd97a';
+    },300+i*350);
+  });
+  setTimeout(()=>document.getElementById('lib-desc').innerHTML=
+    '✅ 点名完成！第 8 层从 <b style="color:#ffd97a">嵌入层拿了 45%</b>、区块 1 拿 30%、区块 2 拿 20%、区块 3 只拿 5%——它自己决定哪里是重点。',300+4*350);
+}
+function libReset(){
+  libStage.querySelectorAll('.lib-arrow').forEach(a=>a.remove());
+  libNames.forEach((n,i)=>{const s=document.getElementById('shelf'+i);s.style.borderColor='#3a5078';s.style.color='#9db4dd';});
+  document.getElementById('lib-desc').textContent='黄色箭头粗细代表调取权重 α——第 8 层可以跳过中间层，直接从嵌入层和第 1~2 区块「拿资料」。';
+}
+
+/* ============ CH4 量化 ============ */
+function quantDemo(){
+  const c4=document.getElementById('case4');
+  c4.style.height='44px';
+  document.getElementById('case4-num').textContent='1.56 TB';
+  document.getElementById('case4-sub').textContent='✅ 压缩完成 · 可部署';
+  document.getElementById('case-arrow').textContent='🗜️';
+}
+function quantReset(){
+  document.getElementById('case4').style.height='160px';
+  document.getElementById('case4-num').textContent='5.6 TB';
+  document.getElementById('case4-sub').textContent='点按钮开始压缩…';
+  document.getElementById('case-arrow').textContent='➡️';
+}
+
+/* ============ CH5 蒸馏 ============ */
+const dStage=document.getElementById('distill-stage');
+const teachers=[
+  ['通用任务','low'],['通用任务','high'],['通用任务','max'],
+  ['智能体','low'],['智能体','high'],['智能体','max'],
+  ['编程','low'],['编程','high'],['编程','max']
+];
+const teacherEls=[];
+(function buildTeachers(){
+  const W=dStage.clientWidth||900;
+  teachers.forEach((t,i)=>{
+    const el=document.createElement('div');el.className='teacher';
+    const ang=(i/(teachers.length-1))*Math.PI; // 半圆
+    const rx=W/2-60, ry=70;
+    const x=W/2 - rx*Math.cos(ang) - 42;
+    const y=150 - ry*Math.sin(ang) + (i%2)*36 - 30;
+    el.style.left=x+'px';el.style.top=Math.max(0,y)+'px';
+    el.innerHTML='<b>'+t[0]+'</b>教练·'+t[1];
+    dStage.appendChild(el);teacherEls.push(el);
+  });
+})();
+function distillDemo(){
+  distillReset();
+  const st=dStage.querySelector('.student');
+  const sx=st.offsetLeft+60, sy=st.offsetTop+40;
+  teacherEls.forEach((el,i)=>{
+    const tx=el.offsetLeft+42, ty=el.offsetTop+42;
+    const b=document.createElement('div');b.className='beam';
+    const len=Math.hypot(sx-tx,sy-ty);
+    b.style.left=tx+'px';b.style.top=ty+'px';b.style.width=len+'px';
+    b.style.transform=`rotate(${Math.atan2(sy-ty,sx-tx)}rad)`;
+    dStage.appendChild(b);
+    setTimeout(()=>{
+      b.style.opacity='1';
+      el.style.borderColor='var(--amber)';
+      el.style.boxShadow='0 0 18px rgba(247,183,49,.5)';
+    },i*220);
+  });
+  setTimeout(()=>{
+    document.getElementById('distill-desc').innerHTML='✅ 蒸馏完成：9 位教练的长处已全部注入同一个 K3（低/中/高三档思考、三大领域全精通）';
+    st.style.transform='translateX(-50%) scale(1.12)';
+  },teachers.length*220+400);
+}
+function distillReset(){
+  dStage.querySelectorAll('.beam').forEach(b=>b.remove());
+  teacherEls.forEach(el=>{el.style.borderColor='#3a5078';el.style.boxShadow='none';});
+  const st=dStage.querySelector('.student');st.style.transform='translateX(-50%)';
+  document.getElementById('distill-desc').textContent='9 位专科教练（3 领域 × 3 思考档位）→ 1 个统一模型';
+}
+</script>
+</body>
+</html>
