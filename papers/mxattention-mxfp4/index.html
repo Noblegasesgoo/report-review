@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>看懂 MXAttention · 不动一分训练数据，把 4-bit 注意力修到接近无损</title>
+<style>
+  :root{
+    --blue:#1783ff; --blue-d:#0b5cc4; --red:#ff6b6b; --amber:#f7b731;
+    --purple:#a55eea; --green:#2bc48a; --ink:#1b2430; --ink-soft:#48566a;
+    --bg:#f6f8fc; --card:#ffffff; --line:#e4eaf3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.8}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+
+  /* ===== Hero ===== */
+  .hero{background:linear-gradient(160deg,#0a1a3f 0%,#103a8c 55%,#1783ff 100%);
+    color:#fff;padding:72px 0 56px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+    padding:4px 14px;border-radius:99px;font-size:13px;letter-spacing:1px;margin-bottom:18px}
+  .hero h1{font-size:clamp(26px,4.6vw,44px);line-height:1.3;margin-bottom:14px}
+  .hero p.sub{font-size:clamp(14px,1.8vw,18px);opacity:.88;max-width:820px}
+  .hero .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);
+    border-radius:16px;padding:14px 22px;min-width:150px}
+  .stat b{display:block;font-size:26px;font-weight:800}
+  .stat span{font-size:13px;opacity:.85}
+
+  /* ===== Nav ===== */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  nav.toc .inner{display:flex;gap:6px;overflow-x:auto;padding:10px 22px;max-width:1060px;margin:0 auto}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--ink-soft);text-decoration:none;
+    padding:6px 12px;border-radius:99px;transition:.2s}
+  nav.toc a:hover{background:#eaf2ff;color:var(--blue-d)}
+
+  /* ===== Sections ===== */
+  section.chapter{padding:56px 0 8px}
+  .chap-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  .chap-num{font-size:14px;font-weight:800;color:#fff;background:var(--blue);
+    border-radius:10px;padding:3px 12px;letter-spacing:1px}
+  .chap-head h2{font-size:clamp(21px,3vw,30px)}
+  .oneline{color:var(--blue-d);font-weight:600;margin:4px 0 22px;font-size:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:0 2px 14px rgba(20,50,110,.05)}
+  .card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .card p{margin-bottom:12px;color:#2c3a4e}
+  .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
+    border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
+  .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
+  .keyfact{position:relative;background:#eef5ff;border-left:4px solid var(--blue);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";position:absolute;left:16px;top:12px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .demo-box{background:#0e1830;border-radius:18px;padding:22px;margin:16px 0;color:#dfe8ff;
+    position:relative;overflow:hidden}
+  .demo-title{color:#8fb8ff;font-size:13px;letter-spacing:2px;font-weight:700;margin-bottom:14px;text-transform:uppercase}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:99px;padding:9px 22px;font-size:14px;
+    cursor:pointer;font-weight:600;transition:.2s;box-shadow:0 4px 14px rgba(23,131,255,.35)}
+  .btn:hover{background:var(--blue-d);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);box-shadow:none;color:#dfe8ff}
+  .btn.ghost.active{background:rgba(23,131,255,.22);border-color:#6db4ff;color:#fff}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border-radius:12px;overflow:hidden}
+  table.tbl th{background:#103a8c;color:#fff;padding:10px 12px;text-align:left;font-weight:600}
+  table.tbl td{padding:10px 12px;border-bottom:1px solid var(--line)}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl tr:nth-child(even) td{background:#f7faff}
+  .tbl-wrap{overflow-x:auto;border-radius:12px;margin:10px 0}
+  .hl{color:var(--blue-d);font-weight:700}
+
+  /* ===== 公式（纯 HTML/CSS，无 MathJax）===== */
+  .formula{background:#0e1830;border-radius:14px;padding:20px 22px;margin:14px 0;color:#eaf1ff;
+    font-size:clamp(15px,2.2vw,19px);text-align:center;overflow-x:auto;line-height:2;
+    font-family:"STIX Two Math","Cambria Math",Georgia,serif}
+  .formula .op{color:#8fb8ff}
+  .formula .cond{font-size:.82em;color:#9db4dd}
+  .frac{display:inline-flex;flex-direction:column;vertical-align:middle;margin:0 2px;line-height:1.4}
+  .frac .num{border-bottom:1.5px solid currentColor;padding:0 7px}
+  .frac .den{padding:0 7px}
+  .fnote{font-size:13px;color:#7f92b8;margin-top:10px;text-align:center;line-height:1.7;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  .formula var{font-style:italic}
+
+  /* ===== 结果条形图 ===== */
+  .scorebar{height:10px;border-radius:99px;background:#e7edf6;overflow:hidden;margin:4px 0 12px}
+  .scorebar i{display:block;height:100%;border-radius:99px;width:0;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+  .bar-row{display:grid;grid-template-columns:170px 1fr 64px;gap:12px;align-items:center;margin-bottom:10px;font-size:14px}
+  @media(max-width:640px){.bar-row{grid-template-columns:110px 1fr 56px}}
+  .bar-row b{text-align:right;font-variant-numeric:tabular-nums}
+
+  /* ===== 滑杆 ===== */
+  .slider-row{display:flex;align-items:center;gap:14px;margin:14px 0 6px;flex-wrap:wrap}
+  .slider-row label{font-size:14px;color:#9db4dd;white-space:nowrap}
+  .slider-row input[type=range]{flex:1;min-width:180px;accent-color:var(--amber)}
+  .slider-row output{color:#ffd97a;font-weight:700;min-width:56px;text-align:right;font-variant-numeric:tabular-nums}
+  canvas.chart{width:100%;height:260px;display:block;border-radius:10px;background:#0a1326}
+  .demo-readout{margin-top:14px;font-size:14.5px;line-height:1.8}
+  .caption{font-size:12.5px;color:#7f92b8;margin-top:8px;line-height:1.6}
+
+  /* ===== 来源标注 ===== */
+  .src{color:var(--blue-d);text-decoration:none;font-size:.8em;font-weight:600;
+    border-bottom:1px dashed #9db8e8;padding:0 1px;white-space:nowrap}
+  .src:hover{color:var(--blue);border-bottom-style:solid;background:#eaf2ff;border-radius:4px}
+  .src::after{content:"↗";font-size:.85em;margin-left:1px}
+  .demo-box .src, .formula .src{color:#8fb8ff;border-bottom-color:#3a5078}
+  .demo-box .src:hover{color:#cfe2ff;background:rgba(23,131,255,.15)}
+  .src-inline{color:inherit;border-bottom:1px dashed #9db8e8;text-decoration:none}
+  .src-inline:hover{color:var(--blue)}
+
+  footer{margin-top:64px;padding:34px 0 46px;color:#7f8ca3;font-size:13px;text-align:center;
+    border-top:1px solid var(--line);line-height:2}
+  .fade-up{opacity:0;transform:translateY(26px);transition:all .7s cubic-bezier(.3,.7,.3,1)}
+  .fade-up.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">arXiv 论文交互解读 · 高效推理与压缩</span>
+    <h1>看懂 MXAttention：不动一分训练数据，把 4-bit 注意力「修」到接近无损</h1>
+    <p class="sub">华为团队为视频扩散模型提出的免数据后训练量化框架：先用「通用最优缩放」推导出一个与数据分布完全无关的闭式边界 Q<sub>max</sub> = 7.25，再用「预归一化量化」让 softmax 循环里的两本账合成一本——不用校准、不用 QAT、不用逐层搜索，就把 MXFP4 注意力拉回到 FP16 级画质。</p>
+    <div class="stats">
+      <div class="stat"><b>7.25</b><span>UOS 闭式缩放边界，与数据分布无关</span></div>
+      <div class="stat"><b>≥ 95%</b><span>收窄 OCP MXFP4 与 FP16 的画质差距</span></div>
+      <div class="stat"><b>&lt; 0.01</b><span>所有 VBench 指标的绝对退化</span></div>
+      <div class="stat"><b>0</b><span>校准数据 / QAT / 逐层搜索</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="toc"><div class="inner">
+  <a href="#ch0">🎬 热身：视频生成的注意力账单</a>
+  <a href="#ch1">🧮 概念基础：MXFP4 与在线 Softmax</a>
+  <a href="#ch2">🕳️ 两个隐形数值坑</a>
+  <a href="#ch3">🎯 核心方法：UOS + PNQ</a>
+  <a href="#ch4">📊 实验结果</a>
+  <a href="#ch5">⚖️ 局限与意义</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ============ CH0 热身 ============ -->
+<section class="chapter" id="ch0">
+  <div class="chap-head"><span class="chap-num">第 0 章</span><h2>热身：视频生成的「注意力账单」</h2></div>
+  <p class="oneline">让模型生成一段 720p 视频，最贵的不是「生成」，而是每一步里每个像素都要和全场其他像素「打招呼」。</p>
+
+  <div class="card fade-up">
+    <h3>🎞️ 为什么注意力是视频扩散模型的瓶颈？</h3>
+    <p>视频扩散 Transformer 处理的是<b>时空 token 序列</b>：分辨率越高、视频越长，token 越多。而注意力的开销随序列长度<b>平方增长</b>——序列翻一倍，注意力算四倍。更麻烦的是，生成一段视频要去噪几十步，每一步都要完整跑一遍所有 Transformer 块（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §1</a>）：Wan2.2 生成 81 帧 720p 视频要 40 步，HunyuanVideo 生成 129 帧要 50 步（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §5.1</a>）。</p>
+    <p>好消息是：注意力里最贵的两个操作——<b>QK<sup>⊤</sup>（算分）和 PV（加权求和）</b>——都是矩阵乘法（GEMM），而新硬件（NVIDIA Blackwell、AMD MI350、华为昇腾 950）已经为 4-bit 浮点（FP4）GEMM 提供了<b>原生吞吐</b>。只要 Q、K、V 和 softmax 路径上的值能以足够小的误差压到 4-bit，推理成本就能大幅下探（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §1</a>）。</p>
+    <div class="analogy">注意力像一场全员团建：每个人都要和在场所有人一一握手（平方开销）。视频生成则是把这场团建连开 40～50 场。4-bit 量化相当于给每个人发一套「速记握手手势」——握手动作没变，但信息交换快了好几倍。</div>
+    <div class="keyfact">注意力的 QK<sup>⊤</sup> 与 PV 两个 GEMM 可以直接吃到硬件原生 FP4 吞吐，前提是量化误差足够小——这正是本文要解决的核心问题（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §1</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🏁 4-bit 的两条格式路线：开放标准 MXFP4 vs 英伟达 NVFP4</h3>
+    <p>目前 4-bit 浮点有两个代表性格式：</p>
+    <table class="tbl">
+      <tr><th></th><th>MXFP4（本文主角）</th><th>NVFP4</th></tr>
+      <tr><td>制定方</td><td><a class="src" href="https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf" target="_blank" rel="noopener">OCP 开放计算项目 MX 规范</a>（<a class="src" href="https://arxiv.org/abs/2310.10537" target="_blank" rel="noopener">arXiv 版本</a>）</td><td><a class="src" href="https://developer.nvidia.com/blog/introducing-nvfp4-for-efficient-and-accurate-low-precision-inference/" target="_blank" rel="noopener">NVIDIA</a></td></tr>
+      <tr><td>块大小</td><td>32 个元素共享一个缩放</td><td>16 个元素一个块，另有张量级缩放</td></tr>
+      <tr><td>共享缩放格式</td><td><b>E8M0：只能是 2 的幂</b></td><td>E4M3：带尾数，更细</td></tr>
+      <tr><td>硬件支持</td><td>NVIDIA Blackwell / AMD MI350 / 昇腾 950 等多家</td><td>NVIDIA Blackwell</td></tr>
+    </table>
+    <p style="margin-top:14px">MXFP4 是开放标准、缩放元数据开销小、处理简单，但它的<b>块更粗</b>、缩放<b>只能是 2 的幂</b>——这两个限制让「直接套标准规则量化注意力」很容易翻车：论文实测直接 MXFP4 量化会把 Wan2.2 的 VBench Imaging Quality 从 0.7085 打到 0.6414，HunyuanVideo 更是从 0.6185 崩到 0.4459（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §5.3 表 2</a>）。</p>
+    <div class="keyfact">本文的任务：<b>不改模型、不看数据</b>，只改量化方式本身，让开放标准 MXFP4 注意力达到接近 FP16 的生成质量（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §1</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH1 概念基础 ============ -->
+<section class="chapter" id="ch1">
+  <div class="chap-head"><span class="chap-num">第 1 章</span><h2>概念基础：量化、MXFP4 与在线 Softmax</h2></div>
+  <p class="oneline">三件道具：把数字「压小」的量化、32 人共用一把尺的 MXFP4 格式、以及边算边记账的 FlashAttention 在线 softmax。</p>
+
+  <div class="card fade-up">
+    <h3>① 量化：把高精度数字「压」进小格子</h3>
+    <p>模型里的数字默认是 FP16（16 位浮点），能表达非常精细的数值。<b>量化</b>就是把这些数字四舍五入到一个稀疏得多的「格子」上，用更少的位数存储和计算。位宽从 16 降到 4，存储和带宽省 4 倍，还能用上硬件原生 FP4 算力——代价是每个数字都被「取整」了，产生量化误差。</p>
+    <p>本文用的 4-bit 元素格式叫 <b>E2M1</b>（1 位符号 + 2 位指数 + 1 位尾数），它能表达的全部正值只有 8 个挡位（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §2 式 (9)</a>）：</p>
+    <div class="formula">
+      <var>G</var><sub>E2M1</sub> <span class="op">=</span> { 0, ±0.5, ±1, ±1.5, ±2, ±3, ±4, ±6 }
+      <div class="fnote">注意挡位是「前密后疏」的：0~2 之间每 0.5 一格，2 之后间隔越来越大，最大有限值是 <b>6</b>。这个形状决定了后面所有故事。</div>
+    </div>
+    <div class="analogy">量化像真空压缩袋：衣服（信息）还是那些衣服，但要用更小的袋子装。E2M1 的 8 个挡位则像一把「不均匀刻度」的尺子——小数字区刻度细密，大数字区只有稀疏几格，量错一点就差很远。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>② MXFP4：32 个数字共用一把「2 的幂」尺子</h3>
+    <p>MXFP4 的做法是：每 <b>32 个数为一组（块）</b>，全组共享一个缩放因子 Δ，且 Δ <b>只能是 2 的幂</b>（E8M0 格式，Δ = 2<sup>e</sup>）。组内每个数先除以 Δ，再四舍五入到 E2M1 网格（超出范围就按 6 封顶），存储时只存 4-bit 格子编号和一个共享指数（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §2 式 (10)</a>）：</p>
+    <div class="formula">
+      <var>Q</var><sub>Δ</sub>(<var>v</var>) <span class="op">=</span> Δ · ⌈ <span class="frac"><span class="num"><var>v</var></span><span class="den">Δ</span></span> ⌉<sub><var>G</var><sub>E2M1</sub></sub> ，&nbsp;&nbsp; Δ = 2<sup><var>e</var></sup>
+      <div class="fnote">⌈·⌉<sub>G</sub> 表示「就近吸附到 E2M1 网格」，最大封顶 ±6。Δ 选大还是选小，直接决定整块数字的命运——这是第 2 章第一个坑的伏笔。</div>
+    </div>
+    <p>标准 OCP 规则这样选尺子：让块内最大值归一化后落在 <b>[4, 8)</b> 区间（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §2 式 (11)</a>）。听起来合理，但 E2M1 最大只能表到 6——矛盾已经埋下了。</p>
+    <div class="analogy">32 个人合影，只有一根「亮度档位」只有 ×1 / ×2 / ×4 的补光灯（2 的幂）：开太亮，前排小脸全过曝成白纸（下溢归零）；开太暗，后排大高个的头顶被裁出画面（溢出封顶）。第 2 章会看到，OCP 标准档位恰好卡在这个两难上。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>③ FlashAttention 在线 softmax：边算边记的两本账</h3>
+    <p>标准注意力要把 N×N 的概率矩阵 P 完整算出来再加权求和，显存开销是平方级。<b>FlashAttention</b> 把 K、V 切成小块，逐块更新，永远不落地完整 P 矩阵（<a class="src" href="https://arxiv.org/abs/2205.14135" target="_blank" rel="noopener">FlashAttention</a>；<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §2 式 (3)–(8)</a>）。它维护两本「流水账」：</p>
+    <div class="formula">
+      ℓ<sub><var>i</var></sub><sup>(<var>j</var>)</sup> <span class="op">=</span> α<sub><var>i</var></sub><sup>(<var>j</var>)</sup> ℓ<sub><var>i</var></sub><sup>(<var>j</var>−1)</sup> <span class="op">+</span> P̃<sub><var>ij</var></sub>1 ，&nbsp;&nbsp;
+      Õ<sub><var>i</var></sub><sup>(<var>j</var>)</sup> <span class="op">=</span> Diag(α<sub><var>i</var></sub><sup>(<var>j</var>)</sup>) Õ<sub><var>i</var></sub><sup>(<var>j</var>−1)</sup> <span class="op">+</span> P̃<sub><var>ij</var></sub><var>V</var><sub><var>j</var></sub>
+      <div class="fnote">P̃<sub>ij</sub> 是<b>未归一化</b>的 softmax 指数块；ℓ 记「这一行指数总和」（未来的分母），Õ 记「加权求和的中间结果」（分子）。所有块处理完后，O = Õ / ℓ。注意：全精度下两本账用的是<b>同一份</b> P̃——这个细节是第 2 章第二个坑的伏笔。</div>
+    </div>
+    <div class="analogy">像分蛋糕时边切边记两本账：一本记「蛋糕总量」（ℓ），一本记「每个人实际拿到的」（Õ）。最后每人份额 = 拿到的 ÷ 总量。只要两本账记得一致，份额加起来必然是 100%——怕就怕两本账用了不同版本的数字。</div>
+    <div class="keyfact">FlashAttention 不落地 P 矩阵，所以低比特实现必须把量化「塞进」分块循环里；而量化插在哪里，决定了注意力权重还行不行（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §2、§4.2</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH2 两个坑 ============ -->
+<section class="chapter" id="ch2">
+  <div class="chap-head"><span class="chap-num">第 2 章</span><h2>两个隐形数值坑：画质是怎么悄悄崩掉的</h2></div>
+  <p class="oneline">论文的贡献之一，是把「直接 MXFP4 量化会掉画质」这件模糊的事，精确定位为两个可证明的数值故障。</p>
+
+  <div class="card fade-up">
+    <h3>🕳️ 坑一：截断与下溢的「跷跷板」</h3>
+    <p>OCP 标准规则把块内最大值归一化到 <b>[4, 8)</b>，但 E2M1 最大有限值只有 <b>6</b>。于是归一化最大值落在 <b>(7, 8)</b> 时，就近取整的「正确」答案是 8——格子不存在，只能硬压回 6，造成<b>溢出饱和（clipping）</b>。论文算出这个事件的概率不低（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §3 式 (15)</a>）：</p>
+    <div class="formula">
+      Pr(<var>x</var><sub>max</sub> &gt; 7) <span class="op">=</span> ∫<sub>7</sub><sup>8</sup> <span class="frac"><span class="num">1</span><span class="den"><var>x</var> ln 2</span></span> d<var>x</var> <span class="op">=</span> log<sub>2</sub> <span class="frac"><span class="num">8</span><span class="den">7</span></span> ≈ <b style="color:#ffd97a">19.27%</b>
+      <div class="fnote">大约每 5 个块就有 1 个块的最大值被「削顶」。已有方案 TFS 干脆把边界压到 6（绝不溢出），代价是整块数字除以更大的 Δ，小值更容易被舍入成 0（<b>下溢</b>）。截断和下溢就像跷跷板的两端：压低一头，另一头必然翘起来（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §3</a>）。</div>
+    </div>
+
+    <div class="demo-box">
+      <div class="demo-title">交互动画 ① · 拖动共享缩放 Δ = 2<sup>e</sup>，看跷跷板两头</div>
+      <canvas id="scale-canvas" class="chart"></canvas>
+      <div class="slider-row">
+        <label>共享缩放指数 e</label>
+        <input type="range" id="scale-e" min="-3" max="2" step="1" value="-1">
+        <output id="scale-ev">Δ = 0.5</output>
+      </div>
+      <div class="demo-readout" id="scale-readout"></div>
+      <div class="caption">横轴是归一化后的数值（v/Δ），刻度是 E2M1 网格。蓝点是 32 个原始值，绿点正常吸附；<span style="color:#ff8f8f">红点 = 溢出饱和（落在 (7,8] 被削到 6）</span>，<span style="color:#c9a7ff">紫点 = 下溢归零</span>。往右拖 Δ 变大：削顶减少、归零增多——演示数据为固定伪随机块，机制与论文 §3 一致。</div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🕳️ 坑二：两本账对不上——注意力权重不再「加起来等于 1」</h3>
+    <p>注意力每一行的权重本质上是<b>概率分布：总和必须为 1</b>（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §2 式 (1)</a>）。直接把 MXFP4 塞进在线 softmax 的常见做法是：分子那步（输出累加器 Õ）用<b>量化后</b>的指数块 P̂，而分母那步（行和 ℓ）仍用<b>未量化</b>的 P̃（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §3 式 (16)–(17)</a>）。两本账用了不同版本的数字，最终诱导出的行和就不再是 1：</p>
+    <div class="formula">
+      P̂<sub><var>i</var></sub><sup>direct</sup> · 1 <span class="op">=</span> <span class="frac"><span class="num">P̂<sub><var>i</var></sub><sup>eff</sup> · 1</span><span class="den">P̃<sub><var>i</var></sub><sup>eff</sup> · 1</span></span> <span class="op">≠</span> 1
+      <div class="fnote">分子是量化后的指数和，分母是未量化的指数和——每个比值是一个<b>逐行不同</b>的缩放误差，会沿着后续 Transformer 块和去噪步骤一路传播放大。</div>
+    </div>
+    <p>这个误差不是理论担忧，是实测：直接在线 MXFP4 基线在 Wan2.2 上的<b>整体平均行和只有 0.9336</b>（5 个去噪步 × 2 条 prompt × 40 层），单行最低 0.7181、最高 1.1127（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §3</a>）。另一组诊断覆盖 80 个注意力张量，<b>80/80 的平均行和全部低于 1.0</b>，平均 0.9266（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §5.5.2 图 7A</a>）。误差来源被拆成四份（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §5.5.2 图 7B</a>）：</p>
+    <table class="tbl">
+      <tr><th>误差来源</th><th>对行和的平均贡献</th><th>占比</th></tr>
+      <tr><td>下溢归零（underflow/zeroing）</td><td>−0.0541</td><td>31.8%</td></tr>
+      <tr><td>溢出饱和（clipping）</td><td>−0.0190</td><td>11.2%</td></tr>
+      <tr><td>向下舍入</td><td>−0.0486</td><td>28.6%</td></tr>
+      <tr><td>向上舍入</td><td>+0.0483</td><td>28.4%</td></tr>
+    </table>
+    <p style="margin-top:14px">更有意思的是：注意力越「平」（熵 &gt; 5 的高熵行，约占 75%）越稳定地<b>欠归一化</b>；而且简单地「整体乘一个系数把平均行和拉回 1」并不管用——平均值修好了，单行错得更离谱（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §5.5.2 图 7C–D</a>）。</p>
+    <div class="analogy">分蛋糕：分母账本写「蛋糕共 10 寸」（原始数字），分子账本却按「每份都缺斤短两」的折扣数字发放。结果每个人拿到的比例看起来对，但全场合计只发出去 93%——剩下 7% 凭空消失了，而且每桌（每行）消失的比例还不一样。</div>
+  </div>
+</section>
+
+<!-- ============ CH3 核心方法 ============ -->
+<section class="chapter" id="ch3">
+  <div class="chap-head"><span class="chap-num">第 3 章</span><h2>核心方法：UOS 定边界，PNQ 管账本</h2></div>
+  <p class="oneline">一个不用看数据就能算出的最优缩放边界 7.25，加一个「两本账合一」的量化位置调整——两个改动都不需要额外遍历注意力矩阵。</p>
+
+  <div class="card fade-up">
+    <h3>🎯 UOS：为什么最优边界和「数据长什么样」无关？</h3>
+    <p>选共享缩放 Δ 等价于选一个<b>边界 Q<sub>max</sub></b>：把块内最大值归一化到 (Q<sub>max</sub>/2, Q<sub>max</sub>] 区间。Q<sub>max</sub> 选多大最优？直觉上这取决于块内最大值的统计分布——不同层、不同模型分布不同，岂不是要逐层校准？</p>
+    <p>论文的关键观察是：缩放只能是 2 的幂，这在对数轴上制造了一个<b>周期为 1 的精确结构</b>。无论块最大值 M 服从什么分布，取 log<sub>2</sub> 再「折叠」到一个周期里（缠绕分布 H(t)，周期恒为 1），边界两端的密度永远满足一个固定比例（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §4.1 引理 1</a>）：</p>
+    <div class="formula">
+      <var>g</var>(<span class="frac"><span class="num"><var>q</var></span><span class="den">2</span></span>) <span class="op">=</span> 2<var>g</var>(<var>q</var>) &nbsp;&nbsp;⟹&nbsp;&nbsp; <var>J′</var>(<var>q</var>) <span class="op">=</span> <var>g</var>(<var>q</var>) [ <var>D</var>(<var>q</var>) <span class="op">−</span> <var>D</var>(<span class="frac"><span class="num"><var>q</var></span><span class="den">2</span></span>) ]
+      <div class="fnote">J(q) 是全局 MXFP4 量化误差目标，D(x) 是 E2M1 网格决定的「无量纲相对误差」。所有关于数据分布的信息都被吸进非负因子 g(q)——它只能改变导数的<b>大小</b>，翻不了导数的<b>符号</b>。所以最优点的位置只由 E2M1 网格决定，与分布无关（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §4.1 式 (32)</a>）。</div>
+    </div>
+    <p>剩下的事就是对着 E2M1 网格精确积分。定义 Γ(q) = E(q) − 8E(q/2)（E 是累积投影误差），在相关区间 [6, 8] 上它有闭式表达（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §4.1 式 (37)–(38)</a>）：</p>
+    <div class="formula">
+      Γ(<var>q</var>) <span class="op">=</span> { −1/8 <span class="cond">（6 ≤ q ≤ 7）</span> ，&nbsp; <span class="frac"><span class="num">(4<var>q</var> − 29)(4<var>q</var> − 27)</span><span class="den">8</span></span> <span class="cond">（7 ≤ q ≤ 8）</span> &nbsp;&nbsp;⟹&nbsp;&nbsp; <var>q*</var> <span class="op">=</span> <span class="frac"><span class="num">29</span><span class="den">4</span></span> <span class="op">=</span> <b style="color:#ffd97a">7.25</b>
+      <div class="fnote">定理 1：对任意（绝对连续的）块最大值分布，q* = 7.25 是全局最优解——不需要高斯假设、不需要校准数据、不需要逐层搜索（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §4.1 定理 1</a>）。</div>
+    </div>
+    <div class="analogy">像裁衣服时发现：尺子刻度是「×2」进位的，无论顾客身高是北方分布还是南方分布，最优尺码档位算出来都是同一个。于是裁缝店可以直接把「7.25」印在尺子上，一辈子不用改——这就是「免数据」的底气。</div>
+
+    <div class="demo-box">
+      <div class="demo-title">交互动画 ② · 误差目标 J(q)：换个分布，最小值纹丝不动</div>
+      <canvas id="j-canvas" class="chart"></canvas>
+      <div class="btn-row">
+        <button class="btn ghost active" id="j-uniform">对数均匀分布</button>
+        <button class="btn ghost" id="j-harmonic">非均匀缠绕分布 H = 1 + 0.9·cos(2πt)</button>
+      </div>
+      <div class="demo-readout" id="j-readout"></div>
+      <div class="caption">纵轴是 J(q) 相对最优值的涨幅（按论文图 2 的口径，对 E2M1 网格实时积分计算）。TFS（q=6）与 OCP（q=8）分别约 <b style="color:#ffd97a">+3.1% / +5.9%</b>。切换分布会改变曲线形状，但按引理 1，最小值永远钉在 q = 7.25——与论文图 2 的现象一致。</div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📏 三种缩放规则摆在一起：7.25 是跷跷板的支点</h3>
+    <p>UOS 与 OCP、TFS 的差别只在「共享指数怎么选」这一条规则上，块形成和逐元素量化完全不变（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §4.1 算法 1</a>）：</p>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>规则</th><th>共享指数</th><th>归一化最大值范围</th><th>溢出舍入区间</th></tr>
+      <tr><td>OCP（标准）</td><td>⌊log₂ M⌋ − 2</td><td>[4, 8)</td><td style="color:#d33">(7, 8) —— 宽约 1，概率 ≈19.27%</td></tr>
+      <tr><td>TFS</td><td>⌈log₂(M/6)⌉</td><td>(3, 6]</td><td>无，但小值下溢更多</td></tr>
+      <tr><td class="hl">UOS（本文）</td><td>⌈log₂(M/7.25)⌉</td><td class="hl">(3.625, 7.25]</td><td>仅 (7, 7.25]，宽 0.25</td></tr>
+    </table></div>
+    <p>相比 OCP，UOS 把溢出区间从宽 1 压到宽 0.25；相比 TFS，它给整块数字留出更多有效分辨率、减少下溢（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §4.1 表 1、图 3</a>）。</p>
+
+    <div class="demo-box">
+      <div class="demo-title">交互动画 ③ · 输入块最大值 M，看三种规则各自把它放到哪</div>
+      <canvas id="map-canvas" class="chart"></canvas>
+      <div class="slider-row">
+        <label>块最大值 M</label>
+        <input type="range" id="map-m" min="0" max="100" step="1" value="50">
+        <output id="map-mv">M = 5.66</output>
+      </div>
+      <div class="demo-readout" id="map-readout"></div>
+      <div class="caption">三条横轴都是 E2M1 梯子（0–8），<span style="color:#ff8f8f">红色区 = 溢出舍入区</span>。拖动 M，观察 OCP 的落点在 [4,8) 里来回「撞红区」，TFS 永远缩在 6 以下，UOS 落在 (3.625, 7.25] 的中间地带。</div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📒 PNQ：两本账合成一本，行和「恰好」等于 1</h3>
+    <p>第二个修复优雅得近乎朴素：<b>先把未归一化的 softmax 指数块 P̃ 量化成 P̂，然后让行和 ℓ 与输出累加器 Õ 两路更新都用这同一份 P̂</b>（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §4.2 式 (44)–(48)</a>）。量化误差没有消失，但它以<b>同样的方式</b>同时进了分子和分母——约分之后，行和归一性在构造上被保证：</p>
+    <div class="formula">
+      P<sub><var>i</var></sub><sup>PNQ</sup> · 1 <span class="op">=</span> Diag(P̂<sub><var>i</var></sub><sup>eff</sup>1)<sup>−1</sup> P̂<sub><var>i</var></sub><sup>eff</sup> 1 <span class="op">=</span> <b style="color:#ffd97a">1</b>
+      <div class="fnote">命题 1：精确算术下，PNQ 诱导的注意力权重每行和恰好为 1（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §4.2 命题 1</a>）。而且低精度 PV GEMM 本来就需要量化块 P̂，行和更新只是「顺手复用」——不需要额外量化、不需要再扫一遍注意力块（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §4.2、§5.6</a>）。</div>
+    </div>
+
+    <div class="demo-box">
+      <div class="demo-title">交互动画 ④ · 直接量化 vs PNQ：同一行 softmax，两本账的结局</div>
+      <canvas id="pnq-canvas" class="chart"></canvas>
+      <div class="btn-row">
+        <button class="btn" id="pnq-play">▶ 播放量化过程</button>
+      </div>
+      <div class="demo-readout" id="pnq-readout">点击播放：8 个 softmax 指数值先吸附到 MXFP4 网格，再看两条路线的行和。</div>
+      <div class="caption">左：直接量化——分母（ℓ）用原始值、分子（Õ）用量化值，行和 ≠ 1。右：PNQ——两路都用量化值，行和恒为 1。数值为教学示意（机制与论文图 4 一致；真实模型中直接量化平均行和 0.9336，见第 2 章）。</div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔧 完整流水线：一次前向里的三步</h3>
+    <p>MXAttention 把三块拼图装进 FlashAttention 的分块循环（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §4.3 算法 2、图 1</a>）：</p>
+    <table class="tbl">
+      <tr><th>步骤</th><th>做什么</th><th>作用</th></tr>
+      <tr><td>1. Hadamard 旋转</td><td>对 Q、K 乘固定的正交 Hadamard 矩阵（旋转外的部分折叠进权重）</td><td>压制激活离群值，让数值分布更「平」</td></tr>
+      <tr><td>2. UOS 量化</td><td>Q、K、V 和 softmax 指数块全部用 Q<sub>max</sub> = 7.25 做 MXFP4 量化</td><td>块级量化误差最小化，且免校准</td></tr>
+      <tr><td>3. PNQ 在线 softmax</td><td>同一份量化指数块同时喂给行和 ℓ 与输出累加器 Õ</td><td>注意力权重行和恒为 1</td></tr>
+    </table>
+    <p style="margin-top:14px">工程上它几乎「免费」：旋转与量化可用正交计算单元并行执行并融合进 Q/K 预处理；不改分块数据流、不落地注意力矩阵、不增加对 K/V 序列的额外遍历（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §5.6</a>）。实现已并入华为 <a class="src" href="https://gitcode.com/Ascend/MindIE-SD/tree/master/mindiesd" target="_blank" rel="noopener">MindIE-SD 主分支</a> 开源。</p>
+    <div class="analogy">Hadamard 旋转像拌沙拉：把几颗「特别大的橄榄」（离群值）均匀拌开，后面切小块（量化）时就不会一刀砍在橄榄上。三步合起来：先拌均、再按 7.25 的尺子切、最后两本账记同一页。</div>
+  </div>
+</section>
+
+<!-- ============ CH4 实验结果 ============ -->
+<section class="chapter" id="ch4">
+  <div class="chap-head"><span class="chap-num">第 4 章</span><h2>实验结果：画质追平 FP16，还能反超</h2></div>
+  <p class="oneline">两个 13B+ 视频模型、固定 prompt 与随机种子的配对比较：MXAttention 把 OCP MXFP4 丢掉的画质几乎全部捡了回来。</p>
+
+  <div class="card fade-up">
+    <h3>🏆 主结果：VBench 三项 + 与 FP16 的逐帧相似度</h3>
+    <p>评测用 Open-Sora 固定 prompt 子集，所有方法同种子生成，与 FP16 输出配对比较；指标为 VBench（Subject / Imaging / Aesthetic，越高越好）和逐帧相似度（Cosine / SSIM / PSNR，越高越好）。Wan2.2 主表采用统一混合精度策略（Block 0 与最后两步保留高精度），HunyuanVideo 为<b>全 4-bit</b> 注意力（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §5.1–5.2 表 2</a>）：</p>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>模型</th><th>方法</th><th>Subject</th><th>Imaging</th><th>Aesthetic</th><th>Cosine</th><th>SSIM</th><th>PSNR</th></tr>
+      <tr><td rowspan="5">Wan2.2</td><td>FP16</td><td>0.9562</td><td>0.7085</td><td>0.6042</td><td>—</td><td>—</td><td>—</td></tr>
+      <tr><td>MXFP4 (OCP)</td><td>0.9517</td><td>0.6414</td><td>0.6202</td><td>0.9290</td><td>0.5076</td><td>15.58</td></tr>
+      <tr><td>NVFP4</td><td>0.9583</td><td>0.6973</td><td>0.6158</td><td>0.9278</td><td>0.5275</td><td>15.52</td></tr>
+      <tr><td>NVFP4 + SageAttention</td><td>0.9558</td><td>0.6980</td><td>0.6127</td><td>0.9510</td><td>0.6177</td><td>17.72</td></tr>
+      <tr><td class="hl">MXAttention</td><td>0.9544</td><td class="hl">0.7054</td><td class="hl">0.6229</td><td class="hl">0.9536</td><td class="hl">0.6319</td><td class="hl">17.92</td></tr>
+      <tr><td rowspan="5">HunyuanVideo</td><td>FP16</td><td>0.9665</td><td>0.6185</td><td>0.6242</td><td>—</td><td>—</td><td>—</td></tr>
+      <tr><td>MXFP4 (OCP)</td><td>0.9781</td><td>0.4459</td><td>0.5928</td><td>0.9489</td><td>0.5954</td><td>16.25</td></tr>
+      <tr><td>NVFP4</td><td>0.9666</td><td>0.6221</td><td>0.6162</td><td>0.9635</td><td>0.6359</td><td>17.80</td></tr>
+      <tr><td>NVFP4 + SageAttention</td><td>0.9649</td><td>0.6063</td><td>0.6288</td><td class="hl">0.9800</td><td class="hl">0.7424</td><td class="hl">20.57</td></tr>
+      <tr><td class="hl">MXAttention</td><td>0.9690</td><td class="hl">0.6380</td><td class="hl">0.6344</td><td>0.9745</td><td>0.7061</td><td>19.23</td></tr>
+    </table></div>
+    <p style="margin-top:14px">几个关键读数（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §5.3</a>）：</p>
+    <ul style="margin:0 0 12px 22px;color:#2c3a4e">
+      <li>Wan2.2：Imaging Quality 从 OCP 的 0.6414 恢复到 <b>0.7054</b>，<b>收窄了 95.4%</b> 的 FP16 差距，距 FP16 仅差 0.0031；Aesthetic 甚至<b>超过</b> FP16（0.6229 vs 0.6042）。</li>
+      <li>HunyuanVideo（全 4-bit）：Imaging 0.4459 → <b>0.6380</b>（+0.1921），直接<b>反超 FP16</b> 的 0.6185；SSIM 0.5954 → 0.7061，PSNR 16.25 → 19.23 dB。</li>
+      <li>量化方法中，MXAttention 在两个模型上拿下 Imaging 与 Aesthetic 双第一；与更强的 NVFP4 系管线相比整体互有胜负、画质维度领先。</li>
+    </ul>
+
+    <div class="demo-box">
+      <div class="demo-title">Imaging Quality：从「崩掉」到「追平/反超」</div>
+      <div style="margin-top:6px">
+        <div class="bar-row"><span>Wan2.2 · FP16</span><div class="scorebar"><i data-w="0.7085" data-max="0.75" data-color="#8fb8ff"></i></div><b>0.7085</b></div>
+        <div class="bar-row"><span>Wan2.2 · OCP</span><div class="scorebar"><i data-w="0.6414" data-max="0.75" data-color="#ff6b6b"></i></div><b>0.6414</b></div>
+        <div class="bar-row"><span>Wan2.2 · MXAttention</span><div class="scorebar"><i data-w="0.7054" data-max="0.75" data-color="#2bc48a"></i></div><b>0.7054</b></div>
+        <div class="bar-row"><span>Hunyuan · FP16</span><div class="scorebar"><i data-w="0.6185" data-max="0.75" data-color="#8fb8ff"></i></div><b>0.6185</b></div>
+        <div class="bar-row"><span>Hunyuan · OCP</span><div class="scorebar"><i data-w="0.4459" data-max="0.75" data-color="#ff6b6b"></i></div><b>0.4459</b></div>
+        <div class="bar-row"><span>Hunyuan · MXAttention</span><div class="scorebar"><i data-w="0.6380" data-max="0.75" data-color="#2bc48a"></i></div><b>0.6380</b></div>
+      </div>
+      <div class="caption">数字摘自论文表 2；条形长度按 0–0.75 归一。绿色为 MXAttention：Wan2.2 上几乎贴住 FP16，HunyuanVideo 上反超 FP16。</div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🧩 消融：三个组件各管一段，缺一不可</h3>
+    <p>全 4-bit 下的顺序消融（先去掉 UOS，再去掉 PNQ，最后去掉 Hadamard 旋转，退化为 OCP）（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §5.4 表 3</a>）：</p>
+    <div class="tbl-wrap"><table class="tbl">
+      <tr><th>模型</th><th>配置</th><th>Subject</th><th>Imaging</th><th>Aesthetic</th><th>Cosine</th><th>SSIM</th><th>PSNR</th></tr>
+      <tr><td rowspan="4">Wan2.2</td><td class="hl">完整 MXAttention</td><td>0.9424</td><td>0.6842</td><td>0.5994</td><td class="hl">0.9329</td><td class="hl">0.5519</td><td class="hl">15.96</td></tr>
+      <tr><td>去掉 UOS</td><td>0.9402</td><td>0.6822</td><td>0.6176</td><td>0.9143</td><td>0.5084</td><td>14.90</td></tr>
+      <tr><td>再去掉 PNQ</td><td>0.9442</td><td>0.6352</td><td>0.6081</td><td>0.9063</td><td>0.4727</td><td>14.77</td></tr>
+      <tr><td>OCP MXFP4（全去掉）</td><td>0.9461</td><td>0.5452</td><td>0.5998</td><td>0.9127</td><td>0.4636</td><td>14.78</td></tr>
+      <tr><td rowspan="4">HunyuanVideo</td><td class="hl">完整 MXAttention</td><td>0.9689</td><td>0.6380</td><td class="hl">0.6344</td><td class="hl">0.9745</td><td class="hl">0.7061</td><td class="hl">19.23</td></tr>
+      <tr><td>去掉 UOS</td><td>0.9713</td><td>0.6423</td><td>0.6229</td><td>0.9676</td><td>0.6740</td><td>18.41</td></tr>
+      <tr><td>再去掉 PNQ</td><td>0.9759</td><td>0.5321</td><td>0.6046</td><td>0.9643</td><td>0.6520</td><td>17.87</td></tr>
+      <tr><td>OCP MXFP4（全去掉）</td><td>0.9781</td><td>0.4459</td><td>0.5928</td><td>0.9489</td><td>0.5954</td><td>16.25</td></tr>
+    </table></div>
+    <ul style="margin:14px 0 0 22px;color:#2c3a4e">
+      <li><b>Hadamard 旋转</b>：Imaging 0.5452→0.6352（Wan2.2）、0.4459→0.5321（Hunyuan）——先把离群值压下去。</li>
+      <li><b>PNQ</b>：带来<b>最大的 Imaging 增益</b>，0.6352→0.6822（Wan2.2）、0.5321→0.6423（Hunyuan），同时三项相似度全涨——印证「两本账合一」消除了逐行缩放误差。</li>
+      <li><b>UOS</b>：主要提升逐帧相似度，Cosine/SSIM/PSNR 从 0.9143/0.5084/14.90 提到 0.9329/0.5519/15.96（Wan2.2），Hunyuan 上同步提升——印证 7.25 是更准的缩放选择（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §5.4</a>）。</li>
+    </ul>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔬 机制验证：7.25 在真实模型里也是「群众的选择」</h3>
+    <p>理论说 7.25 与分布无关，实测呢？作者在第 0 个去噪步对 40 个注意力块的 Q、K、V 逐块扫描 Q<sub>max</sub>（6.00–8.00，步长 0.05），找出每块的经验最优值（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §5.5.1 表 4</a>）：</p>
+    <table class="tbl">
+      <tr><th>模型</th><th>张量</th><th>经验最优 = 7.25 的块占比</th><th>其余主要落点</th></tr>
+      <tr><td rowspan="3">Wan2.2</td><td>Q</td><td class="hl">95.0%</td><td>7.20（5.0%）</td></tr>
+      <tr><td>K</td><td class="hl">90.0%</td><td>7.20（10.0%）</td></tr>
+      <tr><td>V</td><td class="hl">90.0%</td><td>7.20（10.0%）</td></tr>
+      <tr><td rowspan="3">HunyuanVideo</td><td>Q</td><td class="hl">52.5%（众数）</td><td>≤7.15（45.0%）</td></tr>
+      <tr><td>K</td><td>32.5%</td><td>7.20（62.5%）</td></tr>
+      <tr><td>V</td><td class="hl">50.0%（并列众数）</td><td>7.20（50.0%）</td></tr>
+    </table>
+    <p style="margin-top:14px">6 种「模型 × 张量」组合里，7.25 在 5 种里是众数或并列众数，剩下 1 种也是第二多的选择——免校准的解析边界和逐块暴力扫描的经验答案高度吻合（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §5.5.1</a>）。</p>
+    <div class="keyfact">注意两套目标不完全一样：暴力扫描最小化的是有限样本 MSE，UOS 最小化的是免数据解析目标（式 23）——两者的一致是「7.25 可以放心用」的旁证，而非定义（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §5.5.1</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH5 局限与意义 ============ -->
+<section class="chapter" id="ch5">
+  <div class="chap-head"><span class="chap-num">第 5 章</span><h2>局限与意义</h2></div>
+  <p class="oneline">诚实地看：它不是万能钥匙，但它把「开放标准 4-bit 注意力」从不能用拉到了接近无损。</p>
+
+  <div class="card fade-up">
+    <h3>⚖️ 读结果时需要记住的几件事</h3>
+    <ul style="margin:0 0 12px 22px;color:#2c3a4e">
+      <li><b>Wan2.2 主表并非全 4-bit</b>：Block 0 和最后两个去噪步保留了高精度（所有对比方法统一执行）；真正全 4-bit 的数字要看消融表（Imaging 0.6842）（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §5.1 表 2 注、§5.4</a>）。</li>
+      <li><b>相似度维度并非全胜</b>：HunyuanVideo 上 NVFP4 + SageAttention 的逐帧相似度更高（Cosine 0.9800 / SSIM 0.7424 / PSNR 20.57），MXAttention 赢在画质维度（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §5.3</a>）。</li>
+      <li><b>7.25 是 E2M1 网格的特解</b>：推导依赖 32 元素块 + E8M0 幂次缩放 + E2M1 网格；换成其他 MX 格式需要重新积分推导（框架可复用，常数要重算）（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §4.1</a>）。</li>
+      <li><b>PNQ 保证的是归一性而非零误差</b>：元素级量化误差仍在，只是不再变成逐行缩放误差；行和诊断还显示高熵行误差有结构性（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §4.2、§5.5.2</a>）。</li>
+    </ul>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🌍 为什么这项工作值得关注</h3>
+    <p>MXFP4 是 OCP 开放标准，NVIDIA、AMD、华为昇腾三家硬件都已支持——但「缩放只能是 2 的幂」这个格式约束让注意力量化一直不好做。MXAttention 给出的答案是一种<b>稀缺的「免数据」方案</b>：不需要校准集、不需要量化感知训练、不需要逐层搜索，一次推导、处处适用，这与依赖校准或块级经验搜索的路线（如 <a class="src" href="https://arxiv.org/abs/2404.00456" target="_blank" rel="noopener">QuaRot</a>、<a class="src" href="https://arxiv.org/abs/2405.16406" target="_blank" rel="noopener">SpinQuant</a> 的旋转 PTQ、<a class="src" href="https://arxiv.org/abs/2505.11594" target="_blank" rel="noopener">SageAttention3</a> 的 kernel 级优化、TetraJet 的 TFS 规则）形成了清晰对比（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §1、§4</a>）。</p>
+    <p>方法论上更有启发性的是 UOS 的推导思路：<b>格式的缺陷（幂次缩放）反过来造就了分析的便利（对数周期结构）</b>，把一个看似必须靠数据调参的问题变成了闭式数学问题。这类「从格式结构里挖解析解」的思路，对低比特推理的后续工作有参考价值。</p>
+    <div class="keyfact">一句话总结：发现 2 的幂缩放藏着周期结构 → 最优边界与数据无关、闭式解 7.25；让 softmax 两路更新用同一份量化值 → 行和恒为 1。两个零成本改动，把 MXFP4 注意力从「画质崩盘」修到「<0.01 退化」（<a class="src" href="https://arxiv.org/pdf/2607.24377" target="_blank" rel="noopener">论文 §6</a>）。</div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    本页基于 arXiv 论文《MXAttention: Data-Free Optimal Scaling and Pre-Normalization Quantization for MXFP4 Attention》（arXiv:2607.24377v1，2026-07-27，华为技术有限公司）整理制作 · 2026-07<br>
+    通俗类比与演示动画仅用于帮助理解；动画 ② 的 J(q) 曲线按论文定义对 E2M1 网格实时积分计算，动画 ①③④ 的演示数据为教学示意；所有实验数字均直接摘自论文表 1–4 与正文，技术细节以
+    <a class="src-inline" href="https://arxiv.org/abs/2607.24377" target="_blank" rel="noopener">原文</a> 为准 · 文中所有标注 ↗ 的链接均指向原始出处
+  </div>
+</footer>
+
+<script>
+/* ============ 入场淡入 ============ */
+const io = new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('show');io.unobserve(e.target);}
+}),{threshold:.12});
+document.querySelectorAll('.fade-up').forEach(el=>io.observe(el));
+
+/* ============ 结果条形图 ============ */
+const barIo = new IntersectionObserver(es=>es.forEach(en=>{
+  if(en.isIntersecting){
+    const i=en.target;
+    i.style.width=(parseFloat(i.dataset.w)/parseFloat(i.dataset.max)*100).toFixed(1)+'%';
+    i.style.background=i.dataset.color;
+    barIo.unobserve(i);
+  }
+}),{threshold:.4});
+document.querySelectorAll('.scorebar i').forEach(i=>barIo.observe(i));
+
+function setupCanvas(id){
+  const cv=document.getElementById(id);
+  const dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx:ctx,W:W,H:H};
+}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;
+  let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;
+  return((t^t>>>14)>>>0)/4294967296;};}
+
+/* E2M1 正值网格就近吸附，>7 落入溢出舍入区（论文 §2/§3），饱和封顶 6 */
+const E2M1_POS=[0,0.5,1,1.5,2,3,4,6];
+function e2m1Round(v){
+  let best=0,bd=1e9;
+  for(let k=0;k<E2M1_POS.length;k++){
+    const d=Math.abs(v-E2M1_POS[k]);
+    if(d<bd){bd=d;best=E2M1_POS[k];}
+  }
+  return best;
+}
+
+/* ============ 动画 ① 截断-下溢跷跷板 ============ */
+const blkRng=mulberry32(20260728);
+const BLK=[];
+for(let i=0;i<32;i++){
+  const v=0.03+ (3.6-0.03)*Math.pow(blkRng(),2.4);
+  BLK.push(v);
+}
+BLK[0]=3.6;
+function drawScale(){
+  const e=parseInt(document.getElementById('scale-e').value);
+  const delta=Math.pow(2,e);
+  document.getElementById('scale-ev').textContent='Δ = 2^'+e+' = '+delta;
+  const o=setupCanvas('scale-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const XMAX=9,padL=34,padR=14,axisY=H*0.52;
+  const px=x=>padL+x/XMAX*(W-padL-padR);
+  // 溢出区
+  ctx.fillStyle='rgba(255,107,107,.16)';
+  ctx.fillRect(px(7),20,px(XMAX)-px(7),axisY+46-20);
+  ctx.fillStyle='#ff8f8f';ctx.font='11px sans-serif';ctx.textAlign='left';
+  ctx.fillText('溢出舍入区 (7, +∞) → 削到 6',px(7)+4,32);
+  // 数轴与网格刻度
+  ctx.strokeStyle='#3a5078';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(padL,axisY);ctx.lineTo(W-padR,axisY);ctx.stroke();
+  const ticks=[0,0.5,1,1.5,2,3,4,6,8];
+  ctx.font='10px sans-serif';ctx.textAlign='center';
+  ticks.forEach(t=>{
+    ctx.strokeStyle='#3a5078';
+    ctx.beginPath();ctx.moveTo(px(t),axisY);ctx.lineTo(px(t),axisY+6);ctx.stroke();
+    ctx.fillStyle='#7f92b8';ctx.fillText(String(t),px(t),axisY+18);
+  });
+  let nClip=0,nUnder=0,se=0,s2=0;
+  BLK.forEach((v,i)=>{
+    const xn=v/delta;
+    const q=e2m1Round(xn);
+    const clipped=xn>7;
+    const under=xn>0&&q===0;
+    if(clipped)nClip++;else if(under)nUnder++;
+    const rec=q*delta;
+    se+=(rec-v)*(rec-v);s2+=v*v;
+    const col=clipped?'#ff8f8f':(under?'#c9a7ff':'#2bc48a');
+    const xc=Math.min(xn,XMAX-0.08);
+    const y1=axisY-30-(i%3)*16;
+    // 原始值
+    ctx.beginPath();ctx.arc(px(Math.min(xn,XMAX-0.08)),y1,3.2,0,7);
+    ctx.fillStyle='rgba(141,184,255,.85)';ctx.fill();
+    // 连线
+    ctx.setLineDash([2,3]);ctx.strokeStyle='rgba(141,184,255,.35)';
+    ctx.beginPath();ctx.moveTo(px(xc),y1+5);ctx.lineTo(px(Math.min(q,XMAX-0.08)),axisY+34);ctx.stroke();
+    ctx.setLineDash([]);
+    // 量化值
+    ctx.beginPath();ctx.arc(px(Math.min(q,XMAX-0.08)),axisY+38,4,0,7);
+    ctx.fillStyle=col;ctx.fill();
+  });
+  const rrms=Math.sqrt(se/s2)*100;
+  let hint;
+  if(nClip>0&&nUnder===0)hint='削顶严重：大值被压到 6，细节丢失（OCP 式困境）';
+  else if(nClip===0&&nUnder>0)hint='不再削顶，但小值成片归零（TFS 式困境）';
+  else if(nClip>0&&nUnder>0)hint='两头都出错——Δ 取极端时截断与下溢同时发生';
+  else hint='当前 Δ 下两头都较干净——但对别的块未必，7.25 的全局意义正在于此';
+  document.getElementById('scale-readout').innerHTML=
+    '溢出饱和 <b style="color:#ff8f8f">'+nClip+'</b> 个 · 下溢归零 <b style="color:#c9a7ff">'+nUnder+
+    '</b> 个 · 相对 RMS 误差 <b style="color:#ffd97a">'+rrms.toFixed(1)+'%</b><br>'+hint;
+}
+document.getElementById('scale-e').addEventListener('input',drawScale);
+drawScale();
+
+/* ============ 动画 ② J(q) 目标曲线（按论文定义实时积分） ============ */
+function cumE(x){
+  const segs=[[0,0.25,0],[0.25,0.75,0.5],[0.75,1.25,1],[1.25,1.75,1.5],
+              [1.75,2.5,2],[2.5,3.5,3],[3.5,5,4],[5,8,6]];
+  let tot=0;
+  for(let s=0;s<segs.length;s++){
+    const a=segs[s][0],b=segs[s][1],g=segs[s][2];
+    if(x<=a)break;
+    const hi=Math.min(x,b);
+    tot+=(Math.pow(hi-g,3)-Math.pow(a-g,3))/3;
+  }
+  return tot;
+}
+function Dof(x){return cumE(x)/Math.pow(x,3);}
+function Jof(q,Hf){
+  const n=1200,a=q/2,dx=(q-a)/n;
+  let tot=0;
+  for(let i=0;i<n;i++){
+    const x=a+(i+0.5)*dx;
+    tot+=Dof(x)*Hf(Math.log2(x))/(x*Math.LN2);
+  }
+  return tot*dx;
+}
+const H_UNI=function(){return 1;};
+const H_HAR=function(t){return 1+0.9*Math.cos(2*Math.PI*t);};
+let jMode='uni';
+function drawJ(){
+  const Hf=jMode==='uni'?H_UNI:H_HAR;
+  const o=setupCanvas('j-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=44,padR=20,padT=26,padB=34;
+  const N=160,j0=Jof(7.25,Hf);
+  const pts=[];
+  let ymax=0;
+  for(let i=0;i<=N;i++){
+    const q=6+2*i/N;
+    const pct=(Jof(q,Hf)/j0-1)*100;
+    pts.push([q,pct]);
+    if(pct>ymax)ymax=pct;
+  }
+  ymax=Math.max(ymax,6.2)*1.08;
+  const px=q=>padL+(q-6)/2*(W-padL-padR);
+  const py=p=>H-padB-p/ymax*(H-padT-padB);
+  // 坐标轴
+  ctx.strokeStyle='#3a5078';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(padL,padT);ctx.lineTo(padL,H-padB);ctx.lineTo(W-padR,H-padB);ctx.stroke();
+  ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillStyle='#7f92b8';
+  for(let q=6;q<=8;q+=0.5){ctx.fillText(q.toFixed(1),px(q),H-padB+14);}
+  ctx.textAlign='right';
+  const ystep=ymax>10?4:2;
+  for(let p=0;p<=ymax/1.08;p+=ystep){ctx.fillText(p+'%',padL-6,py(p)+3);}
+  ctx.textAlign='left';
+  ctx.fillText('J(q) 相对最优值的涨幅',padL,14);
+  // 曲线
+  ctx.beginPath();
+  pts.forEach((pt,i)=>{const X=px(pt[0]),Y=py(pt[1]);i===0?ctx.moveTo(X,Y):ctx.lineTo(X,Y);});
+  ctx.strokeStyle='#4d9fff';ctx.lineWidth=2.5;ctx.stroke();
+  // 最小值标记
+  ctx.setLineDash([5,4]);ctx.strokeStyle='#ffd97a';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(px(7.25),padT);ctx.lineTo(px(7.25),H-padB);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#ffd97a';ctx.font='bold 12px sans-serif';ctx.textAlign='center';
+  ctx.fillText('UOS 最优 q* = 7.25',px(7.25),padT-6);
+  // TFS / OCP 端点
+  const pTFS=(Jof(6,Hf)/j0-1)*100,pOCP=(Jof(8,Hf)/j0-1)*100;
+  [['TFS q=6',6,pTFS],['OCP q=8',8,pOCP]].forEach(mk=>{
+    ctx.beginPath();ctx.arc(px(mk[1]),py(mk[2]),4.5,0,7);
+    ctx.fillStyle='#ff8f8f';ctx.fill();
+    ctx.fillStyle='#ff8f8f';ctx.font='11px sans-serif';
+    ctx.fillText(mk[0]+'  +'+mk[2].toFixed(1)+'%',px(mk[1])+(mk[1]===6?34:-38),py(mk[2])+4);
+  });
+  document.getElementById('j-readout').innerHTML=
+    (jMode==='uni'?'对数均匀分布（论文图 2a 口径）':'非均匀缠绕分布 H = 1 + 0.9·cos(2πt)（论文图 2b 同类）')+
+    '：TFS(q=6) 比最优差 <b style="color:#ff8f8f">+'+pTFS.toFixed(1)+'%</b>，OCP(q=8) 差 <b style="color:#ff8f8f">+'+pOCP.toFixed(1)+'%</b>，'+
+    '曲线最小值仍在 <b style="color:#ffd97a">q = 7.25</b> ✓';
+}
+document.getElementById('j-uniform').addEventListener('click',function(){
+  jMode='uni';
+  this.classList.add('active');document.getElementById('j-harmonic').classList.remove('active');
+  drawJ();
+});
+document.getElementById('j-harmonic').addEventListener('click',function(){
+  jMode='har';
+  this.classList.add('active');document.getElementById('j-uniform').classList.remove('active');
+  drawJ();
+});
+drawJ();
+
+/* ============ 动画 ③ 三种缩放规则的落点 ============ */
+function drawMap(){
+  const sv=parseInt(document.getElementById('map-m').value);
+  const M=0.5*Math.pow(2,sv/100*7);
+  document.getElementById('map-mv').textContent='M = '+M.toFixed(2);
+  const o=setupCanvas('map-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=92,padR=30;
+  const px=x=>padL+x/8*(W-padL-padR);
+  const rules=[
+    {name:'OCP', e:Math.floor(Math.log2(M))-2, zone:[7,8], color:'#ff8f8f'},
+    {name:'TFS', e:Math.ceil(Math.log2(M/6)), zone:null, color:'#c9a7ff'},
+    {name:'UOS', e:Math.ceil(Math.log2(M/7.25)), zone:[7,7.25], color:'#2bc48a'}
+  ];
+  const ticks=[0,0.5,1,1.5,2,3,4,6,8];
+  const rowH=(H-40)/3;
+  const info=[];
+  rules.forEach((r,i)=>{
+    const y=36+i*rowH+rowH/2;
+    ctx.fillStyle='#9db4dd';ctx.font='bold 12px sans-serif';ctx.textAlign='right';
+    ctx.fillText(r.name,padL-12,y+4);
+    // 红区
+    if(r.zone){
+      ctx.fillStyle='rgba(255,107,107,.18)';
+      ctx.fillRect(px(r.zone[0]),y-22,px(r.zone[1])-px(r.zone[0]),30);
+    }
+    // 轴与刻度
+    ctx.strokeStyle='#3a5078';ctx.lineWidth=1.2;
+    ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();
+    ctx.font='9px sans-serif';ctx.textAlign='center';
+    ticks.forEach(t=>{
+      ctx.beginPath();ctx.moveTo(px(t),y);ctx.lineTo(px(t),y+4);ctx.stroke();
+      ctx.fillStyle='#7f92b8';ctx.fillText(String(t),px(t),y+14);
+    });
+    // 落点
+    const xn=M/Math.pow(2,r.e);
+    const clipped=r.zone&&xn>r.zone[0];
+    ctx.beginPath();ctx.arc(px(xn),y-8,6,0,7);
+    ctx.fillStyle=clipped?'#ff4d4d':r.color;ctx.fill();
+    ctx.fillStyle='#dfe8ff';ctx.font='bold 11px sans-serif';
+    ctx.fillText(xn.toFixed(2),px(xn),y-20);
+    info.push({name:r.name,e:r.e,xn:xn,clip:clipped});
+  });
+  let html='';
+  info.forEach(r=>{
+    html+=r.name+'：e = '+r.e+'，归一化最大值 <b style="color:'+(r.clip?'#ff4d4d':'#ffd97a')+'">'+r.xn.toFixed(2)+'</b>'+
+      (r.clip?'（落入溢出区，被削到 6）':'')+'　';
+  });
+  document.getElementById('map-readout').innerHTML=html+
+    '<br><span style="font-size:13px;color:#7f92b8">UOS 的落点永远在 (3.625, 7.25]——比 TFS 用得更满，比 OCP 更少撞红区（论文表 1、图 3）。</span>';
+}
+document.getElementById('map-m').addEventListener('input',drawMap);
+drawMap();
+
+/* ============ 动画 ④ PNQ vs 直接量化 ============ */
+const PNQ_VALS=[1,0.62,0.30,0.13,0.06,0.028,0.012,0.005];
+const PNQ_DELTA=0.25; /* UOS: M=1, q*=7.25 → e=⌈log2(1/7.25)⌉=-2 */
+const PNQ_Q=PNQ_VALS.map(v=>e2m1Round(v/PNQ_DELTA)*PNQ_DELTA);
+let pnqAnim=null;
+function drawPnq(f){
+  const o=setupCanvas('pnq-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const sumT=PNQ_VALS.reduce((a,b)=>a+b,0);
+  const sumQ=PNQ_Q.reduce((a,b)=>a+b,0);
+  const cur=PNQ_VALS.map((v,i)=>v+(PNQ_Q[i]-v)*f);
+  const sumC=cur.reduce((a,b)=>a+b,0);
+  // 顶部：8 个值的吸附动画
+  const n=PNQ_VALS.length,padL=40,padR=20;
+  const bw=(W-padL-padR)/n;
+  const maxV=1.05,baseY=H*0.46;
+  ctx.textAlign='center';
+  cur.forEach((v,i)=>{
+    const x=padL+bw*i+bw/2;
+    const h=v/maxV*(baseY-40);
+    ctx.fillStyle='rgba(77,159,255,.55)';
+    ctx.fillRect(x-bw*0.28,baseY-h,bw*0.56,h);
+    ctx.fillStyle='#8fb8ff';ctx.font='10px sans-serif';
+    ctx.fillText(v.toFixed(f>0.999?3:2),x,baseY+13);
+    if(f>0&&f<1){
+      ctx.strokeStyle='#ffd97a';ctx.setLineDash([2,3]);
+      const hq=PNQ_Q[i]/maxV*(baseY-40);
+      ctx.beginPath();ctx.moveTo(x-bw*0.28,baseY-hq);ctx.lineTo(x+bw*0.28,baseY-hq);ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  });
+  ctx.fillStyle='#7f92b8';ctx.font='11px sans-serif';ctx.textAlign='left';
+  ctx.fillText(f<0.999?'softmax 指数行（原始 → 正在吸附到 MXFP4 网格）':'量化后的指数行 P̂（Δ = 0.25，UOS 边界 7.25）',padL,26);
+  // 两条路线对比
+  const rows=[
+    {name:'直接量化（分母原始 / 分子量化）', val:sumC/sumT, bad:true},
+    {name:'PNQ（分子分母同用量化值）', val:sumC/sumC, bad:false}
+  ];
+  const gy0=baseY+44,gH=(H-gy0-16)/2;
+  rows.forEach((r,i)=>{
+    const y=gy0+i*gH;
+    ctx.fillStyle='#9db4dd';ctx.font='12px sans-serif';
+    ctx.fillText(r.name,padL,y+4);
+    const bw2=W-padL-padR-110;
+    ctx.fillStyle='#0a1326';
+    ctx.fillRect(padL,y+10,bw2,14);
+    const wgt=Math.max(0,Math.min(1.15,r.val));
+    ctx.fillStyle=r.bad?'#ff8f8f':'#2bc48a';
+    ctx.fillRect(padL,y+10,Math.min(wgt,1.15)/1.15*bw2,14);
+    // 1.0 刻度线
+    const x1=padL+1/1.15*bw2;
+    ctx.strokeStyle='#ffd97a';ctx.setLineDash([4,3]);
+    ctx.beginPath();ctx.moveTo(x1,y+7);ctx.lineTo(x1,y+27);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#ffd97a';ctx.font='10px sans-serif';
+    ctx.fillText('1.0',x1-8,y+40);
+    ctx.fillStyle=r.bad?'#ff8f8f':'#2bc48a';ctx.font='bold 13px sans-serif';ctx.textAlign='left';
+    ctx.fillText('行和 = '+r.val.toFixed(3),padL+bw2+8,y+22);
+    ctx.textAlign='left';
+  });
+  if(f>=0.999){
+    document.getElementById('pnq-readout').innerHTML=
+      '直接量化的诱导行和 = <b style="color:#ff8f8f">'+(sumQ/sumT).toFixed(3)+' ≠ 1</b>（本演示行；真实 Wan2.2 上整体均值 0.9336，见第 2 章）。'+
+      'PNQ 的诱导行和恒为 <b style="color:#2bc48a">1.000</b>——分子分母同一份量化值，误差被约分掉（论文命题 1）。';
+  }
+}
+document.getElementById('pnq-play').addEventListener('click',function(){
+  if(pnqAnim)cancelAnimationFrame(pnqAnim);
+  const t0=performance.now(),dur=1400;
+  const step=function(t){
+    const f=Math.min(1,(t-t0)/dur);
+    drawPnq(1-Math.pow(1-f,3));
+    if(f<1)pnqAnim=requestAnimationFrame(step);
+  };
+  pnqAnim=requestAnimationFrame(step);
+});
+drawPnq(1);
+</script>
+</body>
+</html>

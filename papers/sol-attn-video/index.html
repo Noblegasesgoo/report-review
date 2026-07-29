@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>看懂 Sol-Attn：让视频生成的注意力「边算边扔、扔了的还估个价」</title>
+<style>
+  :root{
+    --blue:#1783ff; --blue-d:#0b5cc4; --red:#ff6b6b; --amber:#f7b731;
+    --purple:#a55eea; --green:#2bc48a; --ink:#1b2430; --ink-soft:#48566a;
+    --bg:#f6f8fc; --card:#ffffff; --line:#e4eaf3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.8}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+
+  /* ===== Hero ===== */
+  .hero{background:linear-gradient(160deg,#0a1a3f 0%,#103a8c 55%,#1783ff 100%);
+    color:#fff;padding:72px 0 56px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+    padding:4px 14px;border-radius:99px;font-size:13px;letter-spacing:1px;margin-bottom:18px}
+  .hero h1{font-size:clamp(26px,4.6vw,44px);line-height:1.3;margin-bottom:14px}
+  .hero p.sub{font-size:clamp(14px,1.8vw,18px);opacity:.88;max-width:860px}
+  .hero .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);
+    border-radius:16px;padding:14px 22px;min-width:150px}
+  .stat b{display:block;font-size:26px;font-weight:800}
+  .stat span{font-size:13px;opacity:.85}
+
+  /* ===== Nav ===== */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  nav.toc .inner{display:flex;gap:6px;overflow-x:auto;padding:10px 22px;max-width:1060px;margin:0 auto}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--ink-soft);text-decoration:none;
+    padding:6px 12px;border-radius:99px;transition:.2s}
+  nav.toc a:hover{background:#eaf2ff;color:var(--blue-d)}
+
+  /* ===== Sections ===== */
+  section.chapter{padding:56px 0 8px}
+  .chap-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  .chap-num{font-size:14px;font-weight:800;color:#fff;background:var(--blue);
+    border-radius:10px;padding:3px 12px;letter-spacing:1px}
+  .chap-head h2{font-size:clamp(21px,3vw,30px)}
+  .oneline{color:var(--blue-d);font-weight:600;margin:4px 0 22px;font-size:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:0 2px 14px rgba(20,50,110,.05)}
+  .card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .card p{margin-bottom:12px;color:#2c3a4e}
+  .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
+    border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
+  .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
+  .keyfact{position:relative;background:#eef5ff;border-left:4px solid var(--blue);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";position:absolute;left:16px;top:12px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .demo-box{background:#0e1830;border-radius:18px;padding:22px;margin:16px 0;color:#dfe8ff;
+    position:relative;overflow:hidden}
+  .demo-title{color:#8fb8ff;font-size:13px;letter-spacing:2px;font-weight:700;margin-bottom:14px;text-transform:uppercase}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:99px;padding:9px 22px;font-size:14px;
+    cursor:pointer;font-weight:600;transition:.2s;box-shadow:0 4px 14px rgba(23,131,255,.35)}
+  .btn:hover{background:var(--blue-d);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);box-shadow:none;color:#dfe8ff}
+  .btn.ghost.active{background:rgba(23,131,255,.22);border-color:#6db4ff;color:#fff}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;align-items:center}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:14px;background:#fff;border-radius:12px;overflow:hidden}
+  table.tbl th{background:#103a8c;color:#fff;padding:9px 10px;text-align:left;font-weight:600;white-space:nowrap}
+  table.tbl td{padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl tr:nth-child(even) td{background:#f7faff}
+  .tbl-scroll{overflow-x:auto;border-radius:12px}
+  .hl{color:var(--blue-d);font-weight:700}
+  .hl-g{color:#0d9463;font-weight:700}
+
+  /* ===== 公式（纯 HTML/CSS，无 MathJax）===== */
+  .formula{background:#0e1830;border-radius:14px;padding:20px 22px;margin:14px 0;color:#eaf1ff;
+    font-size:clamp(15px,2.2vw,19px);text-align:center;overflow-x:auto;line-height:2;
+    font-family:"STIX Two Math","Cambria Math",Georgia,serif}
+  .formula .op{color:#8fb8ff}
+  .frac{display:inline-flex;flex-direction:column;vertical-align:middle;margin:0 2px;line-height:1.4}
+  .frac .num{border-bottom:1.5px solid currentColor;padding:0 7px}
+  .frac .den{padding:0 7px}
+  .fnote{font-size:13px;color:#7f92b8;margin-top:10px;text-align:center;line-height:1.7;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  .formula var{font-style:italic}
+  .ubrace{display:inline-flex;flex-direction:column;vertical-align:middle;line-height:1.2}
+  .ubrace .top{padding:0 8px}
+  .ubrace .bot{font-size:.72em;color:#9db4dd;border-top:1.5px solid currentColor;padding:0 8px;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+
+  /* ===== 结果条形图 ===== */
+  .scorebar{height:10px;border-radius:99px;background:#e7edf6;overflow:hidden;margin:4px 0 12px}
+  .scorebar i{display:block;height:100%;border-radius:99px;width:0;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+  .bar-row{display:grid;grid-template-columns:190px 1fr 90px;gap:12px;align-items:center;margin-bottom:10px;font-size:14px}
+  @media(max-width:640px){.bar-row{grid-template-columns:120px 1fr 70px}}
+  .bar-row b{text-align:right;font-variant-numeric:tabular-nums}
+  .demo-box .scorebar{background:#1c2b4d}
+
+  /* ===== 滑杆 ===== */
+  .slider-row{display:flex;align-items:center;gap:14px;margin:14px 0 6px;flex-wrap:wrap}
+  .slider-row label{font-size:14px;color:#9db4dd;white-space:nowrap}
+  .slider-row input[type=range]{flex:1;min-width:160px;accent-color:var(--amber)}
+  .slider-row output{color:#ffd97a;font-weight:700;min-width:56px;text-align:right;font-variant-numeric:tabular-nums}
+  canvas.chart{width:100%;display:block;border-radius:10px;background:#0a1326}
+  .demo-readout{margin-top:14px;font-size:14.5px;line-height:1.8}
+  .caption{font-size:12.5px;color:#7f92b8;margin-top:8px;line-height:1.6}
+
+  /* ===== 来源标注 ===== */
+  .src{color:var(--blue-d);text-decoration:none;font-size:.8em;font-weight:600;
+    border-bottom:1px dashed #9db8e8;padding:0 1px;white-space:nowrap}
+  .src:hover{color:var(--blue);border-bottom-style:solid;background:#eaf2ff;border-radius:4px}
+  .src::after{content:"↗";font-size:.85em;margin-left:1px}
+  .demo-box .src, .formula .src{color:#8fb8ff;border-bottom-color:#3a5078}
+  .demo-box .src:hover{color:#cfe2ff;background:rgba(23,131,255,.15)}
+
+  footer{margin-top:64px;padding:34px 0 46px;color:#7f8ca3;font-size:13px;text-align:center;
+    border-top:1px solid var(--line);line-height:2}
+  .fade-up{opacity:0;transform:translateY(26px);transition:all .7s cubic-bezier(.3,.7,.3,1)}
+  .fade-up.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">arXiv 论文交互解读 · 视频生成加速</span>
+    <h1>看懂 Sol-Attn：让视频生成的注意力「边算边扔，扔掉的还估个价」</h1>
+    <p class="sub">NVIDIA 提出的免训练稀疏注意力：不再先画好一张「该算哪些块」的地图再开工，而是在 online softmax 的流水线上边扫边判——用一个随 query 自适应的阈值 τ = μ + βσ 当场决定每个 key-value 块的命运：过线就精确计算，不过线也不扔，直接复用刚算出来的代理分数给它估个近似贡献。一趟扫描，路由、稀疏计算、误差补偿三件事同时完成。</p>
+    <div class="stats">
+      <div class="stat"><b>2.1× / 2.3×</b><span>视频生成 / 视频编辑端到端加速</span></div>
+      <div class="stat"><b>5.41×</b><span>128K token、90% 稀疏度下的注意力算子加速</span></div>
+      <div class="stat"><b>32.7×</b><span>路由开销比 top-p 选择快 32.7 倍</span></div>
+      <div class="stat"><b>5.1×</b><span>集成进 Sol-Engine 后的端到端加速</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="toc"><div class="inner">
+  <a href="#ch0">🎬 热身：视频 token 洪水</a>
+  <a href="#ch1">🧭 旧路由之困</a>
+  <a href="#ch2">⚙️ 核心方法：Sol-Attn 三板斧</a>
+  <a href="#ch3">📊 实验结果</a>
+  <a href="#ch4">⚖️ 局限与意义</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ============ CH0 热身 ============ -->
+<section class="chapter" id="ch0">
+  <div class="chap-head"><span class="chap-num">第 0 章</span><h2>热身：视频生成，为什么卡在「注意力」上？</h2></div>
+  <p class="oneline">视频每长一秒、清晰一档，token 序列就暴涨一截——而注意力的开销是 token 数的平方。</p>
+
+  <div class="card fade-up">
+    <h3>🎞️ 扩散 Transformer：逐 token「互相打听」的画师</h3>
+    <p>今天的视频生成模型（<a class="src" href="https://arxiv.org/abs/2503.20314" target="_blank" rel="noopener">Wan 2.1</a>、<a class="src" href="https://arxiv.org/abs/2412.03603" target="_blank" rel="noopener">HunyuanVideo</a>、LTX 等）几乎都是<b>扩散 Transformer（DiT）</b>：把视频切成小方块（patch），每个方块变成一个 token，然后让模型从纯噪声开始，一步一步「去噪」成清晰视频。每一步里，每个 token 都要通过<b>注意力（attention）</b>机制去「打听」其他所有 token 的信息，才能决定自己该画成什么样（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §1</a>、<a class="src" href="https://arxiv.org/abs/2212.09748" target="_blank" rel="noopener">DiT 原论文</a>）。</p>
+    <p>问题出在「互相打听」的成本上：序列长度是 <var>L</var>，注意力就要算 <var>L</var>×<var>L</var> 次配对——<b>平方级复杂度</b>。视频 token 又特别长：本文最重的测试是 LTX 2.3 生成 1080p、721 帧的视频（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §4.1 表 1</a>），序列轻松冲到几万甚至 12.8 万（128K）token。结果是：注意力吃掉了推理的大部分时间，成为端到端瓶颈（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §1</a>）。</p>
+    <div class="analogy">一场 12.8 万人的大型相亲会，每个人都必须和在场所有人单独聊一轮——人数翻 10 倍，聊天场次翻 100 倍。这就是注意力在视频生成里的处境。</div>
+    <div class="formula">
+      <var>O</var> = Softmax<big>(</big><var>Q</var><var>K</var><sup>⊤</sup><big>)</big><var>V</var>
+      <div class="fnote">Q（询问）、K（名片）、V（内容）都是 L×d 的矩阵。QK<sup>⊤</sup> 是一张 L×L 的「谁在乎谁」记分表——L=128K 时这张表有 164 亿个格子。FlashAttention 的 online softmax 做到了不把这张大表存进显存，但计算量一格都省不掉（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §2</a>、<a class="src" href="https://arxiv.org/abs/2205.14135" target="_blank" rel="noopener">FlashAttention</a>、<a class="src" href="https://arxiv.org/abs/2407.08608" target="_blank" rel="noopener">FlashAttention-3</a>）。</div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>✂️ 稀疏注意力：大多数「配对」其实不值得算</h3>
+    <p>关键观察：注意力记分表里，每个 query 真正高度关注的 key 只有一小撮，其余配对的权重接近于零。<b>块稀疏注意力</b>把序列切成块（本文精确分支用 64×64 的物理块），只为每个 query 块算出「最重要的少数 key-value 块」，其余整块跳过——跳过的格子直接变成省下来的算力（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §2、§4.1</a>）。</p>
+
+    <div class="demo-box">
+      <div class="demo-title">交互 ① · 稠密 vs 块稀疏：到底省了多少格子？</div>
+      <canvas id="cvGrid" class="chart" height="300"></canvas>
+      <div class="btn-row">
+        <button class="btn" id="btnGridPlay">▶ 播放</button>
+        <button class="btn ghost active" id="btnGridDense">稠密注意力</button>
+        <button class="btn ghost" id="btnGridSparse">块稀疏（15% 预算）</button>
+      </div>
+      <div class="demo-readout" id="gridReadout">每个 query 块要和全部 16×16 = 256 个 key 块配对计算。</div>
+      <div class="caption">示意动画：16×16 的块级注意力掩码，每格是一个 key-value 块。绿色 = 实际计算的块；暗色 = 跳过的块。稀疏模式的选中块为示意分布（§4 实验中典型稀疏度约 85%，即只算约 15%）。</div>
+    </div>
+    <div class="keyfact">免训练（training-free）稀疏注意力的诱人之处：不改模型权重、不用重新训练，直接给预训练模型「换引擎」就加速（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §1</a>）。但难就难在——<b>怎么又快又准地选出那 15% 的块？</b>这正是 Sol-Attn 要解决的问题。</div>
+  </div>
+</section>
+
+<!-- ============ CH1 旧路由之困 ============ -->
+<section class="chapter" id="ch1">
+  <div class="chap-head"><span class="chap-num">第 1 章</span><h2>旧路由之困：选块的两种老办法，都有硬伤</h2></div>
+  <p class="oneline">top-k 太死板、top-p 太神经质，而且两者都得先把整张「代理分数地图」画出来再挑。</p>
+
+  <div class="card fade-up">
+    <h3>🗳️ 代理分数：让每个块派个「代表」先粗评一轮</h3>
+    <p>逐 token 算整张记分表太贵，所以块稀疏方法先做一轮<b>廉价粗评</b>：把每个块里的 token 取平均，得到一个「块代表」向量，用块代表之间的点积作为<b>代理分数（proxy score）</b>，估计这个块值不值得精确计算（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §2 式 (3)</a>）：</p>
+    <div class="formula">
+      <var>ŝ</var><sub><var>ij</var></sub> = <var>Q̄</var><sub><var>i</var></sub> <var>K̄</var><sub><var>j</var></sub><sup>⊤</sup>，&nbsp;&nbsp;
+      <span class="cond">其中 <var>Q̄</var><sub><var>i</var></sub>、<var>K̄</var><sub><var>j</var></sub> 是第 <var>i</var> 个 query 块、第 <var>j</var> 个 key 块的 token 均值</span>
+      <div class="fnote">N 个块只有 N×N 个代理分数（比 L×L 小几千倍），这就是「选块」的依据。</div>
+    </div>
+    <div class="analogy">像老师不挨个面试 128,000 个学生，而是让每个 64 人的小组派一位「平均分代表」先报个分数，老师凭代表分决定哪些小组值得细谈。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>⚖️ top-k 与 top-p：一个一刀切，一个看天吃饭</h3>
+    <p>拿到代理分数后，主流选块策略有两种（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §1、图 2</a>）：</p>
+    <table class="tbl">
+      <tr><th>策略</th><th>规则</th><th>硬伤</th></tr>
+      <tr><td><b>top-k</b></td><td>每个 query 块固定选分数最高的 k 个块</td><td><b>预算僵化</b>：不管这行分数是平是陡，统统选 k 个——分数集中时漏掉重要块，分数分散时硬凑数</td></tr>
+      <tr><td><b>top-p</b></td><td>从最高分往下选，直到累计概率质量达到 p</td><td><b>预算不可控</b>：分布平坦时几乎全选（稀疏度可低至 21.9%），有注意力汇聚点（sink）时只选一两个块（稀疏度可达 96.9%），负载严重失衡</td></tr>
+    </table>
+    <p style="margin-top:14px">更麻烦的是共同开销（论文所称 L1）：两种策略都要先把<b>整行（乃至整张）代理分数图算完、存进显存（HBM）</b>，再排序或累积挑选；长序列下这一步的显存读写和排序开销不可忽略。此外还有 L2：选剩下的块<b>整个丢弃</b>，高稀疏度下精度明显受损（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §1</a>）。</p>
+
+    <div class="demo-box">
+      <div class="demo-title">交互 ② · 亲手当一回路由器：三种策略选块对比</div>
+      <canvas id="cvRoute" class="chart" height="300"></canvas>
+      <div class="btn-row">
+        <button class="btn ghost active" data-rmode="topk">top-k（固定预算）</button>
+        <button class="btn ghost" data-rmode="topp">top-p（累计质量）</button>
+        <button class="btn ghost" data-rmode="thresh">阈值法（Sol-Attn）</button>
+        <span style="flex:1"></span>
+        <button class="btn ghost active" data-dist="flat">😶 平缓分布</button>
+        <button class="btn ghost" data-dist="sink">⚡ 含汇聚点分布</button>
+      </div>
+      <div class="slider-row">
+        <label id="routeParamLabel">k =</label>
+        <input type="range" id="routeParam" min="1" max="24" step="1" value="4">
+        <output id="routeParamOut">4</output>
+      </div>
+      <div class="demo-readout" id="routeReadout"></div>
+      <div class="caption">示意动画：24 个 key 块的一行代理分数（softmax 前 logit），绿色 = 被选中。切换「含汇聚点分布」再看 top-p：一个超高分会独吞概率质量，其余块几乎全被挤掉；而阈值法（τ = μ + βσ）始终按「高于均值几个标准差」划线，选中比例稳定。灵感对应论文图 2 与图 8。</div>
+    </div>
+    <div class="keyfact">论文用一张图概括了三者差异（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 图 2</a>）：同一行 logit，top-k 两个 query 都卡在 70.3% 稀疏度；top-p 在 p=0.8 下一个只有 21.9%、另一个高达 96.88%；阈值法则稳定在 75.0% / 67.2%。</div>
+  </div>
+</section>
+
+<!-- ============ CH2 核心方法 ============ -->
+<section class="chapter" id="ch2">
+  <div class="chap-head"><span class="chap-num">第 2 章</span><h2>核心方法：Sol-Attn 的三板斧</h2></div>
+  <p class="oneline">一条会自适应的分数线 + 一趟不落盘的流水线 + 一份「扔掉也要估价」的补偿。</p>
+
+  <div class="card fade-up">
+    <h3>① 随 query 自适应的阈值：τ = μ + βσ</h3>
+    <p>Sol-Attn 的第一步来自一个干净的统计观察：把预训练视频模型里所有行的代理分数 logit 聚合起来看，分布在每个模型内都<b>接近高斯（正态）分布</b>——Wan 2.1、Hunyuan 1.5、LTX 2.3 三个模型都如此（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §3.1 图 3</a>）。高斯分布有个好性质：<b>「均值之上 β 个标准差」对应唯一确定的尾部占比</b> 1−Φ(β)。于是选块规则变成（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §3.1 式 (4)</a>）：</p>
+    <div class="formula">
+      <var>τ</var><sub><var>i</var></sub> = <var>μ</var><sub><var>i</var></sub> <span class="op">+</span> <var>β</var><var>σ</var><sub><var>i</var></sub>，&nbsp;&nbsp;
+      <var>S</var><sub><var>i</var></sub> = { <var>j</var> : <var>ŝ</var><sub><var>ij</var></sub> <span class="op">&gt;</span> <var>τ</var><sub><var>i</var></sub> }
+      <div class="fnote">μ<sub>i</sub>、σ<sub>i</sub> 是第 i 个 query 块那一行代理分数的均值和标准差；β 是全局共享的「标准化偏移」。β 定下来，模型整体的平均稀疏度就定下来（≈ 高斯尾部 1−Φ(β)）；但每一行选中几个块，由这行自己的 μ、σ 决定——<b>动态，但可控</b>。</div>
+    </div>
+    <div class="analogy">高考录取：top-k 是「每个省都固定录 k 人」，不管这届考生整体水平；top-p 是「从状元往下录，直到录够总人数的 p」，遇上一个超级状元就把名额全挤没了；τ = μ + βσ 则是「每个省按自己这届的平均分 + β 个标准差划线」——每个省录的人数可以不同（动态），但全国总体录取率稳定（可控）。</div>
+    <p>更妙的是阈值的计算成本：因为代理分数是汇聚后 key 的<b>线性投影</b>，μ<sub>i</sub> 和 σ<sub>i</sub>² 可以直接从汇聚 key 的一阶、二阶矩推出来（论文附录 B 有完整推导），全程只需 O(Ld + Nd²) 时间和 O(d²) 辅助存储——<b>根本不需要把 N×N 的代理分数图具体化出来</b>（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §3.1 式 (5)、附录 B</a>）。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>② On-the-fly 稀疏化：边扫描边判决，分数不落盘</h3>
+    <p>有了阈值，Sol-Attn 把「选块」这件事直接塞进 online softmax 的流水线里：每个 query 块<b>逐 chunk 扫描</b>汇聚 key 序列，每算出一个块的代理分数就<b>当场和 τ 比较</b>——过线的块立刻派发给内层循环做精确注意力，不过线的走近似分支。因为每个分数「产生即消费」，代理分数图和路由索引<b>永远不需要写进显存</b>（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §3.2、图 4、算法 1</a>）。</p>
+    <div class="formula" style="text-align:left;font-size:15px;line-height:2">
+      <span class="op">外层循环（密集扫描）：</span>逐 chunk 读汇聚 key → 算 token-到-块分数块 → 列均值 = 代理分数 → 与 τ<sub>i</sub> 比较<br>
+      <span class="op">├─ 过线（绿色）：</span>派发给 <b>内层循环</b>，对原始 ⟨K<sub>j</sub>, V<sub>j</sub>⟩ 块做精确注意力<br>
+      <span class="op">└─ 不过线（琥珀色）：</span>同一批分数<b>原地复用</b>，做零阶近似修正<br>
+      <span class="op">两条分支共享同一个 online-softmax 状态</span>（running max、分母累加器），一趟扫完输出即归一
+      <div class="fnote" style="text-align:center">数学上可以证明：分 chunk 的流式阈值判决，选出的块集合与「先算完整行再判决」完全相同（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §3.2 式 (6)(7)</a>）。</div>
+    </div>
+
+    <div class="demo-box">
+      <div class="demo-title">交互 ③ · 嵌套循环流水线：4 个 chunk 的流式判决</div>
+      <canvas id="cvPipe" class="chart" height="340"></canvas>
+      <div class="btn-row">
+        <button class="btn" id="btnPipeStep">▶ 扫下一个 chunk</button>
+        <button class="btn ghost" id="btnPipeAuto">⏩ 自动播放</button>
+        <button class="btn ghost" id="btnPipeReset">↺ 重置</button>
+      </div>
+      <div class="demo-readout" id="pipeReadout">点击「扫下一个 chunk」，看外层循环逐块判决。</div>
+      <div class="caption">示意动画：外层循环从左到右扫描 4 个 chunk（每个含 4 个汇聚 key 块）。分数高于 τ（黄线）的块进入右侧「内层精确注意力」，低于 τ 的进入「近似修正」——其分数已在芯片上，复用零成本。右下角：显存里自始至终没有代理分数图。</div>
+    </div>
+    <div class="keyfact">这趟流水线是<b>单内核（single kernel）</b>完成的：Q 块和阈值驻留共享内存，online-softmax 状态驻留寄存器，路由开销被「吸收」进近似分支的计算里（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §3.2 Hardware-Aligned Implementation</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>③ 代理分数复用：被跳过的块，也要「估个价」</h3>
+    <p>传统稀疏注意力的第二大伤（L2）：没选中的块直接扔掉，但它们携带的注意力质量加起来可能不小，稀疏度越高、精度掉得越狠。Sol-Attn 的做法是<b>零阶泰勒近似</b>：把块内每个 key 的指数分数，围绕「块代表分」展开（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §3.2 式 (8)</a>）：</p>
+    <div class="formula">
+      exp<big>(</big><var>Q</var><sub><var>i</var></sub><var>K</var><sub><var>j</var></sub><sup>⊤</sup><big>)</big>
+      = exp<big>(</big><var>Q</var><sub><var>i</var></sub><var>K̄</var><sub><var>j</var></sub><sup>⊤</sup><big>)</big> ⊙
+      <big>[</big> 1 <span class="op">+</span> <var>Q</var><sub><var>i</var></sub>(<var>K</var><sub><var>j</var></sub> − <var>K̄</var><sub><var>j</var></sub>)<sup>⊤</sup> <span class="op">+</span> 𝒪(·²) <big>]</big>
+      <div class="fnote">只保留第 0 阶项：整块近似成 exp(Q<sub>i</sub>K̄<sub>j</sub><sup>⊤</sup>)——右边这个数<b>就是刚才路由时算过的代理分数</b>，白捡的。论文附录 B 的误差界（式 16）表明：分母的近似误差是块内分数离散度的<b>二阶小量</b>——块内越「齐」，估得越准。</div>
+    </div>
+    <p>于是 softmax 的分母和分子都变成「精确 + 近似」两段（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §3.2 式 (9)(10)</a>）：选中块贡献精确值，未选中块贡献近似值——<b>丢弃变成了降级，信息的「总账」大致保住了</b>。</p>
+    <div class="analogy">期末算班级总分时，top-k 是「只统计点名的几个小组，其余小组当不存在」；Sol-Attn 是「重点小组逐人精算，没点名的小组按各自的小组平均分×人数估进去」。总分不会精确到小数点，但量级不会跑偏——而且估分用的平均分，恰好处是点名前就顺手算好的。</div>
+  </div>
+</section>
+
+<!-- ============ CH3 实验结果 ============ -->
+<section class="chapter" id="ch3">
+  <div class="chap-head"><span class="chap-num">第 3 章</span><h2>实验结果：更快，而且不掉画质</h2></div>
+  <p class="oneline">从单层算子到完整视频生成流水线，Sol-Attn 在 6 个模型/任务上全面验证了「质量–效率」双重优势。</p>
+
+  <div class="card fade-up">
+    <h3>⚡ 算子层：路由快 32.7 倍，显存省 8 倍</h3>
+    <p>先看最底层的三个数字（NVIDIA H100 上实测，<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §4.2 图 5</a>）：注意力算子对 FlashAttention-3 的加速随序列长度和稀疏度同步上升，<b>128K token、90% 稀疏度时达 5.41×</b>；路由阶段的延迟和中间显存，则是 on-the-fly 设计收益最直接的地方：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互 ④ · 路由开销实测（H100）</div>
+      <div class="bar-row"><span>top-p 路由（排序+累积）</span><div class="scorebar"><i data-w="100" style="background:#ff6b6b"></i></div><b>10.8 ms</b></div>
+      <div class="bar-row"><span>top-k 路由（物化+遍历）</span><div class="scorebar"><i data-w="59" style="background:#f7b731"></i></div><b>3.80 ms</b></div>
+      <div class="bar-row"><span>Sol-Attn 阈值路由</span><div class="scorebar"><i data-w="17" style="background:#2bc48a"></i></div><b>0.33 ms</b></div>
+      <div class="demo-readout">路由延迟：Sol-Attn 比 top-k 快 <b style="color:#ffd97a">11.5×</b>、比 top-p 快 <b style="color:#ffd97a">32.7×</b>（横条为平方根缩放示意，数字为论文实测值）。</div>
+      <div style="height:18px"></div>
+      <div class="bar-row"><span>SVG2（含路由结构+置换缓冲）</span><div class="scorebar"><i data-w="100" style="background:#ff6b6b"></i></div><b>≈11.5 GB</b></div>
+      <div class="bar-row"><span>Sol-Attn</span><div class="scorebar"><i data-w="14" style="background:#2bc48a"></i></div><b>≈1.45 GB</b></div>
+      <div class="bar-row"><span>稠密注意力（参照）</span><div class="scorebar"><i data-w="13" style="background:#1783ff"></i></div><b>≈1.42 GB</b></div>
+      <div class="demo-readout">注意力处理器峰值显存增量：Sol-Attn 几乎贴平稠密注意力，SVG2 则要约 <b style="color:#ffd97a">8×</b>（LTX 2.3 与 Bernini 上分别为 7.9×）。</div>
+      <div class="caption">数据来源：论文图 5(b)(c)，NVIDIA H100 实测。LTX 2.3：SVG2 11.52 GB / Sol-Attn 1.45 GB / Dense 1.42 GB；Bernini：11.67 / 1.48 / 1.46 GB。</div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🎥 端到端：六个模型/任务，全面领先</h3>
+    <p>与 FA3 稠密基线及三个最强免训练稀疏方法（<a class="src" href="https://arxiv.org/abs/2503.16428" target="_blank" rel="noopener">XAttention</a>、<a class="src" href="https://arxiv.org/abs/2505.18875" target="_blank" rel="noopener">SVG2</a>、<a class="src" href="https://arxiv.org/abs/2602.01077" target="_blank" rel="noopener">PISA</a>）在<b>匹配稀疏度</b>下对比，Sol-Attn 在每个任务上都拿到最高端到端加速，同时质量指标（VBench、姿态精度、Bernini-Bench 等）和对稠密输出的相似度（PSNR/SSIM/LPIPS）总体最优（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §4.3 表 1–5</a>）：</p>
+    <div class="tbl-scroll"><table class="tbl">
+      <tr><th>任务 / 模型</th><th>规模</th><th>稀疏度</th><th>端到端加速</th><th>质量要点</th></tr>
+      <tr><td>文生视频 · Wan 2.1（720p 81帧）</td><td>14B</td><td>85.12%</td><td class="hl">2.02×</td><td>VBench 76.13，反超稠密基线 75.90</td></tr>
+      <tr><td>文生视频 · HunyuanVideo（720p 129帧）</td><td>13B</td><td>85.80%</td><td class="hl">2.12×</td><td>VBench 76.81，对稠密 PSNR 25.21 最高</td></tr>
+      <tr><td>文生视频 · LTX 2.3（1080p 361→721帧）</td><td>22B</td><td>89.83%</td><td class="hl">1.9×（stage-2 内 2.4×）</td><td>LPIPS 0.1197 全场最低（最像稠密输出）</td></tr>
+      <tr><td>视频精修 · SANA-WM Refiner（1 分钟视频）</td><td>—</td><td>85.11%</td><td class="hl">3.04×</td><td>姿态旋转误差 8.781，稀疏方法中最优</td></tr>
+      <tr><td>视频编辑 · Bernini</td><td>14B</td><td>85.00%</td><td class="hl">2.34×</td><td>Bernini-Bench 与相似度均为稀疏方法最优</td></tr>
+      <tr><td>文生图 · Ideogram 4（原生 2K）</td><td>—</td><td>90.16%</td><td class="hl">1.56×</td><td>Qwen-Image-Bench 均值 55.31，稀疏方法最高</td></tr>
+      <tr><td>消费级 GPU · Wan2.1-1.3B（RTX 5090, 480p）</td><td>1.3B</td><td>84.90%</td><td class="hl">1.71×</td><td>对 FA4 基线 PSNR 24.70 最高</td></tr>
+    </table></div>
+    <div class="analogy">相当于同一部电影的渲染农场：别人要么压缩了渲染时间但画面发糊，要么保住了画质但没快多少；Sol-Attn 是「渲染时间砍半，成片肉眼难辨差别」——LTX 上与稠密输出的 LPIPS 差距只有 0.1197，是全场最像原版的稀疏方案。</div>
+    <p style="font-size:13.5px;color:#66788f">配置细节：多数模型前 20% 去噪步与第一层用稠密注意力「热身」；LTX 两阶段流水线中 stage-1 全程稠密、stage-2 全部用 Sol-Attn；SANA-WM 精修器全程使用（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §4.1、附录 A</a>）。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🧩 组合技：接入 Sol-Engine，端到端最高 5.1×</h3>
+    <p>Sol-Attn 只动注意力本身，因此能和<b>去噪步缓存、内核融合</b>等正交加速技术叠加。集成进 Sol-Engine 推理框架后（NVIDIA B200 实测），HunyuanVideo 端到端从 866.9 秒压到 170.6 秒，<b>5.08×</b>；Wan2.1-14B 从 563.8 秒压到 161.8 秒，<b>3.48×</b>（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §4.4 图 7</a>）：</p>
+    <div class="demo-box">
+      <div class="demo-title">Sol-Engine 逐步叠加加速（端到端延迟，秒）</div>
+      <div class="bar-row"><span>Hunyuan · 基线</span><div class="scorebar"><i data-w="100" style="background:#48566a"></i></div><b>866.9 s</b></div>
+      <div class="bar-row"><span>+ 内核融合优化</span><div class="scorebar"><i data-w="90" style="background:#1783ff"></i></div><b>781.0 s</b></div>
+      <div class="bar-row"><span>+ 去噪步缓存</span><div class="scorebar"><i data-w="38" style="background:#a55eea"></i></div><b>328.4 s</b></div>
+      <div class="bar-row"><span>+ Sol-Attn</span><div class="scorebar"><i data-w="20" style="background:#2bc48a"></i></div><b>170.6 s</b></div>
+      <div class="demo-readout">HunyuanVideo 累计 <b style="color:#ffd97a">5.08×</b>。Wan2.1-14B 同法：563.8 → 464.9 → 217.6 → 161.8 秒，累计 <b style="color:#ffd97a">3.48×</b>。</div>
+      <div class="caption">数据来源：论文图 7，NVIDIA B200。横条按实际秒数等比缩放。</div>
+    </div>
+    <p>另一个侧面证据是和 cuDNN 的块稀疏注意力（BSA，H100 上最强块稀疏实现之一）对比：在相同选中块下，Sol-Attn 的算子因多做了近似修正只慢 1.6%–9.4%；但一旦把 BSA 独立的选路阶段算进端到端，Sol-Attn 反而<b>快 6.2%–6.6%</b>——因为路由几乎被「藏」进了 online softmax 流水线，只剩轻量阈值计算在算子之外（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §4.5 图 10</a>）。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔬 消融：两个设计各自兑现了什么</h3>
+    <div class="grid2">
+      <div>
+        <p><b>阈值路由 → 密度稳定。</b>在相同的 15% 平均密度下，top-k 把每个 query 块机械地钉在 15%，top-p 的逐 query 密度则大幅散布；Sol-Attn 的逐 query 密度紧密集中——预算动态，但整体水位稳定（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §4.5 图 8</a>）。</p>
+      </div>
+      <div>
+        <p><b>近似修正 → 误差更低。</b>在相同选中块下对比「只精确」与「精确+近似」：随稀疏度从 70% 升到 90%，只精确方案的相对 ℓ2 误差快速累积，而带修正的方案误差持续更低、与稠密输出的余弦相似度更高，且稀疏度越高优势越大（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §4.5 图 9</a>）。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH4 局限与意义 ============ -->
+<section class="chapter" id="ch4">
+  <div class="chap-head"><span class="chap-num">第 4 章</span><h2>局限与意义</h2></div>
+  <p class="oneline">还不是终点：B200 内核未吃满、只支持前向、自回归视频模型未覆盖。</p>
+
+  <div class="card fade-up">
+    <h3>⚠️ 作者自列的三条局限</h3>
+    <p>论文在结论中坦率给出边界（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §6 Limitations</a>）：</p>
+    <p>· <b>B200 内核还有余量</b>：当前 Blackwell 架构的实现尚未完全发挥硬件潜力；<br>
+    · <b>只支持前向推理</b>：没有反向传播实现，想「稀疏化训练」还得等后续工作；<br>
+    · <b>评测范围限于双向扩散模型</b>：自回归（AR）视频生成尚未覆盖——那里的因果掩码会让「逐块近似」的推导需要额外处理（附录 B 也指出了这一点）。</p>
+    <p>另外值得注意的是，本文的阈值校准依赖「代理分数接近高斯」这一经验观察——在已测的 Wan、Hunyuan、LTX 上都成立，但换到分布形态不同的新模型时，β 与实际稀疏度的对应关系可能需要重新校准。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🌏 意义：把「选块」从一个独立工序变成流水线本能</h3>
+    <p>Sol-Attn 更大的启发在于范式层面：<b>路由不再是稀疏注意力之前的一道独立工序</b>，未选中的块也不再是被丢弃的垃圾、而是被降级的信息（<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 §6</a>）。免训练、单内核、即插即用的特性，让它能作为「替换零件」直接装进 Sol-Engine 这类优化推理框架，与缓存、融合等正交技术叠加出 5 倍级端到端加速（<a class="src" href="https://github.com/NVlabs/Sana/tree/sol-engine" target="_blank" rel="noopener">GitHub 代码</a>、<a class="src" href="https://nvlabs.github.io/Sana/Sol-Attn/" target="_blank" rel="noopener">项目主页</a>）。</p>
+    <div class="keyfact">一句话总结：τ = μ + βσ 这条会自适应的分数线，加上「分数产生即消费、未过线也复用」的流水线设计，让视频生成的注意力在 85%–90% 稀疏度下既快（端到端 2.1×–3.0×，组合 Sol-Engine 达 5.1×）又稳（质量与相似度全面持平或领先）（<a class="src" href="https://arxiv.org/abs/2607.24027" target="_blank" rel="noopener">论文摘要与 §4</a>）。</div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    本页为 <a class="src" href="https://arxiv.org/abs/2607.24027" target="_blank" rel="noopener">arXiv:2607.24027</a>《Sol-Attn: Accelerating Video Generation Inference via On-the-Fly Attention Sparsification》（NVIDIA，2026-07）的中文交互解读，非官方页面。<br>
+    文中所有实验数字均摘自论文原文（§4 各表/图），动画为示意性质、参数为演示设定；解读若有出入，以<a class="src" href="https://arxiv.org/pdf/2607.24027" target="_blank" rel="noopener">论文 PDF 原文</a>为准。<br>
+    相关资源：<a class="src" href="https://github.com/NVlabs/Sana/tree/sol-engine" target="_blank" rel="noopener">GitHub 代码（Sana · sol-engine 分支）</a> · <a class="src" href="https://nvlabs.github.io/Sana/Sol-Attn/" target="_blank" rel="noopener">项目主页</a>
+  </div>
+</footer>
+
+<script>
+"use strict";
+
+/* ---------- 通用：入场淡入 + 条形图触发 ---------- */
+(function(){
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){
+        e.target.classList.add("show");
+        e.target.querySelectorAll(".scorebar i").forEach(function(bar){
+          bar.style.width = bar.getAttribute("data-w") + "%";
+        });
+        io.unobserve(e.target);
+      }
+    });
+  }, {threshold: 0.15});
+  document.querySelectorAll(".fade-up, .card").forEach(function(el){
+    if(!el.classList.contains("fade-up")) el.classList.add("fade-up");
+    io.observe(el);
+  });
+})();
+
+/* ---------- 工具：确定性伪随机 ---------- */
+function mulberry32(seed){
+  return function(){
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    var t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function fitCanvas(cv){
+  var dpr = window.devicePixelRatio || 1;
+  var w = cv.clientWidth, h = parseInt(cv.getAttribute("height"), 10);
+  cv.width = w * dpr; cv.height = h * dpr;
+  var ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return {ctx: ctx, w: w, h: h};
+}
+
+/* ========== 交互①：稠密 vs 块稀疏网格（对比动画） ========== */
+(function(){
+  var cv = document.getElementById("cvGrid");
+  var readout = document.getElementById("gridReadout");
+  var N = 16, mode = "dense", revealed = 0, timer = null;
+  var rnd = mulberry32(42);
+  var sel = [];
+  for(var i = 0; i < N; i++){
+    sel.push([]);
+    for(var j = 0; j < N; j++) sel[i].push(rnd() < 0.15);
+  }
+  function cell(i, j){ return mode === "dense" ? true : sel[i][j]; }
+  function countActive(){
+    var c = 0;
+    for(var a = 0; a < N; a++) for(var b = 0; b < N; b++) if(cell(a, b)) c++;
+    return c;
+  }
+  function draw(){
+    var f = fitCanvas(cv), ctx = f.ctx;
+    var pad = 14, gw = f.w - pad * 2, gh = f.h - pad * 2;
+    var s = Math.min(gw, gh) / N, ox = (f.w - s * N) / 2, oy = (f.h - s * N) / 2;
+    ctx.clearRect(0, 0, f.w, f.h);
+    for(var i = 0; i < N; i++){
+      for(var j = 0; j < N; j++){
+        var idx = i * N + j;
+        var on = idx < revealed;
+        var active = cell(i, j);
+        ctx.fillStyle = !on ? "#16223f" : (active ? (mode === "dense" ? "#1783ff" : "#2bc48a") : "#1a2748");
+        ctx.fillRect(ox + j * s + 1, oy + i * s + 1, s - 2, s - 2);
+      }
+    }
+    var total = Math.min(revealed, N * N);
+    var done = 0;
+    for(var a = 0; a < N; a++) for(var b = 0; b < N; b++){
+      if(a * N + b < total && cell(a, b)) done++;
+    }
+    var pct = mode === "dense" ? "100%" : "15%（示意）";
+    readout.innerHTML = "已扫描 " + total + " / " + (N * N) + " 个块 ｜ 实际计算 <b style='color:#ffd97a'>" + done +
+      "</b> 个 ｜ 计算预算：" + pct +
+      (mode === "sparse" ? " —— 85% 的块被整块跳过，算力直接省下。" : " —— 每个 query 块都要算全部 key 块，一个都跑不掉。");
+  }
+  function play(){
+    if(timer) clearInterval(timer);
+    revealed = 0;
+    timer = setInterval(function(){
+      revealed += 4;
+      if(revealed >= N * N){ revealed = N * N; clearInterval(timer); timer = null; }
+      draw();
+    }, 30);
+  }
+  document.getElementById("btnGridPlay").addEventListener("click", play);
+  document.getElementById("btnGridDense").addEventListener("click", function(){
+    mode = "dense"; revealed = N * N;
+    this.classList.add("active"); document.getElementById("btnGridSparse").classList.remove("active");
+    draw();
+  });
+  document.getElementById("btnGridSparse").addEventListener("click", function(){
+    mode = "sparse"; revealed = N * N;
+    this.classList.add("active"); document.getElementById("btnGridDense").classList.remove("active");
+    draw();
+  });
+  window.addEventListener("resize", draw);
+  revealed = N * N;
+  draw();
+})();
+
+/* ========== 交互②：三种路由策略对比（滑杆探索） ========== */
+(function(){
+  var cv = document.getElementById("cvRoute");
+  var readout = document.getElementById("routeReadout");
+  var slider = document.getElementById("routeParam");
+  var sOut = document.getElementById("routeParamOut");
+  var sLabel = document.getElementById("routeParamLabel");
+  var NB = 24, mode = "topk", dist = "flat";
+  var flatRnd = mulberry32(7), sinkRnd = mulberry32(99);
+  var flatScores = [], sinkScores = [];
+  for(var i = 0; i < NB; i++) flatScores.push(1.2 + flatRnd() * 2.2);
+  for(var k = 0; k < NB; k++) sinkScores.push(0.6 + sinkRnd() * 1.2);
+  sinkScores[5] = 6.5; sinkScores[17] = 3.4;
+  function scores(){ return dist === "flat" ? flatScores : sinkScores; }
+  function softmax(arr){
+    var m = Math.max.apply(null, arr), ex = arr.map(function(v){ return Math.exp(v - m); });
+    var s = ex.reduce(function(a, b){ return a + b; }, 0);
+    return ex.map(function(v){ return v / s; });
+  }
+  function stats(arr){
+    var mu = arr.reduce(function(a, b){ return a + b; }, 0) / arr.length;
+    var va = arr.reduce(function(a, b){ return a + (b - mu) * (b - mu); }, 0) / arr.length;
+    return {mu: mu, sd: Math.sqrt(va)};
+  }
+  function selected(){
+    var sc = scores(), out = new Array(NB).fill(false), i;
+    var v = parseFloat(slider.value);
+    if(mode === "topk"){
+      var idx = sc.map(function(s, i2){ return [s, i2]; }).sort(function(a, b){ return b[0] - a[0]; });
+      for(i = 0; i < v && i < NB; i++) out[idx[i][1]] = true;
+    }else if(mode === "topp"){
+      var p = softmax(sc);
+      var idx2 = p.map(function(s, i2){ return [s, i2]; }).sort(function(a, b){ return b[0] - a[0]; });
+      var cum = 0;
+      for(i = 0; i < NB; i++){ out[idx2[i][1]] = true; cum += idx2[i][0]; if(cum >= v) break; }
+    }else{
+      var st = stats(sc), tau = st.mu + v * st.sd;
+      for(i = 0; i < NB; i++) out[i] = sc[i] > tau;
+    }
+    return out;
+  }
+  function tauVal(){
+    var st = stats(scores());
+    return st.mu + parseFloat(slider.value) * st.sd;
+  }
+  function draw(){
+    var f = fitCanvas(cv), ctx = f.ctx;
+    var sc = scores(), sel = selected();
+    var maxV = Math.max.apply(null, sc) * 1.18;
+    var pad = {l: 12, r: 12, t: 26, b: 20};
+    var bw = (f.w - pad.l - pad.r) / NB;
+    ctx.clearRect(0, 0, f.w, f.h);
+    for(var i = 0; i < NB; i++){
+      var hgt = (sc[i] / maxV) * (f.h - pad.t - pad.b);
+      ctx.fillStyle = sel[i] ? "#2bc48a" : "#2a3a63";
+      ctx.fillRect(pad.l + i * bw + 2, f.h - pad.b - hgt, bw - 4, hgt);
+    }
+    if(mode === "thresh"){
+      var tv = tauVal();
+      var ty = f.h - pad.b - (tv / maxV) * (f.h - pad.t - pad.b);
+      ctx.strokeStyle = "#ffd97a"; ctx.lineWidth = 2; ctx.setLineDash([7, 5]);
+      ctx.beginPath(); ctx.moveTo(pad.l, ty); ctx.lineTo(f.w - pad.r, ty); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#ffd97a"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "left";
+      ctx.fillText("τ = μ + " + parseFloat(slider.value).toFixed(1) + "σ", pad.l + 4, ty - 7);
+    }
+    var n = sel.filter(Boolean).length;
+    var dens = (n / NB * 100).toFixed(1);
+    var msg;
+    if(mode === "topk"){
+      msg = "选中 <b style='color:#2bc48a'>" + n + "</b> / " + NB + " 块（密度 " + dens + "%）。top-k 不管分布形状如何，永远固定选 " + slider.value + " 个——分布平缓时可能漏掉同分段的重要块，分布陡峭时又在硬凑名额。";
+    }else if(mode === "topp"){
+      msg = "选中 <b style='color:#2bc48a'>" + n + "</b> / " + NB + " 块（密度 " + dens + "%）。" +
+        (dist === "sink"
+          ? "注意：汇聚点的超高分独吞了概率质量，p=" + slider.value + " 只够覆盖寥寥几块——论文图 2 中极端时稀疏度冲到 96.88%，负载严重失衡。"
+          : "分布平缓时，要凑够 p=" + slider.value + " 的概率质量得选很多块（论文图 2 中稀疏度低至 21.9%）——同一个 p，预算天差地别。");
+    }else{
+      msg = "τ = μ + βσ 划线，选中 <b style='color:#2bc48a'>" + n + "</b> / " + NB + " 块（密度 " + dens + "%）。换一种分布再试试：线随该行的 μ、σ 自动平移缩放，密度始终稳定——这就是「动态但可控」。";
+    }
+    readout.innerHTML = msg;
+  }
+  function syncSlider(){
+    if(mode === "topk"){
+      sLabel.textContent = "k ="; slider.min = 1; slider.max = 24; slider.step = 1; slider.value = 4;
+    }else if(mode === "topp"){
+      sLabel.textContent = "p ="; slider.min = 0.5; slider.max = 0.98; slider.step = 0.01; slider.value = 0.8;
+    }else{
+      sLabel.textContent = "β ="; slider.min = 0; slider.max = 2.5; slider.step = 0.1; slider.value = 1.0;
+    }
+    sOut.textContent = slider.value;
+  }
+  document.querySelectorAll("[data-rmode]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      mode = btn.getAttribute("data-rmode");
+      document.querySelectorAll("[data-rmode]").forEach(function(b){ b.classList.remove("active"); });
+      btn.classList.add("active");
+      syncSlider(); draw();
+    });
+  });
+  document.querySelectorAll("[data-dist]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      dist = btn.getAttribute("data-dist");
+      document.querySelectorAll("[data-dist]").forEach(function(b){ b.classList.remove("active"); });
+      btn.classList.add("active");
+      draw();
+    });
+  });
+  slider.addEventListener("input", function(){ sOut.textContent = slider.value; draw(); });
+  window.addEventListener("resize", draw);
+  syncSlider(); draw();
+})();
+
+/* ========== 交互③：嵌套循环流水线（流程动画） ========== */
+(function(){
+  var cv = document.getElementById("cvPipe");
+  var readout = document.getElementById("pipeReadout");
+  var NCH = 4, BPC = 4, TAU = 2.4, step = -1, auto = null;
+  var rnd = mulberry32(2026);
+  var chunks = [];
+  for(var c = 0; c < NCH; c++){
+    var blocks = [];
+    for(var b = 0; b < BPC; b++) blocks.push(1.0 + rnd() * 3.2);
+    chunks.push(blocks);
+  }
+  function draw(){
+    var f = fitCanvas(cv), ctx = f.ctx;
+    ctx.clearRect(0, 0, f.w, f.h);
+    var laneY = 90, chW = 118, chH = 74, gap = (f.w - 60 - NCH * chW) / (NCH - 1);
+    ctx.font = "12px sans-serif"; ctx.textAlign = "center";
+    /* 左侧 query 块 */
+    ctx.fillStyle = "#1783ff";
+    ctx.fillRect(8, laneY - 20, 44, 60);
+    ctx.fillStyle = "#fff";
+    ctx.fillText("Q块", 30, laneY + 5);
+    ctx.fillText("+ τ", 30, laneY + 22);
+    /* 各 chunk */
+    for(var c = 0; c < NCH; c++){
+      var x = 62 + c * (chW + gap);
+      var active = c <= step, cur = c === step;
+      ctx.strokeStyle = cur ? "#ffd97a" : "#2a3a63";
+      ctx.lineWidth = cur ? 2.5 : 1.5;
+      ctx.fillStyle = active ? "#14224a" : "#101b38";
+      ctx.fillRect(x, laneY - 40, chW, chH + 40);
+      ctx.strokeRect(x, laneY - 40, chW, chH + 40);
+      ctx.fillStyle = "#8fb8ff";
+      ctx.fillText("chunk " + (c + 1), x + chW / 2, laneY - 48);
+      var bw2 = chW / BPC;
+      for(var b = 0; b < BPC; b++){
+        var sc = chunks[c][b];
+        var bh = (sc / 4.5) * chH;
+        var bx = x + b * bw2;
+        var pass = sc > TAU;
+        ctx.fillStyle = !active ? "#2a3a63" : (pass ? "#2bc48a" : "#f7b731");
+        ctx.fillRect(bx + 3, laneY + chH - 10 - bh, bw2 - 6, bh);
+      }
+      /* τ 线 */
+      var ty = laneY + chH - 10 - (TAU / 4.5) * chH;
+      ctx.strokeStyle = "rgba(255,217,122,.7)"; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.moveTo(x, ty); ctx.lineTo(x + chW, ty); ctx.stroke();
+      ctx.setLineDash([]);
+      /* 派发箭头 */
+      if(active){
+        var nPass = chunks[c].filter(function(s){ return s > TAU; }).length;
+        var nFail = BPC - nPass;
+        var exX = f.w / 2 - 190, apX = f.w / 2 + 60, by = laneY + 78;
+        ctx.strokeStyle = "#2bc48a"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x + chW / 2 - 14, laneY + chH + 2); ctx.lineTo(exX + 70, by - 6); ctx.stroke();
+        ctx.strokeStyle = "#f7b731";
+        ctx.beginPath(); ctx.moveTo(x + chW / 2 + 14, laneY + chH + 2); ctx.lineTo(apX + 70, by - 6); ctx.stroke();
+      }
+    }
+    /* 下方两个分支框 */
+    var byy = laneY + 78, bw3 = 260, bh3 = 46;
+    var exX2 = f.w / 2 - 190 - 70, apX2 = f.w / 2 + 60 - 70;
+    ctx.fillStyle = "#0f2b1f"; ctx.strokeStyle = "#2bc48a";
+    ctx.fillRect(exX2, byy, bw3, bh3); ctx.strokeRect(exX2, byy, bw3, bh3);
+    ctx.fillStyle = "#2bc48a";
+    ctx.fillText("内层循环：精确注意力（过线块）", exX2 + bw3 / 2, byy + 20);
+    var totPass = 0, totFail = 0;
+    for(var c2 = 0; c2 <= step && c2 < NCH; c2++){
+      chunks[c2].forEach(function(s){ if(s > TAU) totPass++; else totFail++; });
+    }
+    ctx.fillStyle = "#9fe8c8";
+    ctx.fillText("已派发 " + totPass + " 块", exX2 + bw3 / 2, byy + 38);
+    ctx.fillStyle = "#33260a"; ctx.strokeStyle = "#f7b731";
+    ctx.fillRect(apX2, byy, bw3, bh3); ctx.strokeRect(apX2, byy, bw3, bh3);
+    ctx.fillStyle = "#f7b731";
+    ctx.fillText("近似修正：复用代理分数（未过线块）", apX2 + bw3 / 2, byy + 20);
+    ctx.fillStyle = "#ffe6b0";
+    ctx.fillText("已复用 " + totFail + " 块", apX2 + bw3 / 2, byy + 38);
+    /* HBM 状态 */
+    ctx.fillStyle = "#16223f";
+    ctx.fillRect(f.w / 2 - 210, byy + 62, 420, 34);
+    ctx.fillStyle = "#8fb8ff";
+    ctx.fillText("显存（HBM）：代理分数图 = 未生成 ✓ ｜ 路由索引 = 未落盘 ✓", f.w / 2, byy + 84);
+    if(step < 0){
+      readout.innerHTML = "点击「扫下一个 chunk」，看外层循环逐块判决。";
+    }else{
+      readout.innerHTML = "已扫描 <b style='color:#ffd97a'>" + (step + 1) + " / " + NCH + "</b> 个 chunk ｜ " +
+        "<span style='color:#2bc48a'>" + totPass + " 块过线 → 精确计算</span> ｜ " +
+        "<span style='color:#f7b731'>" + totFail + " 块未过线 → 分数原地复用做近似</span>。每个分数产生即消费，无需存回显存。";
+    }
+  }
+  function doStep(){
+    if(step < NCH - 1){ step++; } else { step = -1; }
+    draw();
+  }
+  document.getElementById("btnPipeStep").addEventListener("click", doStep);
+  document.getElementById("btnPipeAuto").addEventListener("click", function(){
+    if(auto){ clearInterval(auto); auto = null; this.textContent = "⏩ 自动播放"; return; }
+    this.textContent = "⏸ 暂停";
+    auto = setInterval(function(){
+      doStep();
+      if(step === NCH - 1){ clearInterval(auto); auto = null; document.getElementById("btnPipeAuto").textContent = "⏩ 自动播放"; }
+    }, 1100);
+  });
+  document.getElementById("btnPipeReset").addEventListener("click", function(){
+    if(auto){ clearInterval(auto); auto = null; document.getElementById("btnPipeAuto").textContent = "⏩ 自动播放"; }
+    step = -1; draw();
+  });
+  window.addEventListener("resize", draw);
+  draw();
+})();
+</script>
+</body>
+</html>

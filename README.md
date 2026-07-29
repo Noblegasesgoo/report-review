@@ -15,6 +15,15 @@
 | 📄 论文（LLM 智能体） | 看懂 MemChain：检索到 ≠ 用得上，143 个 token 的「呈堂证供」打赢 3,491 个 token 的原始记忆 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/memchain-agent-memory/) |
 | 📄 论文（AI 安全与对齐） | 看懂不可见推理：大模型用一串「废话 token」偷偷思考，盯着思维链的监控器什么都没看见 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/invisible-reasoning/) |
 | 📄 论文（推理与思维链） | 看懂 CALM：别只练一套拳法——训练时轮流换「指挥」，让大模型学会配合任何推理时控制器 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/inference-time-controllers/) |
+| 📄 论文（LLM 智能体） | 看懂 SpecBox：模型还在吐字，沙箱已经开门——投机式调度把智能体工具调用的 P99 延迟砍掉 2.9 倍 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/specbox-agent-serving/) |
+| 📄 论文（推理与思维链） | 看懂 LaRec：让大模型「心里默想」6 步再说答案——推荐全场第一，延迟只有显式推理的 1/6 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/larec-latent-reasoning/) |
+| 📄 论文（扩散模型） | 看懂 CFG 扩散蒸馏：正、负分支误差会互相抵消骗过损失函数，把对账提前到「合成之前」（PDM）才能根治 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/cfg-diffusion-distillation/) |
+| 📄 论文（视频生成） | 看懂 Sol-Attn：视频生成注意力「边算边扔」，扔掉的还按平均分估个价——2 倍加速不掉画质 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/sol-attn-video/) |
+| 📄 论文（高效推理与压缩） | 看懂 MXAttention：一个不用任何校准数据算出的「神奇数字 7.25」，如何把 4-bit 注意力修到接近无损 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/mxattention-mxfp4/) |
+| 📄 论文（多模态大模型） | 看懂证据归因：VLM 答对了却指错证据框？把「默写坐标」换成「复述原文+检索定位」，召回率从 8% 飙到 47% | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/evidence-attribution/) |
+| 📄 论文（检索增强生成） | 看懂 DeCoRAG：VLM 建知识图谱前注意力总往左上角飘？先写段「看图说话」当锚，再按锚裁剪精读 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/decorag-documents/) |
+| 📄 论文（具身智能与机器人） | 看懂 τ：给 VLA 机器人装上「指尖触觉」，精细接触操作平均成功率从 30% 翻倍到 71.25% | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/touch-vla/) |
+| 📄 论文（AI 安全与对齐） | 看懂 CoT 不忠实的两个世界：为什么「读模型的推理过程」恰在它答错时失灵 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/cot-unfaithfulness/) |
 
 ## 目录结构
 
@@ -39,8 +48,26 @@
 │   │   └── index.html           # MemChain 智能体记忆论文交互解读（单文件，零依赖）
 │   ├── invisible-reasoning/
 │   │   └── index.html           # 不可见推理论文交互解读（单文件，零依赖）
-│   └── inference-time-controllers/
-│       └── index.html           # CALM 推理时控制器论文交互解读（单文件，零依赖）
+│   ├── inference-time-controllers/
+│   │   └── index.html           # CALM 推理时控制器论文交互解读（单文件，零依赖）
+│   ├── specbox-agent-serving/
+│   │   └── index.html           # SpecBox 智能体沙箱调度论文交互解读（单文件，零依赖）
+│   ├── larec-latent-reasoning/
+│   │   └── index.html           # LaRec 潜推理推荐论文交互解读（单文件，零依赖）
+│   ├── cfg-diffusion-distillation/
+│   │   └── index.html           # CFG 扩散蒸馏论文交互解读（单文件，零依赖）
+│   ├── sol-attn-video/
+│   │   └── index.html           # Sol-Attn 视频生成稀疏注意力论文交互解读（单文件，零依赖）
+│   ├── mxattention-mxfp4/
+│   │   └── index.html           # MXAttention 量化论文交互解读（单文件，零依赖）
+│   ├── evidence-attribution/
+│   │   └── index.html           # 证据归因论文交互解读（单文件，零依赖）
+│   ├── decorag-documents/
+│   │   └── index.html           # DeCoRAG 文档理解论文交互解读（单文件，零依赖）
+│   ├── touch-vla/
+│   │   └── index.html           # τ 触觉 VLA 论文交互解读（单文件，零依赖）
+│   └── cot-unfaithfulness/
+│       └── index.html           # CoT 不忠实检测论文交互解读（单文件，零依赖）
 ├── README.md
 └── LICENSE                      # MIT
 ```
@@ -129,6 +156,87 @@
 - **核心方法 × 4 组交互动画**：控制器 = 可复用推理模块的组合（6 种控制器流程动画）、单控制器 vs CALM 对比动画、GRPO 组内优势滑杆、ADAPTIVE 权重滑杆
 - **实验结果**：四种变体在「见过的控制器 / 旧模块新组合 / 全新模块」三档评测全部反超最强单控基线（73.72% vs 71.11%），并泛化到 MATH500/AMC23
 - **局限与意义**：无全能变体，多轮 RL 训练不稳定性未解决，所有关键结论均挂 ↗ 原文出处
+
+### SpecBox 智能体沙箱调度论文解读（`papers/specbox-agent-serving/index.html`，LLM 智能体）
+
+基于 arXiv 论文《SpecBox: Speculative Sandbox Scheduling for Efficient LLM Agent Serving》（arXiv:2607.23933）制作的单文件交互页面，内容包括：
+
+- **核心矛盾**：常驻沙箱内存爆炸 vs 按需冷启动 2~4 秒（重量级近 20 秒），QPS=20 时超 65% 的单步时间花在模型推理之外
+- **核心方法 × 4 组交互动画**：反应式 vs 投机式时间轴对比、双路由器流式预热流程、SDG 马尔可夫预取语义地图、带外传输载荷滑杆
+- **实验结果**：P99 延迟降 2.9×、供应延迟降 4.53×、峰值内存省 45.9%，实现「serverful 的性能，serverless 的成本」
+- **局限与意义**：经典 serverless 预热假设在智能体负载下失效，服务基建必须与智能体行为特征协同设计，所有关键结论均挂 ↗ 原文出处
+
+### LaRec 潜推理推荐论文解读（`papers/larec-latent-reasoning/index.html`，推理与思维链）
+
+基于 arXiv 论文《LaRec: Unleashing LLM-based Latent Reasoning for Generative Recommendation》（arXiv:2607.24617，中科院大学 × 小红书）制作的单文件交互页面，内容包括：
+
+- **核心问题 × 1 组对比动画**：显式 CoT 逐字生成 vs K=6 个潜向量「心里默想」的竞速对比
+- **核心方法 × 3 组交互动画**：InfoNCE 逐步对齐流程、语义空转 vs 过程方向对齐轨迹、高斯混合锚定探索滑杆
+- **实验结果**：4 个数据集全指标第一，延迟只有显式 CoT 的约 1/6~1/15，亿级用户广告平台 A/B 转化 +2.93%
+- **局限与意义**：潜推理的细粒度监督与路径探索两大难题的解法，所有关键结论均挂 ↗ 原文出处
+
+### CFG 扩散蒸馏论文解读（`papers/cfg-diffusion-distillation/index.html`，扩散模型）
+
+基于 arXiv 论文《Rethinking Classifier-Free Guidance in On-Policy Diffusion Distillation》（arXiv:2607.24731，阿里 Qwen 团队）制作的单文件交互页面，内容包括：
+
+- **欠约束 × 2 组滑杆动画**：γ 旋钮下的合成速度过冲矢量图、e₊/e₋ 平面上的零损失直线——误差可互相补偿骗过损失函数
+- **NBA 失效模式 × 1 组对比动画**：教师负支持有特权信息时，正支误差降、负支误差升的拮抗动力学
+- **PDM 方法**：分别匹配正支预测与 CFG 方向 d=v₊−v₋，唯一零解消除补偿自由度
+- **实验结果 × γ 敏感性动画**：Wan-VACE 三模态全面优于朴素 OPD，γ=1 时朴素 FVD 暴涨至 507.70 而 PDM 仅 60.97；只监督前 8/50 步省 6 倍训练成本
+
+### Sol-Attn 视频生成稀疏注意力论文解读（`papers/sol-attn-video/index.html`，视频生成）
+
+基于 arXiv 论文《Sol-Attn: Accelerating Video Generation Inference via On-the-Fly Attention Sparsification》（arXiv:2607.24027，NVIDIA）制作的单文件交互页面，内容包括：
+
+- **核心观察 × 1 组滑杆动画**：代理分数近似高斯分布，τ = μ + βσ 自适应阈值选块——top-k 太死板、top-p 看天吃饭
+- **核心方法 × 2 组动画**：稠密 vs 块稀疏网格对比、选路熔进 online softmax 的流式判决流程（未过线块原地复用做零阶泰勒近似）
+- **实验结果**：85%–90% 稀疏度下端到端 2.1×–3.0× 加速且质量持平或领先，路由比 top-p 快 32.7×，组合 Sol-Engine 最高 5.1×
+- **局限与意义**：B200 内核未吃满、仅前向、未覆盖自回归视频模型，所有关键结论均挂 ↗ 原文出处
+
+### MXAttention 量化论文解读（`papers/mxattention-mxfp4/index.html`，高效推理与压缩）
+
+基于 arXiv 论文《MXAttention: Data-Free Optimal Scaling and Pre-Normalization Quantization for MXFP4 Attention》（arXiv:2607.24377，华为）制作的单文件交互页面，内容包括：
+
+- **两个隐形坑 × 2 组滑杆动画**：幂次缩放的截断-下溢跷跷板（溢出概率 ≈ 19.27%）、在线 softmax 两本账不一致导致行和 ≠ 1
+- **UOS × 1 组曲线动画**：2 的幂缩放的对数周期结构使最优边界与数据分布无关，闭式解 Q\*max = 7.25——零校准、零 QAT
+- **PNQ × 1 组对比动画**：行和分母与输出累加器复用同一份量化块，行和恒为 1（0.870 ≠ 1 vs 恒 1.000）
+- **实验结果**：Wan2.2 / HunyuanVideo 收窄 ≥95% 的 FP16 画质差距，全部 VBench 指标退化 <0.01，已并入 MindIE-SD 主分支
+
+### 证据归因论文解读（`papers/evidence-attribution/index.html`，多模态大模型）
+
+基于 arXiv 论文《Evidence Attribution in Visual Document Understanding without Coordinates or Region Labels》（arXiv:2607.24651）制作的单文件交互页面，内容包括：
+
+- **归因失效是接口伪影 × 1 组对比动画**：坐标接口下证据召回最高仅 8.1%、幻觉率 82–97%；换「逐字引用+检索定位」语言接口召回跃升至 25.9–46.9%
+- **引用-检索管线 × 1 组流程动画**：MinerU 切语义块 → 嵌入匹配 → 匈牙利算法一对一指派
+- **零区域标注的 GRPO 训练 × 1 组奖励滑杆**：乘性门控奖励，8B 模型 SAA 22.4→33.8，全程无需框标注
+- **诚实的边界 × IoU 阈值动画**：解析器天花板 88.2%、图类证据召回仍低，闭源 Gemini-3.1-Pro 用坐标也能 68.9——格式「不是学不会，是没学过」
+
+### DeCoRAG 文档理解论文解读（`papers/decorag-documents/index.html`，检索增强生成）
+
+基于 arXiv 论文《DeCoRAG: Cognitive Decoupling and Semantic-Aware Cropping for Complex Document Understanding》（arXiv:2607.24554）制作的单文件交互页面，内容包括：
+
+- **视觉注意力沉没 × 1 组对比动画**：无引导时 VLM 注意力集体飘向图片左上角（COCR 3.49→0.80），28 条真值关系只抽出 8 条
+- **认知解耦三阶段 × 1 组流程动画**：全局语义锚定 → 双流 RAP-Crop 裁剪（形态学视觉流 + OCR 语义流）→ 带坐标对齐的局部抽取
+- **实验结果 × 1 组 token 滑杆**：SPIQA/SlideVQA/PaperTab 全面领先（最高 +12.5pp），离线建图 token −40.8% 而精度不降
+- **局限与意义**：锚点幻觉级联、形态学启发式、单页限制，所有关键结论均挂 ↗ 原文出处
+
+### τ 触觉 VLA 论文解读（`papers/touch-vla/index.html`，具身智能与机器人）
+
+基于 arXiv 论文《τ: Learning Touch-Augmented Vision-Language-Action Models from Future Visual Supervision》（arXiv:2607.24485）制作的单文件交互页面，内容包括：
+
+- **小数据触觉 × 1 组流程动画**：触觉编码器 + 适配器把视觉式触觉翻成 VLA token，不动预训练 π0.5，每任务仅 100 条示教
+- **JEPA 式未来视觉监督 × 2 组动画**：以「手感+动作」预测未来视觉特征变化量，训练期分支推理时整体移除、零部署开销
+- **实验结果 × 2 组对比动画**：真机四任务平均完整成功率 71.25%（最强基线仅 30.00%）；消融拆零件——拆触觉模块 −42.50pt
+- **局限与意义**：泛化强任务依赖（擦拭几乎不掉点，精密插入对杂波敏感），配套 TacAura 数据集将开源
+
+### CoT 不忠实检测论文解读（`papers/cot-unfaithfulness/index.html`，AI 安全与对齐）
+
+基于 arXiv 论文《Two Regimes of Chain-of-Thought Unfaithfulness: Behavioral Detection Fails Where Models Are Wrong》（arXiv:2607.23458）制作的单文件交互页面，内容包括：
+
+- **核心发现 × 1 组锦标赛动画**：「答错了」单一信号（AUROC 0.696）击败所有专用不忠实检测器——69% 的不忠实 CoT 出现在答错样本上
+- **两个 regime × 1 组切换动画**：答对的世界信号中等有效（0.63–0.67），答错的世界全面失明——而那里正是不忠实的主场
+- **指标反转 × 1 组 AUROC 刻度滑杆**：标准 step-removal 指标与人类标签反向（AUROC 0.349），实际测的是「答案-推理耦合度」
+- **构造 vs 标注 × 1 组流程动画**：「明示合理化」构造对真实标注零迁移，提示诱导构造意外迁向答错世界
 
 ## 许可证
 

@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>看懂 LaRec · 让大模型「心里默想」6 步，再把推荐答案说出口</title>
+<style>
+  :root{
+    --blue:#1783ff; --blue-d:#0b5cc4; --red:#ff6b6b; --amber:#f7b731;
+    --purple:#a55eea; --green:#2bc48a; --ink:#1b2430; --ink-soft:#48566a;
+    --bg:#f6f8fc; --card:#ffffff; --line:#e4eaf3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.8}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+
+  /* ===== Hero ===== */
+  .hero{background:linear-gradient(160deg,#0a1a3f 0%,#103a8c 55%,#1783ff 100%);
+    color:#fff;padding:72px 0 56px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+    padding:4px 14px;border-radius:99px;font-size:13px;letter-spacing:1px;margin-bottom:18px}
+  .hero h1{font-size:clamp(26px,4.6vw,44px);line-height:1.3;margin-bottom:14px}
+  .hero p.sub{font-size:clamp(14px,1.8vw,18px);opacity:.88;max-width:820px}
+  .hero .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);
+    border-radius:16px;padding:14px 22px;min-width:150px}
+  .stat b{display:block;font-size:26px;font-weight:800}
+  .stat span{font-size:13px;opacity:.85}
+
+  /* ===== Nav ===== */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  nav.toc .inner{display:flex;gap:6px;overflow-x:auto;padding:10px 22px;max-width:1060px;margin:0 auto}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--ink-soft);text-decoration:none;
+    padding:6px 12px;border-radius:99px;transition:.2s}
+  nav.toc a:hover{background:#eaf2ff;color:var(--blue-d)}
+
+  /* ===== Sections ===== */
+  section.chapter{padding:56px 0 8px}
+  .chap-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  .chap-num{font-size:14px;font-weight:800;color:#fff;background:var(--blue);
+    border-radius:10px;padding:3px 12px;letter-spacing:1px}
+  .chap-head h2{font-size:clamp(21px,3vw,30px)}
+  .oneline{color:var(--blue-d);font-weight:600;margin:4px 0 22px;font-size:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:0 2px 14px rgba(20,50,110,.05)}
+  .card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card p{margin-bottom:12px;color:#2c3a4e}
+  .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
+    border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
+  .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
+  .keyfact{position:relative;background:#eef5ff;border-left:4px solid var(--blue);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";position:absolute;left:16px;top:12px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .demo-box{background:#0e1830;border-radius:18px;padding:22px;margin:16px 0;color:#dfe8ff;
+    position:relative;overflow:hidden}
+  .demo-title{color:#8fb8ff;font-size:13px;letter-spacing:2px;font-weight:700;margin-bottom:14px;text-transform:uppercase}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:99px;padding:9px 22px;font-size:14px;
+    cursor:pointer;font-weight:600;transition:.2s;box-shadow:0 4px 14px rgba(23,131,255,.35)}
+  .btn:hover{background:var(--blue-d);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);box-shadow:none;color:#dfe8ff}
+  .btn.ghost.active{background:rgba(23,131,255,.22);border-color:#6db4ff;color:#fff}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border-radius:12px;overflow:hidden}
+  table.tbl th{background:#103a8c;color:#fff;padding:10px 12px;text-align:left;font-weight:600}
+  table.tbl td{padding:10px 12px;border-bottom:1px solid var(--line)}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl tr:nth-child(even) td{background:#f7faff}
+  .hl{color:var(--blue-d);font-weight:700}
+
+  /* ===== 公式（纯 HTML/CSS，无 MathJax）===== */
+  .formula{background:#0e1830;border-radius:14px;padding:20px 22px;margin:14px 0;color:#eaf1ff;
+    font-size:clamp(15px,2.2vw,19px);text-align:center;overflow-x:auto;line-height:2;
+    font-family:"STIX Two Math","Cambria Math",Georgia,serif}
+  .formula .op{color:#8fb8ff}
+  .frac{display:inline-flex;flex-direction:column;vertical-align:middle;margin:0 2px;line-height:1.4}
+  .frac .num{border-bottom:1.5px solid currentColor;padding:0 7px}
+  .frac .den{padding:0 7px}
+  .fnote{font-size:13px;color:#7f92b8;margin-top:10px;text-align:center;line-height:1.7;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  .formula var{font-style:italic}
+
+  /* ===== 结果条形图 ===== */
+  .scorebar{height:10px;border-radius:99px;background:#e7edf6;overflow:hidden;margin:4px 0 12px}
+  .scorebar i{display:block;height:100%;border-radius:99px;width:0;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+  .bar-row{display:grid;grid-template-columns:170px 1fr 64px;gap:12px;align-items:center;margin-bottom:10px;font-size:14px}
+  @media(max-width:640px){.bar-row{grid-template-columns:110px 1fr 56px}}
+  .bar-row b{text-align:right;font-variant-numeric:tabular-nums}
+
+  /* ===== 滑杆 ===== */
+  .slider-row{display:flex;align-items:center;gap:14px;margin:14px 0 6px;flex-wrap:wrap}
+  .slider-row label{font-size:14px;color:#9db4dd;white-space:nowrap}
+  .slider-row input[type=range]{flex:1;min-width:180px;accent-color:var(--amber)}
+  .slider-row output{color:#ffd97a;font-weight:700;min-width:56px;text-align:right;font-variant-numeric:tabular-nums}
+  canvas.chart{width:100%;height:240px;display:block;border-radius:10px;background:#0a1326}
+  .demo-readout{margin-top:14px;font-size:14.5px;line-height:1.8}
+  .caption{font-size:12.5px;color:#7f92b8;margin-top:8px;line-height:1.6}
+
+  /* ===== 来源标注 ===== */
+  .src{color:var(--blue-d);text-decoration:none;font-size:.8em;font-weight:600;
+    border-bottom:1px dashed #9db8e8;padding:0 1px;white-space:nowrap}
+  .src:hover{color:var(--blue);border-bottom-style:solid;background:#eaf2ff;border-radius:4px}
+  .src::after{content:"↗";font-size:.85em;margin-left:1px}
+  .demo-box .src, .formula .src{color:#8fb8ff;border-bottom-color:#3a5078}
+  .demo-box .src:hover{color:#cfe2ff;background:rgba(23,131,255,.15)}
+  .src-inline{color:inherit;border-bottom:1px dashed #9db8e8;text-decoration:none}
+  .src-inline:hover{color:var(--blue)}
+
+  footer{margin-top:64px;padding:34px 0 46px;color:#7f8ca3;font-size:13px;text-align:center;
+    border-top:1px solid var(--line);line-height:2}
+  .fade-up{opacity:0;transform:translateY(26px);transition:all .7s cubic-bezier(.3,.7,.3,1)}
+  .fade-up.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">arXiv 论文交互解读 · 推理与思维链</span>
+    <h1>看懂 LaRec：让大模型「心里默想」6 步，再把推荐答案说出口</h1>
+    <p class="sub">小红书与中科院团队提出的生成式推荐框架：不让 LLM 把推理过程写成啰嗦的文字（显式 CoT），而是在连续潜空间里用 6 个隐向量「默默想完」再作答。通过「潜预训练」给每一步脑内推理配上细粒度监督，再用「个性化强化微调」在用户兴趣邻域内锚定探索——推荐精度全场第一，延迟却只有显式推理的约 1/6。</p>
+    <div class="stats">
+      <div class="stat"><b>K = 6</b><span>潜推理步数：只输出 6 个向量，不写一个字</span></div>
+      <div class="stat"><b>≈ 1/6</b><span>延迟对比显式 CoT（工业集 0.67s vs 3.92s）</span></div>
+      <div class="stat"><b>4 / 4</b><span>数据集全指标第一（t 检验 p&lt;0.001）</span></div>
+      <div class="stat"><b>+2.93%</b><span>线上 A/B 转化率提升（亿级用户广告平台）</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="toc"><div class="inner">
+  <a href="#ch0">🛒 热身：推荐为什么需要「想一想」</a>
+  <a href="#ch1">🧠 概念基础：潜推理与两大挑战</a>
+  <a href="#ch2">🎯 核心方法：LaRec 两阶段</a>
+  <a href="#ch3">📊 实验结果</a>
+  <a href="#ch4">⚖️ 局限与意义</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ============ CH0 热身 ============ -->
+<section class="chapter" id="ch0">
+  <div class="chap-head"><span class="chap-num">第 0 章</span><h2>热身：推荐为什么需要「想一想」</h2></div>
+  <p class="oneline">「看过 Fender 音箱和吉他背带的人，下一步可能想要什么？」——这个问题值得想，但把想法全写出来就太慢了。</p>
+
+  <div class="card fade-up">
+    <h3>🎬 生成式推荐：让 LLM 直接「报出」下一件商品</h3>
+    <p>传统推荐系统靠 ID 匹配：用户 1024 看过商品 887、2331，模型算一算相似度就推。而<b>生成式推荐（Generative Recommendation）</b>让大语言模型直接「生成」下一个商品的标识（ID 或标题）——就像让一位阅人无数的资深导购，看完你的购物记录后脱口而出：「你该去看看这个。」这条路线由 <a class="src" href="https://arxiv.org/abs/2305.05065" target="_blank" rel="noopener">TIGER</a> 开创，OneRec 系列、LC-Rec 等不断跟进（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §2.1</a>）。</p>
+    <p>既然用了 LLM，大家自然想挖掘它的<b>推理能力</b>：先让模型逐步分析用户偏好（「第一步：用户聚焦吉他类商品；第二步：有明显的 Fender 品牌倾向……」），再给出推荐——这就是显式思维链（<a class="src" href="https://arxiv.org/abs/2201.11903" target="_blank" rel="noopener">Chain-of-Thought</a>）路线，代表作如 OneRec-Think、TrackRec（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §2.2</a>）。推理确实提升了精度和可解释性，但代价立竿见影：</p>
+    <div class="keyfact">显式 CoT 要<b>逐字生成</b>一长串推理文本，单样本推理延迟高达 <b>2.49s ~ 3.92s</b>，是不推理基线（0.16s ~ 0.56s）的 7~18 倍——线上系统根本等不起（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §1、§4.4.5 表 4</a>）。</div>
+    <div class="analogy">像点咖啡时，店员把你可能的口味分析<b>逐字念出来</b>再动手做：「根据您上次点了美式不加糖，推测您偏好苦味……」分析得挺好，但队伍已经排到店门外了。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🤫 潜推理：心里想，别说出来</h3>
+    <p><b>潜推理（latent reasoning）</b>给出了另一条路：不生成推理文字，而是让模型在连续向量空间里「默默思考」——用 <var>K</var> 个高维隐向量 <var>z</var><sub>1</sub>, …, <var>z</var><sub><var>K</var></sub> 替代冗长的推理 token。高维向量的信息密度远高于文字，多步推理可以被压缩进有限的几个向量里，延迟因此大幅下降（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §1</a>；思想源头可追溯到 <a class="src" href="https://arxiv.org/abs/2412.06769" target="_blank" rel="noopener">COCONUT</a>）。在推荐领域，ReaRec、LARES、LatentR3 已做了初步尝试（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §2.2</a>）。</p>
+    <p>形式上，生成式推荐的目标从「逐字写出推理再作答」变成「先在潜空间演化 <var>K</var> 步，再从最后一步状态 <var>z</var><sub><var>K</var></sub> 预测下一个商品」（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §3.1 式 (1)</a>）：</p>
+    <div class="formula">
+      <var>P</var>(<var>i</var><sub><var>t</var>+1</sub> | <var>S</var><sub><var>u</var></sub>) <span class="op">=</span> <var>P</var>(<var>i</var><sub><var>t</var>+1</sub> | <b>z</b><sub><var>K</var></sub>) <span class="op">·</span> ∏<sub><var>k</var>=1…<var>K</var></sub> <var>P</var>(<b>z</b><sub><var>k</var></sub> | <b>z</b><sub>&lt;<var>k</var></sub>, <var>S</var><sub><var>u</var></sub>)
+      <div class="fnote">S<sub>u</sub> 是用户历史交互序列。左边读作：推荐下一件商品的概率 = 先一步步「想」出 K 个潜状态，再基于最后的状态给出答案。全程没有一个文字被写出来。</div>
+    </div>
+    <div class="analogy">显式 CoT 是<b>边想边说</b>的导购，潜推理是<b>心里飞快过一遍</b>、然后直接告诉你结论的导购。顾客听到的都一样，后者却快得多——前提是：他心里那套「默想」真的在认真推理，而不是走神。</div>
+  </div>
+</section>
+
+<!-- ============ CH1 概念基础 ============ -->
+<section class="chapter" id="ch1">
+  <div class="chap-head"><span class="chap-num">第 1 章</span><h2>概念基础：潜推理好用，但有两大难关</h2></div>
+  <p class="oneline">把思考塞进「黑盒」省下了时间，却也丢掉了两样东西：每一步的监督信号，和探索多条路的能力。</p>
+
+  <div class="card fade-up">
+    <h3>🕳️ 挑战一：只有「期末成绩」，没有「平时批改」</h3>
+    <p>显式 CoT 之所以训得好，是因为预训练阶段每个推理 token 都有<b>下一个词预测（NTP）</b>的逐词监督——学生的每一步推导都被老师逐句批改。而潜推理把整个多步思考封装成黑盒，<b>唯一能用的监督信号来自最终的推荐结果</b>：推对了 +1，推错了 0。这种稀疏又延迟的反馈很难「穿透」到深层的中间推理步骤，潜状态容易退化成浅层模式匹配，而不是真正的多步推理（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §1、§3.2</a>）。</p>
+    <div class="analogy">像一位<b>只看期末成绩</b>的家教：孩子整学期的演算过程从不检查，最后只说一句「及格 / 不及格」。孩子根本不知道哪一步开始错的，下次还是错在同一个地方。</div>
+    <div class="keyfact">论文原话：稀疏、延迟的反馈「挣扎着穿透深层推理步骤」，无法有效指导中间潜状态的学习（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §1</a>）。LaRec 的「潜预训练」就是为补上这份「平时批改」而生的。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🧭 挑战二：只会走一条路，不会「货比三家」</h3>
+    <p>用户兴趣天然是<b>多样且动态</b>的。显式 CoT 可以用 Best-of-N 等采样策略生成多条推理路径，挑出最匹配的一条；而现有潜推理通常是一个<b>确定性映射</b>——同一个输入永远走出同一条潜空间轨迹，探索无从谈起。有工作尝试注入随机高斯噪声来打破确定性，但噪声与推理空间不对齐：要么把推理逻辑撞崩，要么把搜索空间撑得过大、难以收敛（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §1</a>）。</p>
+    <div class="analogy">确定性潜推理像一台<b>只会导航一条固定路线</b>的地图 App；随机噪声版则像随机空降地球任意一点再瞎走——大多数时候落在了「语义荒漠」里，离用户真正感兴趣的地方十万八千里。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>⏱️ 直观对比：想 40 个字 vs 想 6 个向量</h3>
+    <p>用一个小动画感受两种推理的「时间账单」：左边是显式 CoT 逐字生成推理文本（示意 40 个 token），右边是潜推理快速演化 6 个潜向量后直接作答。两者给出同样的推荐结论，耗时差了一个数量级。</p>
+    <div class="demo-box">
+      <div class="demo-title">▶ 对比动画 · 显式 CoT vs 潜推理（时间轴为示意，真实延迟见第 3 章表）</div>
+      <canvas id="cmp-canvas" class="chart" style="height:250px"></canvas>
+      <div class="btn-row">
+        <button class="btn" id="cmp-play">▶ 播放对比</button>
+      </div>
+      <div class="demo-readout" id="cmp-result">点击播放：同一个推荐请求，两种「想」法的耗时对比。</div>
+      <div class="caption">token 数与节奏为教学示意。论文实测（表 4，单张 H20）：潜推理 0.19s~0.67s/样本，显式 CoT 2.49s~3.92s/样本（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §4.4.5</a>）。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH2 核心方法 ============ -->
+<section class="chapter" id="ch2">
+  <div class="chap-head"><span class="chap-num">第 2 章</span><h2>核心方法：LaRec 的两阶段训练</h2></div>
+  <p class="oneline">遵循「先预训练、再 RL 对齐」的范式：先把「默想」教成有章法的推理，再让它在用户兴趣的锚点之间学会探索。</p>
+
+  <div class="card fade-up">
+    <h3>🗺️ 总览：先教会「怎么默想」，再教会「往哪探索」</h3>
+    <table class="tbl">
+      <tr><th>阶段</th><th>要解决的挑战</th><th>核心机制</th><th>产出</th></tr>
+      <tr><td><b>① 潜预训练 LPT</b><br>Latent Pre-training</td><td>缺乏细粒度监督</td><td>逐步对齐（SA）+ 过程方向对齐（PA），给每个潜状态配「平时批改」</td><td>会「认真默想」的 LLM<sub>pretrain</sub></td></tr>
+      <tr><td><b>② 个性化强化微调 PRL</b><br>Personalized RL-tuning</td><td>确定性单一路径</td><td>个性化高斯混合引导分布 + 复合奖励 + GRPO</td><td>会「锚定探索」的 LaRec</td></tr>
+    </table>
+    <p style="margin-top:12px">整个设计遵循 DeepSeek-R1 带火的「Pre-training then RL Alignment」原则，RL 部分使用 <a class="src" href="https://arxiv.org/abs/2501.12948" target="_blank" rel="noopener">GRPO 算法</a>（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §1、§3.3</a>）。实现上还有一个细节：由于 LLM 解码层隐状态与输入嵌入空间存在分布差异，LaRec 引入了一个轻量 <b>Reasoning Head</b> 把潜推理状态映射回文本嵌入空间，方便后续对齐与优化（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §3.2</a>）。</p>
+  </div>
+
+  <!-- SA -->
+  <div class="card fade-up">
+    <h3>① 逐步对齐 SA：请一位「金牌教师」把脑内讲解录成教材</h3>
+    <p>第一步要解决的是：<b>教师信号从哪来？</b>LaRec 用一个<b>面向目标的反向推理生成</b>策略：把用户历史 S<sub>u</sub> 和标准答案商品 i<sub>tgt</sub> 一起喂给 Qwen-72B 这样的强推理模型，要求它生成一条「从历史能逻辑推导出目标商品、但全文不许透露目标商品信息」的推理链 C⁺——<b>带着答案出考题，但题面不能泄题</b>。然后取这条教师 CoT 每一步在 LLM 最后一层的隐状态 h<sub>k</sub> 作为教学路标（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §3.2.1 式 (3)</a>）。</p>
+    <p>接下来做<b>对齐优化</b>：学生模型的第 k 步潜状态 z<sub>k</sub> 要在表示空间里贴近同一步的教师状态 h<sub>k</sub>，同时与本 batch 里<b>其他样本</b>的教师状态拉开距离——后者天然构成对比学习的负样本集 H⁻，无需额外标注。用的是经典的 InfoNCE 对比损失（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §3.2.1 式 (4)</a>）：</p>
+    <div class="formula">
+      L<sub>SA</sub> <span class="op">=</span> Σ<sub><var>i</var></sub> Σ<sub><var>k</var></sub> <span class="op">−</span> log
+      <span class="frac"><span class="num">exp( sim(<b>z</b><sub><var>i</var>,<var>k</var></sub>, <b>h</b><sub><var>i</var>,<var>k</var></sub>) / τ<sub>1</sub> )</span><span class="den">Σ<sub><var>j</var></sub> exp( sim(<b>z</b><sub><var>i</var>,<var>k</var></sub>, <b>h</b><sub><var>j</var>,<var>k</var></sub>) / τ<sub>1</sub> )</span></span>
+      <div class="fnote">白话：分子 = 学生第 k 步和自己老师第 k 步的「心有灵犀度」；分母 = 它和全班所有老师第 k 步的相似度总和。比值越大 → 学生这一步默想的内容越贴近正确教材、且不会张冠李戴。</div>
+    </div>
+    <div class="analogy">金牌教师把自己的「脑内讲解」按步骤录成 6 段录音。学生每一步默想完都要和老师对应那段录音<b>对表</b>——像不像不重要，「想到一块儿去」才算数；同时还得保证没有和隔壁同学的录音搞混（负样本对比）。</div>
+    <div class="demo-box">
+      <div class="demo-title">▶ 流程动画 · 6 步潜状态逐步向教师轨迹对齐（示意）</div>
+      <canvas id="sa-canvas" class="chart" style="height:220px"></canvas>
+      <div class="btn-row">
+        <button class="btn" id="sa-play">▶ 播放对齐过程</button>
+      </div>
+      <div class="demo-readout" id="sa-result">金色 = 教师 CoT 的 6 步隐状态 hₖ（教材路标）；蓝色 = 学生潜状态 zₖ。点击播放，看学生每一步被「拉力」拽向对应路标，同时被推离红色的他人路标。</div>
+      <div class="caption">位置为 2D 教学投影示意；真实对齐发生在数千维表示空间，由式 (4) 的 InfoNCE 损失驱动（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §3.2.1</a>）。</div>
+    </div>
+  </div>
+
+  <!-- PA -->
+  <div class="card fade-up">
+    <h3>② 过程方向对齐 PA：每一步都得「朝目的地走」，不许原地兜圈</h3>
+    <p>只保证每一步语义正确还不够——这些步子合起来是否真的<b>走向</b>最终答案？缺乏方向约束时，潜状态容易陷入<b>「语义空转」（semantic idling）</b>：在语义空间里原地打转，推理停在局部、推荐性能下降（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §3.2.2</a>）。</p>
+    <p>PA 的做法很几何：先用目标商品标题的词嵌入均值池化得到<b>目标方向向量</b> e<sub>tgt</sub>（式 (5)）；再借鉴「线性累加」原理——K 步推理应该像把路程均分成 K−1 段，每一步的<b>实际位移</b> v<sub>k+1</sub> = z<sub>k+1</sub> − z<sub>k</sub> 都应该指向 e<sub>tgt</sub>/(K−1) 的方向（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §3.2.2 式 (6)</a>）：</p>
+    <div class="formula">
+      L<sub>PA</sub> <span class="op">=</span> Σ<sub><var>k</var>=2…<var>K</var></sub> max<span class="op">(</span> 0 , 1 <span class="op">−</span> sim<span class="op">(</span> <b>v</b><sub><var>k</var></sub> , <span class="frac"><span class="num">1</span><span class="den"><var>K</var>−1</span></span> <b>e</b><sub>tgt</sub> </span><span class="op">)</span> <span class="op">)</span>
+      <div class="fnote">白话：每一步的实际位移方向与「直奔目标」的理想方向算余弦相似度，越接近 1 损失越小；走偏了、原地转了都会被扣分。sim(·) 是余弦相似度。</div>
+    </div>
+    <div class="analogy">像导航 App 的<b>纠偏提示</b>：SA 保证你每个路口做的决定都「合理」，PA 则保证你的总航向始终指向目的地——步数不多不少，正好 K−1 段直路走完，不允许在环岛上来回兜圈耗油。</div>
+    <div class="demo-box">
+      <div class="demo-title">▶ 演示 · 潜空间轨迹：语义空转 vs 方向对齐（示意）</div>
+      <canvas id="pa-canvas" class="chart" style="height:260px"></canvas>
+      <div class="btn-row">
+        <button class="btn" id="pa-play-a">▶ 无 PA：原地打转</button>
+        <button class="btn ghost" id="pa-play-b">▶ 有 PA：直线逼近</button>
+      </div>
+      <div class="demo-readout" id="pa-result">☆ 是目标商品方向。切换两个按钮，看同样 6 步预算下，潜状态「兜圈」与「定向推进」的差别。</div>
+      <div class="caption">2D 教学示意。论文消融（表 3）：去掉 PA 后 Industry 集 H@10 从 0.4090 掉到 0.4025（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §4.3</a>）。</div>
+    </div>
+    <div class="keyfact">潜预训练的总目标 = 推荐交叉熵 L<sub>Rec</sub> + α·L<sub>SA</sub> + γ·L<sub>PA</sub>（式 (7)），实验中 α = γ = 1.0（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §3.2.3、§4.1.4</a>）。</div>
+  </div>
+
+  <!-- PGD -->
+  <div class="card fade-up">
+    <h3>③ 个性化引导分布：探索从「兴趣锚点」出发，不从噪声出发</h3>
+    <p>潜预训练之后的模型会认真默想了，但仍是确定性的——同一用户永远走同一条推理路径。要打破确定性，常规做法是加标准高斯噪声，可在高维潜空间里盲目扰动极易撞毁辛苦学来的语义结构。LaRec 提出<b>「锚定探索」（Anchored Exploration）</b>：探索应该<b>从用户兴趣的邻域出发</b>。具体地，把用户历史上每件交互商品的嵌入当作一个「语义锚点」，构成兴趣锚点集 Ω<sub>u</sub>，再以每个锚点为圆心、σ 为半径建一个<b>均匀高斯混合分布</b>作为引导信号的来源（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §3.3.1 式 (8)(9)</a>）：</p>
+    <div class="formula">
+      <var>H</var><sub>0</sub> <span class="op">~</span> <var>P</var><sub>guide</sub>(<var>u</var>) <span class="op">=</span> <span class="frac"><span class="num">1</span><span class="den">|Ω<sub><var>u</var></sub>|</span></span> Σ<sub><b>e</b>∈Ω<sub><var>u</var></sub></sub> 𝓝<span class="op">(</span> <b>e</b> , σ²<b>I</b> <span class="op">)</span>
+      &nbsp;&nbsp;⟹&nbsp;&nbsp;
+      <b>z̃</b><sub>1</sub> <span class="op">=</span> <b>z</b><sub>1</sub> <span class="op">+</span> <var>H</var><sub>0</sub>
+      <div class="fnote">白话：每个历史行为都可能成为「新兴趣的出发点」。训练时从这个混合分布里采样 H₀，加到推理的初始潜状态 z₁ 上（式 (10)），同一位用户就能走出 n 条互不相同的推理路径——而且每条路径的起点都落在「这个人真正感兴趣的街区」里。σ 是控制探索半径的超参数，实验取 1.5。</div>
+    </div>
+    <div class="analogy">周末逛街探索新店的两种策略：<b>随机空降</b>地球任意坐标（可能落在太平洋里），或者<b>从你常去的几家店附近</b>向外散步。后者既保证了新鲜感，又不会离谱——这就是「锚定探索」。</div>
+    <div class="demo-box">
+      <div class="demo-title">▶ 滑杆探索 · 从个性化混合分布里采样（示意）</div>
+      <canvas id="pgd-canvas" class="chart" style="height:280px"></canvas>
+      <div class="slider-row">
+        <label>探索半径 σ</label>
+        <input type="range" id="pgd-sigma" min="0.5" max="2.5" step="0.1" value="1.5">
+        <output id="pgd-sigmav">1.5</output>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="pgd-sample">🎲 采样 12 次（个性化分布）</button>
+        <button class="btn ghost" id="pgd-noise">🌪️ 对比：纯高斯噪声</button>
+      </div>
+      <div class="demo-readout" id="pgd-result">金色圆点 = 用户的 4 个兴趣锚点（历史商品嵌入），虚线圈 = 各锚点的探索半径 σ。点击采样，看点落在哪里。</div>
+      <div class="caption">2D 教学示意，点的分布形状为演示所用。论文消融（表 3）证实：换成标准高斯噪声（w/o PGD）后四个数据集全线掉分——锚定探索假设成立（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §4.3</a>）。</div>
+    </div>
+  </div>
+
+  <!-- GRPO -->
+  <div class="card fade-up">
+    <h3>④ 复合奖励 + GRPO：不只判对错，还给「沾边分」</h3>
+    <p>有了 n 条平行推理路径，怎么评价哪条好？LaRec 设计了一个<b>复合奖励</b>（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §3.3.2 式 (11)</a>）：</p>
+    <div class="formula">
+      <var>r</var>(<var>O</var><sub><var>i</var></sub>) <span class="op">=</span> 𝕀<span class="op">(</span> <var>O</var><sub><var>i</var></sub> = <var>i</var><sub>tgt</sub> <span class="op">)</span> <span class="op">+</span> λ <span class="op">·</span> sim<span class="op">(</span> Emb(<var>O</var><sub><var>i</var></sub>) , Emb(<var>i</var><sub>tgt</sub>) <span class="op">)</span>
+      <div class="fnote">第一项 𝕀 是稀疏的「命中分」：推荐中了标准答案 +1，否则 0。第二项是稠密的「沾边分」：预测商品与答案商品的语义余弦相似度——就算没猜中，方向对了也给分，让模型在没命中的情况下也知道该往哪优化。实验 λ = 1.0。</div>
+    </div>
+    <p>然后交给 <a class="src" href="https://arxiv.org/abs/2501.12948" target="_blank" rel="noopener">GRPO</a> 做组内相对优势对齐：同一用户的 n 条路径算出奖励 r<sub>1</sub>…r<sub>n</sub> 后，<b>用组内均值 μ 和标准差 σ 做标准化</b>，每条路径的「优势」就是它比同组平均好多少（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §3.3.2 式 (12)</a>）：</p>
+    <div class="formula">
+      <var>A</var><sub><var>i</var></sub> <span class="op">=</span>
+      <span class="frac"><span class="num"><var>r</var><sub><var>i</var></sub> <span class="op">−</span> μ</span><span class="den">σ</span></span>
+      ，&nbsp;&nbsp; μ <span class="op">=</span> <span class="frac"><span class="num">1</span><span class="den"><var>n</var></span></span>Σ<sub><var>i</var></sub> <var>r</var><sub><var>i</var></sub>
+      <div class="fnote">白话：不看绝对分，看「班内排名」。比同组平均好的路径被强化、比平均差的被抑制，再配上裁剪的重要性比率与 KL 正则（式 (13)），完成稳定对齐。</div>
+    </div>
+    <div class="analogy">像小组做题互评：老师不只打勾叉（命中分），还给思路沾边的同学发「过程分」；然后把组内成绩标准化——你不需要考过全班所有人，只要比同组平均强，就会被表扬并推广你的做法。</div>
+    <div class="keyfact">消融实验（表 3）：PRL 阶段的「个性化引导分布」和「GRPO 强化对齐」各自单独拿掉都会掉分，且 w/o PGD（换成普通噪声）明显劣于完整 LaRec——「探索-对齐」两个零件缺一不可（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §4.3</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH3 实验 ============ -->
+<section class="chapter" id="ch3">
+  <div class="chap-head"><span class="chap-num">第 3 章</span><h2>实验结果：四个数据集全指标第一，延迟几乎不涨</h2></div>
+  <p class="oneline">3 个公开集 + 1 个工业集，11 个基线，外加一周线上 A/B——这份成绩单相当完整。</p>
+
+  <div class="card fade-up">
+    <h3>🧪 实验设置一览</h3>
+    <table class="tbl">
+      <tr><th>项目</th><th>配置</th></tr>
+      <tr><td>数据集</td><td>Amazon Toys / Instruments、MovieLens-100K（Movie）、工业集 Industry；稀疏度 99.14%~99.89%；按时间戳 8:1:1 切分，5-core 过滤，序列最长 10（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">表 1、§4.1.1</a>）</td></tr>
+      <tr><td>基座模型</td><td><a class="src" href="https://qwenlm.github.io/blog/qwen2.5/" target="_blank" rel="noopener">Qwen2.5-1.5B</a>（LLM 类方法统一）；规模分析覆盖 0.5B / 1.5B / 3B / 7B</td></tr>
+      <tr><td>关键超参</td><td>潜推理步数 K=6；α=γ=1.0；探索半径 σ=1.5；λ=1.0</td></tr>
+      <tr><td>基线</td><td>ID 类：GRU4Rec、SASRec、BERT4Rec、<a class="src" href="https://arxiv.org/abs/2503.22675" target="_blank" rel="noopener">ReaRec</a>、PLR；LLM 类：TallRec、BIGRec、D³、<a class="src" href="https://arxiv.org/abs/2508.15388" target="_blank" rel="noopener">TrackRec</a>、<a class="src" href="https://arxiv.org/abs/2505.19092" target="_blank" rel="noopener">LatentR3</a>（均用 Trie 约束束搜索生成 Top-N）</td></tr>
+      <tr><td>指标 / 硬件</td><td>HR@5/10、NDCG@5/10；8 张 NVIDIA H20</td></tr>
+    </table>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🏆 主结果：H@5 全面领先（摘自论文表 2）</h3>
+    <p>下面按数据集画出三个代表性方法的 H@5（命中率：Top-5 推荐里有没有正确答案）——传统最强 ID 基线之一 SASRec、最强潜推理基线 LatentR3、以及 LaRec。<b>LaRec 在全部 4 个数据集、全部 4 项指标（H@5/10、N@5/10）上都是第一</b>，且对基线的提升通过 t 检验显著（p&lt;0.001）（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §4.2 表 2</a>）。</p>
+    <div id="bars-wrap">
+      <div style="font-weight:700;margin:14px 0 6px">Toys</div>
+      <div class="bar-row"><span>SASRec</span><div class="scorebar"><i data-w="86" style="background:#9db4dd"></i></div><b>0.0700</b></div>
+      <div class="bar-row"><span>LatentR3</span><div class="scorebar"><i data-w="97" style="background:#4d9fff"></i></div><b>0.0785</b></div>
+      <div class="bar-row"><span><b>LaRec</b></span><div class="scorebar"><i data-w="100" style="background:#1783ff"></i></div><b class="hl">0.0813</b></div>
+      <div style="font-weight:700;margin:14px 0 6px">Instruments</div>
+      <div class="bar-row"><span>SASRec</span><div class="scorebar"><i data-w="74" style="background:#9db4dd"></i></div><b>0.0762</b></div>
+      <div class="bar-row"><span>LatentR3</span><div class="scorebar"><i data-w="97" style="background:#4d9fff"></i></div><b>0.0997</b></div>
+      <div class="bar-row"><span><b>LaRec</b></span><div class="scorebar"><i data-w="100" style="background:#1783ff"></i></div><b class="hl">0.1024</b></div>
+      <div style="font-weight:700;margin:14px 0 6px">Movie（MovieLens-100K）</div>
+      <div class="bar-row"><span>SASRec</span><div class="scorebar"><i data-w="87" style="background:#9db4dd"></i></div><b>0.1431</b></div>
+      <div class="bar-row"><span>LatentR3</span><div class="scorebar"><i data-w="93" style="background:#4d9fff"></i></div><b>0.1528</b></div>
+      <div class="bar-row"><span><b>LaRec</b></span><div class="scorebar"><i data-w="100" style="background:#1783ff"></i></div><b class="hl">0.1648</b></div>
+      <div style="font-weight:700;margin:14px 0 6px">Industry（工业集）</div>
+      <div class="bar-row"><span>SASRec</span><div class="scorebar"><i data-w="65" style="background:#9db4dd"></i></div><b>0.1956</b></div>
+      <div class="bar-row"><span>LatentR3</span><div class="scorebar"><i data-w="96" style="background:#4d9fff"></i></div><b>0.2899</b></div>
+      <div class="bar-row"><span><b>LaRec</b></span><div class="scorebar"><i data-w="100" style="background:#1783ff"></i></div><b class="hl">0.3033</b></div>
+    </div>
+    <p style="font-size:13px;color:#7f8ca3">条长按各图内 LaRec=100% 归一。完整 11 个基线 × 4 指标见论文表 2。</p>
+    <div class="keyfact">论文还指出两个旁证：① LLM 类方法整体优于 ID 类方法；② <b>潜推理对两派都有增益</b>——Instruments 上 ReaRec 相对 SASRec 提升 17.71%（H@5），LaRec 相对 TallRec 提升 10.34%（H@5）/ 9.16%（N@5）（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §4.2</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔬 消融：每拆一个零件，成绩就掉一截</h3>
+    <table class="tbl">
+      <tr><th>变体</th><th>Toys H@10</th><th>Instr. H@10</th><th>Movie H@10</th><th>Industry H@10</th><th>拆了谁</th></tr>
+      <tr><td><b>LaRec 完整版</b></td><td><b>0.1073</b></td><td><b>0.1238</b></td><td><b>0.2256</b></td><td><b>0.4090</b></td><td>—</td></tr>
+      <tr><td>w/o PGD</td><td>0.1053</td><td>0.1233</td><td>0.2210</td><td>0.4061</td><td>个性化分布 → 换成普通噪声</td></tr>
+      <tr><td>w/o RL</td><td>0.1050</td><td>0.1229</td><td>0.2206</td><td>0.4058</td><td>整个 GRPO 强化对齐</td></tr>
+      <tr><td>w/o PA</td><td>0.0995</td><td>0.1190</td><td>0.2182</td><td>0.4025</td><td>过程方向对齐</td></tr>
+      <tr><td>w/o SA</td><td>0.0948</td><td>0.1142</td><td>0.2161</td><td>0.3948</td><td>逐步对齐（教师蒸馏）</td></tr>
+      <tr><td>w/o LR</td><td>0.0900</td><td>0.1106</td><td>0.2083</td><td>0.3654</td><td>潜推理整体移除</td></tr>
+    </table>
+    <p style="margin-top:12px">读法：越往下拆得越狠，掉得越多。SA（教师蒸馏）贡献最大，PA 次之，两者<b>互补</b>；PGD 与 RL 再锦上添花（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §4.3 表 3</a>）。</p>
+    <div class="analogy">像拆一台精密仪器：先拔电源适配器（RL）还能亮，再拆散热（PA）开始降频，抽掉主板（SA）基本趴窝，最后连芯片（LR）都拿走，就只剩个壳了。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📈 想几步最好？—— K=6，欠思考与过度思考都不行</h3>
+    <p>论文把推理步数 K 在 {0, 2, 4, 6, 8} 中扫描（K=0 表示不推理），两个数据集呈现一致规律：<b>性能先升后降，K=6 达峰</b>——恰好对应教师 CoT 数据中大多数样本的推理步数。步数太少，显式 CoT 的语义逻辑迁移不充分（欠思考）；步数太多则「过度思考」反而拖累（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §4.4.2 图 5</a>）。</p>
+    <div class="demo-box">
+      <div class="demo-title">▶ 滑杆探索 · 推理步数 K 对性能的影响（趋势示意）</div>
+      <canvas id="k-canvas" class="chart" style="height:240px"></canvas>
+      <div class="slider-row">
+        <label>潜推理步数 K</label>
+        <input type="range" id="k-slider" min="0" max="8" step="1" value="6">
+        <output id="k-val">6</output>
+      </div>
+      <div class="demo-readout" id="k-result">拖动滑杆，看 H@10 / N@10 随 K 的变化。峰在 K=6：左边「欠思考」，右边「过度思考」。</div>
+      <div class="caption">曲线形状为教学示意，「先升后降、K=6 达峰、有推理均优于 K=0」的趋势与论文图 5 一致（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §4.4.2</a>）。</div>
+    </div>
+    <div class="analogy">像考试时留给一道大题的思考时间：秒答是瞎蒙，适中时间发挥最好，给你无限时间反而会开始怀疑人生、改错答案。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🧱 更多分析：规模定律、注入实验、教师策略</h3>
+    <table class="tbl">
+      <tr><th>分析</th><th>结论</th></tr>
+      <tr><td>Scaling Law（图 6）</td><td>Qwen2.5 系列 0.5B→7B，LaRec 的推荐性能<b>随模型规模持续上升</b>——潜推理同样服从 LLM 的规模定律（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §4.4.3</a>）</td></tr>
+      <tr><td>表示注入实验（图 4）</td><td>把 LaRec 潜推理的 K 步状态均值池化后注入经典 SASRec，增益<b>持平甚至超过</b>注入显式 CoT 的隐状态——潜表示确实抓到了复杂用户偏好（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §4.4.1</a>）</td></tr>
+      <tr><td>教师 CoT 策略（表 5）</td><td>「面向目标」的反向 CoT 优于无目标 CoT（Industry H@10 0.4090 vs 0.4071）——带着答案出的题质量更高，且不泄露答案信息（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §4.4.6</a>）</td></tr>
+      <tr><td>超参敏感性（图 7）</td><td>α 在 0.8~1.0 附近最优；探索半径 σ 先升后降、峰值 σ=1.5——探索空间太大太小都不好（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §4.4.4</a>）</td></tr>
+    </table>
+  </div>
+
+  <div class="card fade-up">
+    <h3>⚡ 效率账单 + 线上实战</h3>
+    <div class="grid2">
+      <div>
+        <p style="font-weight:700;margin-bottom:8px">单样本推理延迟（秒，单张 H20，表 4）</p>
+        <table class="tbl">
+          <tr><th>方法</th><th>Toys</th><th>Instr.</th><th>Movie</th><th>Industry</th></tr>
+          <tr><td>TallRec（不推理）</td><td>0.20</td><td>0.23</td><td>0.16</td><td>0.56</td></tr>
+          <tr><td><b>LaRec（潜推理 K=6）</b></td><td><b>0.24</b></td><td><b>0.34</b></td><td><b>0.19</b></td><td><b>0.67</b></td></tr>
+          <tr><td>显式 CoT</td><td>2.49</td><td>2.88</td><td>2.85</td><td>3.92</td></tr>
+        </table>
+      </div>
+      <div>
+        <p style="font-weight:700;margin-bottom:8px">线上 A/B（亿级用户广告平台，为期一周，表 6）</p>
+        <table class="tbl">
+          <tr><th>指标</th><th>相对线上多通道基线</th></tr>
+          <tr><td>曝光量</td><td class="hl">+0.46%</td></tr>
+          <tr><td>消耗（Costs）</td><td class="hl">+1.39%</td></tr>
+          <tr><td>转化量</td><td class="hl">+2.93%</td></tr>
+        </table>
+        <p style="font-size:13px;color:#7f8ca3;margin-top:10px">部署方式：作为额外的 LLM 召回通道，用用户两个月点击记录构造 prompt，输出嵌入做 ANN 检索，每日更新（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §4.5</a>）。</p>
+      </div>
+    </div>
+    <div class="keyfact">潜推理的延迟<b>几乎与不推理持平</b>，只有显式 CoT 的约 1/6 ~ 1/15——这就是「效果与效率兼得」的实锤（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §4.4.5</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH4 局限与意义 ============ -->
+<section class="chapter" id="ch4">
+  <div class="chap-head"><span class="chap-num">第 4 章</span><h2>局限与意义</h2></div>
+  <p class="oneline">论文没有单设 limitation 章节，但从实验和设计中能读出一些明确的边界与权衡。</p>
+
+  <div class="card fade-up">
+    <h3>⚠️ 四条值得注意的边界</h3>
+    <table class="tbl">
+      <tr><th>边界</th><th>依据</th></tr>
+      <tr><td><b>步数 K 需要精心调</b></td><td>K 偏离 6 都会掉性能，且峰值与教师 CoT 数据的步数分布绑定——换数据分布可能要重调（论文 §4.4.2 明确讨论了欠思考/过度思考）</td></tr>
+      <tr><td><b>教师信号依赖外部强模型</b></td><td>SA 的教材质量取决于 Qwen-72B 生成的 CoT 质量；这是额外的一次性数据构造成本（论文 §3.2.1）</td></tr>
+      <tr><td><b>超参对数据分布敏感</b></td><td>论文自己承认 α、γ 在不同数据集上敏感性不同，γ 在两个数据集上的趋势甚至相反（论文 §4.4.4）</td></tr>
+      <tr><td><b>丢掉了显式推理的可读性</b></td><td>显式 CoT 的中间过程是人可检查、可纠错的；潜推理的 6 个向量是黑盒——论文 §1 提到可解释性是显式 CoT 的优势，LaRec 用效率换了它（解读性推断，非论文结论）</td></tr>
+    </table>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🌟 为什么这项工作值得读</h3>
+    <p>此前潜推理在推荐里的尝试（ReaRec、LARES、LatentR3）都被同一个问题卡住：<b>只靠最终结果监督，潜空间的「默想」教不出真推理</b>。LaRec 的贡献在于给出了一套可操作的解法——把显式 CoT 的成功经验（逐 token 监督）「翻译」成潜空间里的两种对齐（语义对齐 + 方向对齐），再把 RL 探索从随机噪声改成兴趣锚定的混合分布。结果是实打实的：全指标第一、延迟几乎不涨、一周线上 A/B 转化 +2.93%（<a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">论文 §4、§5</a>）。</p>
+    <div class="keyfact"><b>一句话总结：LaRec 证明了「让 LLM 在脑内安静推理」这件事，在推荐场景里既可以教得会、也可以管得住——而且部署得起。</b></div>
+    <p>对更广的推理研究也有启发：潜推理的两大痼疾（监督稀疏、路径确定）并不只属于推荐，LaRec 的「显式轨迹蒸馏 + 方向约束 + 锚定探索」三件套，为其他想用潜推理省 token 的场景提供了一份可参考的配方。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📎 原文与延伸阅读</h3>
+    <p>
+      📄 论文：<a class="src" href="https://arxiv.org/abs/2607.24617" target="_blank" rel="noopener">LaRec: Unleashing LLM-based Latent Reasoning for Generative Recommendation（arXiv:2607.24617）</a>
+      · <a class="src" href="https://arxiv.org/pdf/2607.24617" target="_blank" rel="noopener">PDF 全文</a><br>
+      🏫 作者团队：中国科学院大学 × 小红书（Yu Xia、Zihan Lin、Wei Yang、Rui Zhong、Cheng Chen、Huan Ren、Yao Hu）<br>
+      📚 潜推理溯源：<a class="src" href="https://arxiv.org/abs/2412.06769" target="_blank" rel="noopener">COCONUT</a> ·
+      推荐中的潜推理：<a class="src" href="https://arxiv.org/abs/2503.22675" target="_blank" rel="noopener">ReaRec</a> · <a class="src" href="https://arxiv.org/abs/2505.16865" target="_blank" rel="noopener">LARES</a> · <a class="src" href="https://arxiv.org/abs/2505.19092" target="_blank" rel="noopener">LatentR3</a><br>
+      🧠 推理与对齐：<a class="src" href="https://arxiv.org/abs/2201.11903" target="_blank" rel="noopener">Chain-of-Thought</a> · <a class="src" href="https://arxiv.org/abs/2501.12948" target="_blank" rel="noopener">DeepSeek-R1 / GRPO</a> ·
+      生成式推荐：<a class="src" href="https://arxiv.org/abs/2305.05065" target="_blank" rel="noopener">TIGER</a> · <a class="src" href="https://arxiv.org/abs/2510.11639" target="_blank" rel="noopener">OneRec-Think</a>
+    </p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    本页基于 arXiv 论文《LaRec: Unleashing LLM-based Latent Reasoning for Generative Recommendation》（arXiv:2607.24617v1，2026-07-27）整理制作 · 2026-07<br>
+    通俗类比与演示动画仅用于帮助理解，动画中的轨迹、采样点与曲线形状为教学示意；所有实验数字均直接摘自论文表 1–6 与图 4–7，技术细节以
+    <a class="src-inline" href="https://arxiv.org/abs/2607.24617" target="_blank" rel="noopener">原文</a> 为准 · 文中所有标注 ↗ 的链接均指向原始出处
+  </div>
+</footer>
+
+<script>
+/* ============ 入场动画 ============ */
+const io = new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('show');
+    e.target.querySelectorAll('.scorebar i').forEach(b=>b.style.width=b.dataset.w+'%');
+  }
+}),{threshold:.15});
+document.querySelectorAll('.fade-up').forEach(el=>io.observe(el));
+
+/* ============ 工具：高清 canvas ============ */
+function setupCanvas(id){
+  const cv=document.getElementById(id);
+  const dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  return{ctx,W,H};
+}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;
+  let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;
+  return((t^t>>>14)>>>0)/4294967296;};}
+
+/* ============ A1 对比动画：显式 CoT vs 潜推理 ============ */
+const CMP_TOKENS=40, CMP_STEPS=6;
+const CMP_TOKEN_MS=90, CMP_STEP_MS=70;
+let cmpAnim=null;
+function drawCmp(elapsed){
+  const o=setupCanvas('cmp-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=118,padR=24,rowW=W-padL-padR;
+  /* --- 上排：显式 CoT --- */
+  const y1=H*0.30;
+  ctx.fillStyle='#8fb8ff';ctx.font='bold 13px sans-serif';ctx.textAlign='left';
+  ctx.fillText('显式 CoT',14,y1-24);
+  const nCot=Math.min(CMP_TOKENS,Math.floor(elapsed/CMP_TOKEN_MS));
+  const bs=Math.min(14,(rowW-20)/CMP_TOKENS-2);
+  for(let i=0;i<CMP_TOKENS;i++){
+    const x=padL+i*(bs+2);
+    ctx.fillStyle=i<nCot?'#f7b731':'#22304f';
+    ctx.fillRect(x,y1-10,bs,bs);
+  }
+  const cotDone=nCot>=CMP_TOKENS;
+  if(cotDone){
+    ctx.fillStyle='#2bc48a';ctx.font='bold 13px sans-serif';
+    ctx.fillText('✓ 推荐答案',padL+CMP_TOKENS*(bs+2)+10,y1+4);
+  }
+  /* --- 下排：潜推理 --- */
+  const y2=H*0.68;
+  ctx.fillStyle='#8fb8ff';ctx.font='bold 13px sans-serif';
+  ctx.fillText('潜推理',14,y2-30);
+  const nLat=Math.min(CMP_STEPS,Math.floor(elapsed/CMP_STEP_MS));
+  const gap=rowW/(CMP_STEPS+2);
+  for(let i=0;i<CMP_STEPS;i++){
+    const x=padL+gap*(i+1);
+    ctx.beginPath();ctx.arc(x,y2-6,11,0,7);
+    ctx.fillStyle=i<nLat?'#4d9fff':'#22304f';ctx.fill();
+    ctx.fillStyle=i<nLat?'#0e1830':'#4a5b7d';ctx.font='bold 11px sans-serif';ctx.textAlign='center';
+    ctx.fillText('z'+(i+1),x,y2-2);
+  }
+  const latDone=nLat>=CMP_STEPS;
+  if(latDone){
+    ctx.fillStyle='#2bc48a';ctx.font='bold 13px sans-serif';ctx.textAlign='left';
+    ctx.fillText('✓ 推荐答案',padL+gap*(CMP_STEPS+1)+14,y2-2);
+  }
+  return{cotDone,latDone};
+}
+function cmpPlay(){
+  if(cmpAnim){cancelAnimationFrame(cmpAnim);cmpAnim=null;}
+  const t0=performance.now();
+  const total=CMP_TOKENS*CMP_TOKEN_MS+300;
+  const step=t=>{
+    const el=t-t0;
+    drawCmp(el);
+    if(el<total){cmpAnim=requestAnimationFrame(step);}
+    else{
+      const cotT=(CMP_TOKENS*CMP_TOKEN_MS/1000).toFixed(1);
+      const latT=(CMP_STEPS*CMP_STEP_MS/1000).toFixed(1);
+      document.getElementById('cmp-result').innerHTML=
+        '同样的答案：显式 CoT 逐字生成 '+CMP_TOKENS+' 个推理 token（示意 '+cotT+'s），潜推理只演化 '+CMP_STEPS+' 个潜向量（示意 '+latT+'s）——示意加速比 <b style="color:#ffd97a">'+Math.round(CMP_TOKEN_MS/CMP_STEP_MS*CMP_TOKENS/CMP_STEPS)+'×</b>。论文实测 CoT 与潜推理的延迟差距约 6~15 倍（表 4）。';
+      cmpAnim=null;
+    }
+  };
+  cmpAnim=requestAnimationFrame(step);
+}
+document.getElementById('cmp-play').addEventListener('click',cmpPlay);
+drawCmp(0);
+
+/* ============ A2 流程动画：逐步对齐 SA ============ */
+const SA_TEACHER=[],SA_STUDENT=[],SA_NEG=[];
+(function(){
+  const rng=mulberry32(7);
+  for(let i=0;i<6;i++)SA_TEACHER.push({x:i,jy:rng()*0.5-0.25});
+  for(let i=0;i<6;i++)SA_STUDENT.push({x:i,ox:(rng()-0.5)*0.9,oy:0.6+rng()*0.5});
+  for(let i=0;i<3;i++)SA_NEG.push({fx:0.15+rng()*0.7,fy:rng()});
+})();
+let saAnim=null;
+function saPos(frac){
+  /* frac=0 初始散乱，frac=1 对齐到教师 */
+  return SA_STUDENT.map(s=>({ox:s.ox*(1-frac)}));
+}
+function drawSa(frac){
+  const o=setupCanvas('sa-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=60,padR=40,yT=H*0.30,yS=H*0.74;
+  const gx=i=>padL+(W-padL-padR)*(i/5);
+  ctx.fillStyle='#8fb8ff';ctx.font='bold 12px sans-serif';ctx.textAlign='left';
+  ctx.fillText('教师 CoT 隐状态 hₖ',14,yT-24);
+  ctx.fillText('学生潜状态 zₖ',14,yS+26);
+  /* 负样本（他人的教师状态） */
+  SA_NEG.forEach(n=>{
+    const x=padL+n.fx*(W-padL-padR),y=yT-8+n.fy*(yS-yT);
+    ctx.beginPath();ctx.arc(x,y,6,0,7);ctx.fillStyle='#5a2f3a';ctx.fill();
+    ctx.strokeStyle='#ff6b6b';ctx.lineWidth=1.2;
+    ctx.beginPath();ctx.moveTo(x-4,y-4);ctx.lineTo(x+4,y+4);ctx.moveTo(x+4,y-4);ctx.lineTo(x-4,y+4);ctx.stroke();
+  });
+  /* 教师 */
+  SA_TEACHER.forEach((t,i)=>{
+    const x=gx(t.x),y=yT+t.jy*20;
+    ctx.beginPath();ctx.arc(x,y,9,0,7);ctx.fillStyle='#f7b731';ctx.fill();
+    ctx.fillStyle='#0e1830';ctx.font='bold 10px sans-serif';ctx.textAlign='center';
+    ctx.fillText('h'+(i+1),x,y+3);
+  });
+  /* 学生（插值到教师位置下方） */
+  saPos(frac).forEach((s,i)=>{
+    const t=SA_TEACHER[i];
+    const tx=gx(t.x),ty=yT+t.jy*20;
+    const sy0=yS, sx0=tx+s.ox*60; /* 起始在下排、带水平偏移 */
+    const cx=sx0*(1-frac)+tx*frac, cy=sy0*(1-frac)+(ty+34)*frac;
+    if(frac>0.02){
+      ctx.setLineDash([4,4]);ctx.strokeStyle='rgba(77,159,255,.5)';ctx.lineWidth=1.2;
+      ctx.beginPath();ctx.moveTo(cx,cy-9);ctx.lineTo(tx,ty+11);ctx.stroke();ctx.setLineDash([]);
+    }
+    ctx.beginPath();ctx.arc(cx,cy,9,0,7);ctx.fillStyle='#4d9fff';ctx.fill();
+    ctx.fillStyle='#0e1830';ctx.font='bold 10px sans-serif';ctx.textAlign='center';
+    ctx.fillText('z'+(i+1),cx,cy+3);
+  });
+}
+function saPlay(){
+  if(saAnim){cancelAnimationFrame(saAnim);saAnim=null;}
+  const t0=performance.now(),dur=2400;
+  const step=t=>{
+    const f=Math.min(1,(t-t0)/dur);
+    drawSa(1-Math.pow(1-f,3));
+    if(f<1){saAnim=requestAnimationFrame(step);}
+    else{
+      document.getElementById('sa-result').innerHTML=
+        '对齐完成：每个 zₖ 都贴近了对应的 hₖ（InfoNCE 分子项 ↑），并远离红叉标记的他人教师状态（分母项 ↓）。这套「逐句批改」贯穿全部 K=6 步。';
+      saAnim=null;
+    }
+  };
+  saAnim=requestAnimationFrame(step);
+}
+document.getElementById('sa-play').addEventListener('click',saPlay);
+drawSa(0);
+
+/* ============ A3 演示：语义空转 vs 方向对齐 ============ */
+let paAnim=null;
+function paPath(mode){
+  const rng=mulberry32(mode==='a'?11:12);
+  const pts=[{x:0.08,y:0.82}];
+  if(mode==='a'){
+    let x=0.08,y=0.82;
+    for(let i=0;i<30;i++){
+      x+= (rng()-0.5)*0.10; y+=(rng()-0.5)*0.10;
+      x=Math.max(0.05,Math.min(0.55,x)); y=Math.max(0.45,Math.min(0.9,y));
+      pts.push({x,y});
+    }
+  }else{
+    for(let i=1;i<=6;i++){
+      const f=i/6;
+      pts.push({x:0.08+(0.86-0.08)*f+(rng()-0.5)*0.02, y:0.82+(0.18-0.82)*f+(rng()-0.5)*0.02});
+    }
+  }
+  return pts;
+}
+function drawPa(mode,frac){
+  const o=setupCanvas('pa-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const pts=paPath(mode);
+  const tx=0.86*W,ty=0.18*H;
+  /* 目标 */
+  ctx.font='22px sans-serif';ctx.textAlign='center';
+  ctx.fillStyle='#f7b731';ctx.fillText('☆',tx,ty+8);
+  ctx.font='11px sans-serif';ctx.fillStyle='#8fb8ff';
+  ctx.fillText('目标商品方向 eₜ',tx,ty-14);
+  const n=Math.max(2,Math.floor(pts.length*frac));
+  ctx.strokeStyle=mode==='a'?'#ff6b6b':'#2bc48a';ctx.lineWidth=2.5;
+  ctx.beginPath();
+  for(let i=0;i<n;i++){
+    const x=pts[i].x*W,y=pts[i].y*H;
+    if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  /* 起点与当前点 */
+  ctx.beginPath();ctx.arc(pts[0].x*W,pts[0].y*H,6,0,7);ctx.fillStyle='#4d9fff';ctx.fill();
+  const cur=pts[n-1];
+  ctx.beginPath();ctx.arc(cur.x*W,cur.y*H,7,0,7);
+  ctx.fillStyle=mode==='a'?'#ff6b6b':'#2bc48a';ctx.fill();
+  ctx.fillStyle='#9db4dd';ctx.font='11px sans-serif';ctx.textAlign='left';
+  ctx.fillText('z₁ 起点',pts[0].x*W+10,pts[0].y*H+4);
+}
+function paPlay(mode){
+  if(paAnim){cancelAnimationFrame(paAnim);paAnim=null;}
+  const t0=performance.now(),dur=mode==='a'?2600:1800;
+  const step=t=>{
+    const f=Math.min(1,(t-t0)/dur);
+    drawPa(mode,f);
+    if(f<1){paAnim=requestAnimationFrame(step);}
+    else{
+      document.getElementById('pa-result').innerHTML= mode==='a'
+        ?'<b style="color:#ff6b6b">语义空转</b>：30 步都在起点附近兜圈，离 ☆ 越来越远——潜状态「走神」了，推理预算白白耗掉。'
+        :'<b style="color:#2bc48a">方向对齐</b>：每一步位移都被 L<sub>PA</sub> 约束指向目标方向的 1/(K−1)，6 步直路抵达 ☆ 附近。';
+      paAnim=null;
+    }
+  };
+  paAnim=requestAnimationFrame(step);
+}
+document.getElementById('pa-play-a').addEventListener('click',()=>paPlay('a'));
+document.getElementById('pa-play-b').addEventListener('click',()=>paPlay('b'));
+drawPa('b',1);
+
+/* ============ A4 滑杆探索：个性化高斯混合采样 ============ */
+const PGD_ANCHORS=[{x:0.22,y:0.30,label:'吉他'},{x:0.70,y:0.24,label:'音箱'},{x:0.30,y:0.72,label:'背带'},{x:0.76,y:0.68,label:'调音钉'}];
+const pgdRng=mulberry32(23);
+function gauss(){let u=0,v=0;while(u===0)u=pgdRng();while(v===0)v=pgdRng();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function pgdSigma(){return parseFloat(document.getElementById('pgd-sigma').value);}
+function drawPgd(samples){
+  const o=setupCanvas('pgd-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const r=pgdSigma()*38;
+  PGD_ANCHORS.forEach(a=>{
+    const x=a.x*W,y=a.y*H;
+    ctx.setLineDash([6,5]);ctx.strokeStyle='rgba(247,183,49,.55)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.arc(x,y,8,0,7);ctx.fillStyle='#f7b731';ctx.fill();
+    ctx.fillStyle='#ffd97a';ctx.font='12px sans-serif';ctx.textAlign='center';
+    ctx.fillText(a.label,x,y-14);
+  });
+  samples.forEach(s=>{
+    ctx.beginPath();ctx.arc(s.x*W,s.y*H,5.5,0,7);
+    ctx.fillStyle=s.inside?'#4d9fff':'#ff6b6b';ctx.fill();
+  });
+}
+function pgdSample(mode){
+  const sigma=pgdSigma();
+  const rPx=sigma*38;
+  const o=setupCanvas('pgd-canvas');
+  const unit=o.W;
+  const samples=[];
+  for(let i=0;i<12;i++){
+    let x,y;
+    if(mode==='gmm'){
+      const a=PGD_ANCHORS[Math.floor(pgdRng()*PGD_ANCHORS.length)];
+      x=a.x+gauss()*sigma*0.09;
+      y=a.y+gauss()*sigma*0.12;
+    }else{
+      x=0.5+gauss()*0.30;
+      y=0.5+gauss()*0.30;
+    }
+    x=Math.max(0.03,Math.min(0.97,x));y=Math.max(0.08,Math.min(0.94,y));
+    const inside=PGD_ANCHORS.some(a=>{
+      const dx=(x-a.x)*o.W,dy=(y-a.y)*o.H;
+      return Math.sqrt(dx*dx+dy*dy)<=rPx;
+    });
+    samples.push({x,y,inside});
+  }
+  drawPgd(samples);
+  const inCnt=samples.filter(s=>s.inside).length;
+  document.getElementById('pgd-result').innerHTML= mode==='gmm'
+    ?'采样 12 个推理起点 H₀：<b style="color:#4d9fff">'+inCnt+' / 12</b> 落在兴趣锚点的 σ 邻域内——探索发生在「用户真正感兴趣的街区」（σ='+sigma.toFixed(1)+'，论文取 1.5）。'
+    :'换成纯高斯噪声：只有 <b style="color:#ff6b6b">'+inCnt+' / 12</b> 碰巧落在兴趣邻域内，其余散落在语义荒漠——这正是 w/o PGD 消融全线掉分的原因（表 3）。';
+}
+document.getElementById('pgd-sample').addEventListener('click',()=>pgdSample('gmm'));
+document.getElementById('pgd-noise').addEventListener('click',()=>pgdSample('noise'));
+document.getElementById('pgd-sigma').addEventListener('input',()=>{
+  document.getElementById('pgd-sigmav').textContent=pgdSigma().toFixed(1);
+  drawPgd([]);
+});
+drawPgd([]);
+
+/* ============ A5 滑杆探索：推理步数 K 的影响（趋势示意） ============ */
+const K_H10={0:0.208,1:0.214,2:0.220,3:0.225,4:0.229,5:0.232,6:0.234,7:0.231,8:0.226};
+const K_N10={0:0.127,1:0.130,2:0.134,3:0.137,4:0.139,5:0.141,6:0.142,7:0.140,8:0.137};
+function drawK(){
+  const k=parseInt(document.getElementById('k-slider').value);
+  document.getElementById('k-val').textContent=k;
+  const o=setupCanvas('k-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=46,padR=20,padT=22,padB=34;
+  const px=v=>padL+(v/8)*(W-padL-padR);
+  const pyH=v=>padT+(1-(v-0.20)/(0.24-0.20))*(H-padT-padB);
+  const pyN=v=>padT+(1-(v-0.122)/(0.146-0.122))*(H-padT-padB);
+  /* 网格与轴 */
+  ctx.strokeStyle='#22304f';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(padL,padT);ctx.lineTo(padL,H-padB);ctx.lineTo(W-padR,H-padB);ctx.stroke();
+  ctx.fillStyle='#7f92b8';ctx.font='10px sans-serif';ctx.textAlign='center';
+  for(let i=0;i<=8;i+=2)ctx.fillText('K='+i,px(i),H-padB+16);
+  /* 曲线 */
+  function curve(data,py,color){
+    ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.beginPath();
+    for(let i=0;i<=8;i++){
+      const x=px(i),y=py(data[i]);
+      if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    for(let i=0;i<=8;i++){
+      ctx.beginPath();ctx.arc(px(i),py(data[i]),3,0,7);ctx.fillStyle=color;ctx.fill();
+    }
+  }
+  curve(K_H10,pyH,'#4d9fff');
+  curve(K_N10,pyN,'#2bc48a');
+  /* 峰值标记 */
+  ctx.setLineDash([5,4]);ctx.strokeStyle='#f7b731';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(px(6),padT);ctx.lineTo(px(6),H-padB);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#ffd97a';ctx.font='bold 11px sans-serif';ctx.textAlign='center';
+  ctx.fillText('峰值 K=6',px(6),padT-8);
+  /* 当前点 */
+  ctx.beginPath();ctx.arc(px(k),pyH(K_H10[k]),7,0,7);ctx.fillStyle='#4d9fff';ctx.fill();
+  ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+  ctx.beginPath();ctx.arc(px(k),pyN(K_N10[k]),7,0,7);ctx.fillStyle='#2bc48a';ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle='#9db4dd';ctx.font='11px sans-serif';ctx.textAlign='left';
+  ctx.fillText('— H@10（示意）',padL+8,padT+14);
+  ctx.fillStyle='#2bc48a';
+  ctx.fillText('— N@10（示意）',padL+8,padT+30);
+  let mood;
+  if(k===0)mood='不推理：基线水平';
+  else if(k<4)mood='欠思考：语义逻辑迁移不充分';
+  else if(k<=6)mood='黄金区间：K=6 达峰（与教师 CoT 步数一致）';
+  else mood='过度思考：性能开始回落';
+  document.getElementById('k-result').innerHTML=
+    'K='+k+'：H@10 ≈ <b style="color:#4d9fff">'+K_H10[k].toFixed(3)+'</b>，N@10 ≈ <b style="color:#2bc48a">'+K_N10[k].toFixed(3)+'</b>（示意值）——'+mood+'。';
+}
+document.getElementById('k-slider').addEventListener('input',drawK);
+drawK();
+</script>
+</body>
+</html>

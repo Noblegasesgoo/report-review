@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>看懂 DeCoRAG · 先「看图说话」再「按图索骥」，治好 VLM 的注意力飘移</title>
+<style>
+  :root{
+    --blue:#1783ff; --blue-d:#0b5cc4; --red:#ff6b6b; --amber:#f7b731;
+    --purple:#a55eea; --green:#2bc48a; --ink:#1b2430; --ink-soft:#48566a;
+    --bg:#f6f8fc; --card:#ffffff; --line:#e4eaf3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.8}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+
+  /* ===== Hero ===== */
+  .hero{background:linear-gradient(160deg,#0a1a3f 0%,#103a8c 55%,#1783ff 100%);
+    color:#fff;padding:72px 0 56px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+    padding:4px 14px;border-radius:99px;font-size:13px;letter-spacing:1px;margin-bottom:18px}
+  .hero h1{font-size:clamp(26px,4.6vw,44px);line-height:1.3;margin-bottom:14px}
+  .hero p.sub{font-size:clamp(14px,1.8vw,18px);opacity:.88;max-width:820px}
+  .hero .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);
+    border-radius:16px;padding:14px 22px;min-width:150px}
+  .stat b{display:block;font-size:26px;font-weight:800}
+  .stat span{font-size:13px;opacity:.85}
+
+  /* ===== Nav ===== */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  nav.toc .inner{display:flex;gap:6px;overflow-x:auto;padding:10px 22px;max-width:1060px;margin:0 auto}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--ink-soft);text-decoration:none;
+    padding:6px 12px;border-radius:99px;transition:.2s}
+  nav.toc a:hover{background:#eaf2ff;color:var(--blue-d)}
+
+  /* ===== Sections ===== */
+  section.chapter{padding:56px 0 8px}
+  .chap-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  .chap-num{font-size:14px;font-weight:800;color:#fff;background:var(--blue);
+    border-radius:10px;padding:3px 12px;letter-spacing:1px}
+  .chap-head h2{font-size:clamp(21px,3vw,30px)}
+  .oneline{color:var(--blue-d);font-weight:600;margin:4px 0 22px;font-size:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:0 2px 14px rgba(20,50,110,.05)}
+  .card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card p{margin-bottom:12px;color:#2c3a4e}
+  .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
+    border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
+  .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
+  .keyfact{position:relative;background:#eef5ff;border-left:4px solid var(--blue);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";position:absolute;left:16px;top:12px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .demo-box{background:#0e1830;border-radius:18px;padding:22px;margin:16px 0;color:#dfe8ff;
+    position:relative;overflow:hidden}
+  .demo-title{color:#8fb8ff;font-size:13px;letter-spacing:2px;font-weight:700;margin-bottom:14px;text-transform:uppercase}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:99px;padding:9px 22px;font-size:14px;
+    cursor:pointer;font-weight:600;transition:.2s;box-shadow:0 4px 14px rgba(23,131,255,.35)}
+  .btn:hover{background:var(--blue-d);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);box-shadow:none;color:#dfe8ff}
+  .btn.ghost.active{background:rgba(23,131,255,.22);border-color:#6db4ff;color:#fff}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border-radius:12px;overflow:hidden}
+  table.tbl th{background:#103a8c;color:#fff;padding:10px 12px;text-align:left;font-weight:600}
+  table.tbl td{padding:10px 12px;border-bottom:1px solid var(--line)}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl tr:nth-child(even) td{background:#f7faff}
+  .hl{color:var(--blue-d);font-weight:700}
+  .win{color:#0a9b6c;font-weight:700}
+
+  /* ===== 公式（纯 HTML/CSS，无 MathJax）===== */
+  .formula{background:#0e1830;border-radius:14px;padding:20px 22px;margin:14px 0;color:#eaf1ff;
+    font-size:clamp(15px,2.2vw,19px);text-align:center;overflow-x:auto;line-height:2;
+    font-family:"STIX Two Math","Cambria Math",Georgia,serif}
+  .formula .op{color:#8fb8ff}
+  .formula .cond{font-size:.82em;color:#9db4dd}
+  .frac{display:inline-flex;flex-direction:column;vertical-align:middle;margin:0 2px;line-height:1.4}
+  .frac .num{border-bottom:1.5px solid currentColor;padding:0 7px}
+  .frac .den{padding:0 7px}
+  .fnote{font-size:13px;color:#7f92b8;margin-top:10px;text-align:center;line-height:1.7;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  .formula var{font-style:italic}
+
+  /* ===== 结果条形图 ===== */
+  .scorebar{height:10px;border-radius:99px;background:#e7edf6;overflow:hidden;margin:4px 0 12px}
+  .scorebar i{display:block;height:100%;border-radius:99px;width:0;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+  .bar-row{display:grid;grid-template-columns:170px 1fr 64px;gap:12px;align-items:center;margin-bottom:10px;font-size:14px}
+  @media(max-width:640px){.bar-row{grid-template-columns:110px 1fr 56px}}
+  .bar-row b{text-align:right;font-variant-numeric:tabular-nums}
+  .bar-group{font-size:13px;font-weight:800;color:var(--blue-d);letter-spacing:1px;margin:18px 0 8px}
+
+  /* ===== 滑杆 ===== */
+  .slider-row{display:flex;align-items:center;gap:14px;margin:14px 0 6px;flex-wrap:wrap}
+  .slider-row label{font-size:14px;color:#9db4dd;white-space:nowrap}
+  .slider-row input[type=range]{flex:1;min-width:180px;accent-color:var(--amber)}
+  .slider-row output{color:#ffd97a;font-weight:700;min-width:56px;text-align:right;font-variant-numeric:tabular-nums}
+  canvas.chart{width:100%;height:260px;display:block;border-radius:10px;background:#0a1326}
+  .demo-readout{margin-top:14px;font-size:14.5px;line-height:1.8}
+  .caption{font-size:12.5px;color:#7f92b8;margin-top:8px;line-height:1.6}
+
+  /* ===== 来源标注 ===== */
+  .src{color:var(--blue-d);text-decoration:none;font-size:.8em;font-weight:600;
+    border-bottom:1px dashed #9db8e8;padding:0 1px;white-space:nowrap}
+  .src:hover{color:var(--blue);border-bottom-style:solid;background:#eaf2ff;border-radius:4px}
+  .src::after{content:"↗";font-size:.85em;margin-left:1px}
+  .demo-box .src, .formula .src{color:#8fb8ff;border-bottom-color:#3a5078}
+  .demo-box .src:hover{color:#cfe2ff;background:rgba(23,131,255,.15)}
+  .src-inline{color:inherit;border-bottom:1px dashed #9db8e8;text-decoration:none}
+  .src-inline:hover{color:var(--blue)}
+
+  footer{margin-top:64px;padding:34px 0 46px;color:#7f8ca3;font-size:13px;text-align:center;
+    border-top:1px solid var(--line);line-height:2}
+  .fade-up{opacity:0;transform:translateY(26px);transition:all .7s cubic-bezier(.3,.7,.3,1)}
+  .fade-up.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">arXiv 论文交互解读 · 检索增强生成</span>
+    <h1>看懂 DeCoRAG：先「看图说话」，再「按图索骥」——治好 VLM 的注意力飘移</h1>
+    <p class="sub">启元实验室团队发现：让视觉语言模型在一张复杂财报图表上「一次性」找证据、懂语义、抽关系，它的注意力会集体飘到图片左上角（视觉注意力沉没），于是开始凭想象编图谱。DeCoRAG 的对策是「认知解耦」：先让模型写一段全局描述当「语义锚」，再沿锚裁剪出高分辨率信息区块，最后分块抽图谱——精度最高提升 12.5 个百分点，建图 token 反而省 40.8%。</p>
+    <div class="stats">
+      <div class="stat"><b>+12.5%</b><span>PaperTab 上语义通过率绝对提升（vs 最强基线）</span></div>
+      <div class="stat"><b>−40.8%</b><span>离线建图 prompt token 削减，精度不降</span></div>
+      <div class="stat"><b>3 阶段</b><span>语义锚定 → RAP-Crop 裁剪 → 局部抽取</span></div>
+      <div class="stat"><b>5 个基准</b><span>SPIQA / SlideVQA / PaperTab / DocVQA / FetaTab</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="toc"><div class="inner">
+  <a href="#ch0">📄 热身：双重困境</a>
+  <a href="#ch1">🕳️ 诊断：注意力沉没</a>
+  <a href="#ch2">🧩 核心方法：认知解耦</a>
+  <a href="#ch3">📊 实验结果</a>
+  <a href="#ch4">⚖️ 局限与意义</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ============ CH0 热身 ============ -->
+<section class="chapter" id="ch0">
+  <div class="chap-head"><span class="chap-num">第 0 章</span><h2>热身：复杂文档理解的「双重困境」</h2></div>
+  <p class="oneline">从一张财报图表里抠出一个小小的数据标记，为什么又贵又容易出错？</p>
+
+  <div class="card fade-up">
+    <h3>🧱 概念基础：RAG → Graph RAG → 多模态 Graph RAG</h3>
+    <p><b>RAG（检索增强生成）</b>是开放域问答的标准范式：模型回答前先去外部知识库检索相关资料，把资料塞进上下文再作答，从而减少「凭记忆瞎编」（<a class="src" href="https://arxiv.org/abs/2005.11401" target="_blank" rel="noopener">Lewis et al. 2020</a>）。<b>Graph RAG</b> 更进一步：先把资料整理成<b>知识图谱</b>（一个个 ⟨头实体, 关系, 尾实体⟩ 三元组连成的网），检索时就能沿关系做多跳推理（<a class="src" href="https://arxiv.org/abs/2404.16130" target="_blank" rel="noopener">GraphRAG, Microsoft 2024</a>）。</p>
+    <p>当资料不是纯文本、而是财报、工程图纸、学术论文这类<b>视觉密集型文档</b>时，就得请<b>视觉语言模型（VLM）</b>出马：把页面当图片看，从中抽出实体和关系建图谱——这就是多模态 Graph RAG（如 <a class="src" href="https://arxiv.org/abs/2507.20804" target="_blank" rel="noopener">MMGraphRAG</a>）。例如从一张营收折线图中抽出 ⟨Revenue, increase by, 12%⟩ 这样的三元组（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §1、§3.2</a>）。</p>
+    <div class="analogy">传统 RAG 像「查字典」，Graph RAG 像「查地图」——不只找到地点，还能沿着路走多远跳。而多模态 Graph RAG 是要先从一张卫星照片里把道路网手绘出来，再谈导航——画图这一步出了错，后面全盘皆输。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>⚡ 困境一（精度）：信息坍缩——模型开始「凭想象画图」</h3>
+    <p>现有管线让 VLM 在<b>一次推理里同时</b>完成三件事：定位视觉证据、理解语义、抽取图谱关系。论文发现这三件事会互相争抢同一份「视觉 token 与注意力预算」，结果是 <b>Information Collapse（信息坍缩）</b>：模型频繁幻觉、只输出稀疏关系，抽出的图谱残缺不全，直接拖垮下游问答（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §1</a>）。在一个典型案例里，图中有 28 条真值关系，模型只抽出 8 条，丢了超过 70%（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §3.2</a>）。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>💸 困境二（效率）：分辨率瓶颈——token 开销的平方诅咒</h3>
+    <p>想看清坐标轴标签、脚注这种小细节，就得喂高分辨率图片；但视觉注意力的计算量随图像尺寸<b>平方增长</b>。常规补救都不好用：<b>滑动窗口</b>切块会切断跨区域的全局语义拓扑；<b>降采样</b>又让细字糊成一片（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §1</a>）。</p>
+    <p>雪上加霜的是文档图片的<b>结构化视觉稀疏性（Structural Visual Sparsity）</b>：有效信息（数据点、文字标签）在空间上是离散的，绝大部分像素是空白背景。整页高分辨率处理，等于把大把算力花在编码「空气」上——论文称之为极低的<b>有效信息密度</b>（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §3.3</a>）。</p>
+    <div class="analogy">像在空旷的停车场里找三辆特定的车：你却给每个车位都装上高清摄像头、逐帧分析——绝大部分算力都在认真观察水泥地。而「精度困境」则是：保安盯着监控看太久，注意力涣散了，开始凭印象填报表。</div>
+    <div class="keyfact">DeCoRAG 的核心主张：这两个困境是同源的——都出自「把定位、理解、抽取耦合在一次推理里」的系统级设计缺陷。解法是<b>重组管线</b>，而不是单纯换更大的 VLM（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §1</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH1 诊断 ============ -->
+<section class="chapter" id="ch1">
+  <div class="chap-head"><span class="chap-num">第 1 章</span><h2>问题诊断：视觉注意力沉没（Visual Attention Sink）</h2></div>
+  <p class="oneline">把模型「看哪里」画成热力图，答案令人意外：它根本没在看内容，而是盯着左上角发呆。</p>
+
+  <div class="card fade-up">
+    <h3>🔬 怎么看模型的「视线」：注意力聚合图</h3>
+    <p>论文用 Qwen-VL 做分析对象，提取自回归生成过程中最后一层 Transformer 的注意力权重。对每个生成的文本 token，把所有注意力头的权重平均、还原回二维空间网格，得到一张「这一刻在看哪」的空间注意力图；再把整个生成过程的图做时间平均，就得到模型全程的「视线总结」（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §3.1</a>）：</p>
+    <div class="formula">
+      <span style="text-decoration:overline"><var>M</var></span> <span class="op">=</span>
+      <span class="frac"><span class="num">1</span><span class="den"><var>L</var></span></span>
+      <span style="font-size:1.3em">∑</span><sub><var>t</var>=1</sub><sup><var>L</var></sup> <var>M</var><sub><var>t</var></sub>
+      <div class="fnote">白话翻译：把模型生成 L 个词时每一刻的「注视分布」平均起来。M̄ 越亮的区域，就是模型推理时看得越多的地方。</div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🕳️ 失败现象：注意力「逃」去了左上角</h3>
+    <p>在没有语义引导的情况下，注意力概率质量会<b>不成比例地聚集到图片左上角的 patch</b>——这与流式 LLM 中发现的「注意力沉没」（<a class="src" href="https://arxiv.org/abs/2309.17453" target="_blank" rel="noopener">StreamingLLM, ICLR 2024</a>）、以及 ViT 需要「寄存器 token」吸收冗余注意力的现象（<a class="src" href="https://arxiv.org/abs/2309.16588" target="_blank" rel="noopener">Darcet et al., ICLR 2024</a>）一脉相承。论文称之为<b>视觉注意力沉没（Visual Attention Sink）</b>（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §1、§3.2</a>）。</p>
+    <p>后果是「认知放弃」：模型不再基于视觉证据，而是凭<b>语言先验</b>编造图谱关系——把 does not overlap、part of 这类复杂拓扑约束，退化成 above、left of 这种平庸方位词（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §3.2</a>）。</p>
+    <div class="analogy">考试时题目太难，考生的眼神开始飘忽、盯着教室角落发呆，最后凭「常识」瞎填答案。左上角那个 patch 就是教室角落——什么都没装，却成了注意力的「避难所」。</div>
+
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 注意力热力图：无锚定 vs 语义锚定（热力图为示意）</div>
+      <canvas class="chart" id="sink-canvas"></canvas>
+      <div class="btn-row">
+        <button class="btn ghost active" id="sink-base">😵 Baseline：无锚定</button>
+        <button class="btn ghost" id="sink-ours">🎯 DeCoRAG：语义锚定</button>
+      </div>
+      <div class="demo-readout" id="sink-result"></div>
+      <div class="caption">热力图的网格与色块分布为教学示意；下方 readout 中的 COCR、左上角注意力质量、三元组数量均摘自论文原文（§3.2、表 1）。切换模式可见注意力从左上角「避难所」回流到内容区域。</div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🧪 是「角落里有东西」还是「边界在吸引」？对照实验一锤定音</h3>
+    <p>光观察到相关性还不够：左上角热点到底是「那里恰好有个 logo/文字」造成的，还是「边界本身」在吸引注意力？论文在 100 对 SPIQA 页面上做了<b>配对干预实验</b>，用两个指标量化——左上角注意力质量（TL Mass）和角部过集中度 COCR（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §3.5，式 (1)</a>）：</p>
+    <div class="formula">
+      COCR(<span style="text-decoration:overline"><var>M</var></span>) <span class="op">=</span>
+      <span class="frac">
+        <span class="num"><span class="frac"><span class="num">1</span><span class="den">|Ω<sub>TL</sub>|</span></span> ∑<sub>(<var>i</var>,<var>j</var>)∈Ω<sub>TL</sub></sub> <span style="text-decoration:overline"><var>M</var></span><sub><var>ij</var></sub></span>
+        <span class="den"><span class="frac"><span class="num">1</span><span class="den"><var>HW</var></span></span> ∑<sub><var>i</var>=1</sub><sup><var>H</var></sup> ∑<sub><var>j</var>=1</sub><sup><var>W</var></sup> <span style="text-decoration:overline"><var>M</var></span><sub><var>ij</var></sub></span>
+      </span>
+      <div class="fnote">白话翻译：左上角诊断窗口的<b>平均注意力密度</b> ÷ 全图平均注意力密度。COCR &gt; 1 说明左上角被「过度关注」；原始输入下 COCR 高达 3.49。</div>
+    </div>
+    <table class="tbl">
+      <tr><th>干预</th><th>目的</th><th>COCR↓</th><th>结论</th></tr>
+      <tr><td>原始输入</td><td>baseline</td><td>3.49</td><td>左上角严重过集中</td></tr>
+      <tr><td>遮住左上角像素</td><td>移除 TL 内容</td><td>3.56（+0.08）</td><td>几乎不变——<b>不是内容驱动</b></td></tr>
+      <tr><td>遮住非左上角</td><td>通用遮罩对照</td><td>6.62（+3.14）</td><td>通用遮挡反而加剧</td></tr>
+      <tr><td>左上加空白边距</td><td>移动内容边界</td><td>3.56（+0.08）</td><td>注意力「跟」去了新边界</td></tr>
+      <tr><td>右下加空白边距</td><td>画布尺寸对照</td><td>2.70（−0.79）</td><td>仅微弱的边界效应缓解</td></tr>
+      <tr><td>内容平移换布局</td><td>改变布局</td><td>12.57（+9.09）</td><td>不稳定，注意力追随新边界</td></tr>
+      <tr><td class="hl">语义锚定（本文）</td><td>改变推理先验</td><td class="win">0.80（−2.68）</td><td class="win">COCR 降 77%，TL Mass 降 69%</td></tr>
+    </table>
+    <div class="keyfact">像素级、布局级的修修补补都治不了本——沉没是<b>边界驱动的系统性现象</b>。只有「语义锚定」直接修改推理先验才奏效：100 个样本中 88 个改善（符号检验 p ≈ 1.9×10⁻¹⁵），结构化输出合法率从 75% 升到 85%（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §3.5，表 1</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📈 锚定之后：不只抽得多，还抽得「深」</h3>
+    <p>抽得多可能是灌水。论文把生成的关系按语义深度分四层：<b>L0</b> 幻觉/无效、<b>L1</b> 平庸方位（如 above）、<b>L2</b> 基础属性（如 has）、<b>L3</b> 高阶逻辑（如 increase by）。锚定前后的对比（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §3.5，表 2、图 3</a>）：</p>
+    <table class="tbl">
+      <tr><th>设置</th><th>平均三元组数</th><th>噪声率（L0+L1）↓</th><th>关系深度指数 RDI（L2+L3）↑</th><th>DSSR↑</th></tr>
+      <tr><td>无锚定</td><td>13.5</td><td>42.1%</td><td>57.3%</td><td>—</td></tr>
+      <tr><td class="hl">有锚定</td><td>15.3</td><td class="win">29.5%</td><td class="win">70.5%</td><td class="win">84.0%</td></tr>
+    </table>
+    <p style="margin-top:12px">DSSR（稠密语义保留率）84.0% 意味着：稠密基线抽到的核心逻辑事实，锚定后绝大部分仍然保留——<b>提质不以丢内容为代价</b>。</p>
+  </div>
+</section>
+
+<!-- ============ CH2 核心方法 ============ -->
+<section class="chapter" id="ch2">
+  <div class="chap-head"><span class="chap-num">第 2 章</span><h2>核心方法：认知解耦三阶段</h2></div>
+  <p class="oneline">一句话：把「一边找证据一边建图谱」的耦合任务，拆成「先描述、再裁剪、后抽取」的流水线。</p>
+
+  <div class="card fade-up">
+    <h3>🗺️ 总览：Describe-then-Extract</h3>
+    <p>DeCoRAG 把以往「端到端一把梭」的建图阶段重构成三个层级递进的阶段，阶段之间通过显式的中间产物通信——语义锚 <var>A</var>、带坐标的裁剪集合 <var>C</var>、多模态知识图谱 <var>G</var>（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §4.1，图 4</a>）：</p>
+    <table class="tbl">
+      <tr><th>阶段</th><th>做什么</th><th>治什么病</th></tr>
+      <tr><td><b>I. 全局语义锚定</b></td><td>对<b>降采样</b>全局图生成一段稠密描述（Semantic Anchor）：图表类型、结构关键点、关键洞察、关键 OCR 文本</td><td>注意力沉没：锚点把注意力头拽回语义实体</td></tr>
+      <tr><td><b>II. RAP-Crop 裁剪</b></td><td>在锚点与视觉形态学双重引导下，找出并裁出「兴趣簇」（CoI），保留原图坐标，丢弃背景</td><td>效率困境：最大化有效信息密度，token 大减</td></tr>
+      <tr><td><b>III. 局部结构抽取</b></td><td>高分辨率裁剪块 + 全局图 + 语义锚一起进 VLM，抽取三元组建图 <var>G</var></td><td>信息坍缩：高保真关系推理，无分辨率瓶颈</td></tr>
+    </table>
+    <div class="analogy">像带一位新同事看一张复杂白板：<b>第一阶段</b>先退后三步，让他口述「这是张什么图、分哪几块、关键数字是啥」（写摘要）；<b>第二阶段</b>拿剪刀把白板上有内容的几块剪下来，空白扔掉；<b>第三阶段</b>凑近了逐块精读、整理成笔记。比起一上来就怼脸细读整张白板，又快又准。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>⚓ 阶段 I：语义锚——把注意力「拽回来」</h3>
+    <p>不直接喂高分辨率原图，而是先生成一个<b>降采样全局视图</b>：保住宏观版面拓扑，又把视觉 token 数严格压住。然后让 VLM 扮演领域专家（如「科学数据分析师」）输出四样东西：①图表类型与语义 ②结构关键点（坐标轴、表头） ③关键洞察 ④关键 OCR 文本（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §4.2</a>）。</p>
+    <p>机制上，这是一记<b>强制注意力重定向</b>：要求模型先说清楚「Revenue」「12% Growth」这些具体视觉元素，等于把强语义先验注入上下文窗口，后续推理中分配给沉没区域的概率质量随之下降（这正是第 1 章表 1 最后一行量化的效果）。</p>
+    <div class="keyfact">消融实验证明锚定不是某个模型的「提示词玄学」：6 个不同规模/架构的 VLM（4B–34B）加上 Phase I 后全部提升，最大 +10.5 个百分点——它是一个可复用的系统组件（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §5.5，表 6</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>✂️ 阶段 II：RAP-Crop——双流检测 + 贪心合并 + 物理裁剪</h3>
+    <p>滑动窗口会切穿语义区块，重型目标检测器又太贵。RAP-Crop（Region-Aware Pruning and Cropping）用<b>双流架构</b>融合传统视觉先验与 VLM 语义先验（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §4.3，算法 1</a>）：</p>
+    <table class="tbl">
+      <tr><th>支流</th><th>原理</th><th>分工</th></tr>
+      <tr><td><b>Stream A 视觉密度流</b></td><td>假设图表元素（线条、坐标轴、数据标记）空间频率高：自适应阈值 + 形态学膨胀，把墨迹像素连成块</td><td>高召回：即使锚点漏了小字，密集结构也不会丢</td></tr>
+      <tr><td><b>Stream B 语义锚定流</b></td><td>用正则从语义锚中抽关键词，再用轻量 OCR 把关键词映射回原图物理坐标</td><td>防跑偏：不在「视觉密集但语义无关」的区域浪费预算</td></tr>
+    </table>
+    <p>两流框合并（B<sub>all</sub> = B<sub>vis</sub> ∪ B<sub>sem</sub>）后常有重叠碎片，于是<b>按面积从大到小贪心合并</b>：距离小于动态阈值 τ 就并成一个框，最后加 padding 裁出高分辨率子图，其余背景物理丢弃（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §4.3</a>）：</p>
+    <div class="formula">
+      τ <span class="op">=</span> ρ · min(<var>w</var>, <var>h</var>)，&nbsp;&nbsp; ρ = 0.08，padding 比例 = 0.1
+      <div class="fnote">白话翻译：两个框的距离小于「页面短边的 8%」就合并——页面越大，容忍的距离越大。ρ 扫过 0.06/0.08/0.10 时召回保持 1.00，平均裁剪数仅从 1.18 变到 1.08，对参数不敏感（论文 §5.6）。</div>
+    </div>
+
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · RAP-Crop 五步流水线（示意布局）</div>
+      <canvas class="chart" id="rap-canvas"></canvas>
+      <div class="btn-row">
+        <button class="btn" id="rap-next">▶ 下一步</button>
+        <button class="btn ghost" id="rap-reset">↺ 重置</button>
+      </div>
+      <div class="demo-readout" id="rap-result"></div>
+      <div class="caption">页面布局与框位置为教学示意，流程与论文算法 1 一致：①原始高分辨率墨迹 → ②Stream A 视觉密度框（蓝） → ③Stream B 语义 OCR 框（绿） → ④贪心合并为兴趣簇（橙） → ⑤加 padding 裁剪、丢弃背景。注意第 ③步救回了视觉流漏掉的孤立小字。</div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔍 阶段 III：锚定引导的局部抽取 + 坐标对齐</h3>
+    <p>进入最终推理的上下文是精心编排的「多粒度套餐」：视觉上 = 降采样全局图（保版面）+ 一串高分辨率裁剪块（保细节）；文本上 = 阶段 I 的语义锚（作认知先验）。每个裁剪块都带着<b>原始页面坐标 [x₁, y₁, x₂, y₂]</b>，抽出的三元组先投影回全局坐标系再合并——于是 containment、adjacency、non-overlap 这类<b>跨裁剪块</b>的关系也能恢复，裁剪块不会沦为「证据孤岛」（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §4.4</a>）。</p>
+    <p>建好图谱 <var>G</var> 后，线上检索用经典混合方案：稠密向量相似度定位相关锚点节点 → 以这些节点为起点跑 <b>Personalized PageRank</b> 拓扑遍历取子图 → 子图上下文喂给 LLM 生成答案（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §4.5</a>）。</p>
+    <div class="analogy">坐标对齐就像给剪下来的每块白板碎片贴上「原位编号」：笔记做完后还能拼回整面白板的布局——谁包含谁、谁和谁不相交，跨碎片的关系一目了然。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>💰 为什么裁剪能省这么多？视觉稀疏性的数学直觉</h3>
+    <p>prompt token 数大致正比于喂进去的像素面积；而注意力计算量随 token 数<b>平方</b>增长。所以如果只保留 60% 的面积，token 省 40%，注意力计算却省约 64%。拖动滑杆感受这个杠杆（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §1、§5.6</a>）：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 保留面积 vs token 与计算量（示意）</div>
+      <canvas class="chart" id="tok-canvas"></canvas>
+      <div class="slider-row">
+        <label>裁剪后保留的有效区域面积占比</label>
+        <input type="range" id="tok-pct" min="10" max="100" step="1" value="59">
+        <output id="tok-pctv">59%</output>
+      </div>
+      <div class="demo-readout" id="tok-result"></div>
+      <div class="caption">示意规则：prompt token ∝ 保留面积；注意力计算 ∝ token²。两条曲线以「整页处理 = 100」归一。论文实测（FetaTab 离线建图，表 8）：prompt token 99.54M → 58.91M，即 −40.8%；总 token −29.6%；VLM 请求数几乎不变（+0.1%）——省的是每次请求里的冗余视觉输入，而不是少处理文档。</div>
+    </div>
+    <div class="keyfact">关键不是「省」，而是「省了还不掉精度」：FetaTab 上端到端 SPR 从 90.3%（不裁剪）到 90.6%（RAP-Crop），统计上持平（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §5.6，表 8</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH3 实验结果 ============ -->
+<section class="chapter" id="ch3">
+  <div class="chap-head"><span class="chap-num">第 3 章</span><h2>实验结果：五个基准上的全面领先</h2></div>
+  <p class="oneline">评价口径：32B LLM 当裁判打四维加权分（事实一致性 40% / 完整性 30% / 逻辑结构 20% / 表达 10%），≥0.5 即「通过」——这就是语义通过率 SPR。</p>
+
+  <div class="card fade-up">
+    <h3>🏆 主结果：SPR 全面压制三类基线</h3>
+    <p>对比三类范式：纯文本 RAG、端到端视觉检索器（<a class="src" href="https://arxiv.org/abs/2407.01449" target="_blank" rel="noopener">ColPali</a>、ColQwen2）、多模态图框架（<a class="src" href="https://arxiv.org/abs/2507.20804" target="_blank" rel="noopener">MMGraphRAG</a>）。所有方法使用相同的基础 VLM（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §5.3，表 4</a>）：</p>
+
+    <div class="bar-group">SPIQA（科学图表，<a class="src" href="https://arxiv.org/abs/2407.14413" target="_blank" rel="noopener">基准</a>）</div>
+    <div class="bar-row"><span>DeCoRAG（本文）</span><div class="scorebar"><i data-w="89.2" style="background:linear-gradient(90deg,#1783ff,#2bc48a)"></i></div><b class="hl">89.2%</b></div>
+    <div class="bar-row"><span>ColQwen2-V1.0</span><div class="scorebar"><i data-w="86.8" style="background:#8fb8ff"></i></div><b>86.8%</b></div>
+    <div class="bar-row"><span>ColPali-V1.2</span><div class="scorebar"><i data-w="83.5" style="background:#8fb8ff"></i></div><b>83.5%</b></div>
+    <div class="bar-row"><span>Text-Only RAG</span><div class="scorebar"><i data-w="78.7" style="background:#c4d3ee"></i></div><b>78.7%</b></div>
+    <div class="bar-row"><span>MMGraphRAG</span><div class="scorebar"><i data-w="77.8" style="background:#c4d3ee"></i></div><b>77.8%</b></div>
+
+    <div class="bar-group">SlideVQA（演示文稿，版面最不规则，<a class="src" href="https://arxiv.org/abs/2301.04883" target="_blank" rel="noopener">基准</a>）</div>
+    <div class="bar-row"><span>DeCoRAG（本文）</span><div class="scorebar"><i data-w="67.3" style="background:linear-gradient(90deg,#1783ff,#2bc48a)"></i></div><b class="hl">67.3%</b></div>
+    <div class="bar-row"><span>MMGraphRAG</span><div class="scorebar"><i data-w="55.4" style="background:#8fb8ff"></i></div><b>55.4%</b></div>
+    <div class="bar-row"><span>ColQwen2-V1.0</span><div class="scorebar"><i data-w="53.5" style="background:#8fb8ff"></i></div><b>53.5%</b></div>
+    <div class="bar-row"><span>ColPali-V1.2</span><div class="scorebar"><i data-w="39.7" style="background:#c4d3ee"></i></div><b>39.7%</b></div>
+    <div class="bar-row"><span>Text-Only RAG</span><div class="scorebar"><i data-w="38.1" style="background:#c4d3ee"></i></div><b>38.1%</b></div>
+
+    <div class="bar-group">PaperTab（高密度学术表格）</div>
+    <div class="bar-row"><span>DeCoRAG（本文）</span><div class="scorebar"><i data-w="79.3" style="background:linear-gradient(90deg,#1783ff,#2bc48a)"></i></div><b class="hl">79.3%</b></div>
+    <div class="bar-row"><span>ColQwen2-V1.0</span><div class="scorebar"><i data-w="66.8" style="background:#8fb8ff"></i></div><b>66.8%</b></div>
+    <div class="bar-row"><span>MMGraphRAG</span><div class="scorebar"><i data-w="63.9" style="background:#c4d3ee"></i></div><b>63.9%</b></div>
+    <div class="bar-row"><span>Text-Only RAG</span><div class="scorebar"><i data-w="62.1" style="background:#c4d3ee"></i></div><b>62.1%</b></div>
+    <div class="bar-row"><span>ColPali-V1.2</span><div class="scorebar"><i data-w="47.7" style="background:#c4d3ee"></i></div><b>47.7%</b></div>
+
+    <div class="keyfact">布局越「极端」，优势越大：SlideVQA 上 ColPali 跌到 39.7%（正是第 1 章诊断的视觉失锚），DeCoRAG 保持 67.3%（比 ColPali 高 27.6 个百分点）；PaperTab 上比最强基线高 12.5 个百分点——即摘要中的「up to 12.5%」（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §5.3</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🧭 泛化与可信度：不只是「图表特长生」</h3>
+    <div class="grid2">
+      <div>
+        <p><b>① 常规文档 VQA（DocVQA）</b>：在 100 个随机采样、覆盖扫描件/表单/信函的页面上，DeCoRAG 取得 ANLS 0.968、精确匹配 90.0%、LLM QA 通过率 97.0%——认知解耦在图表/表格之外的常规文档上同样成立（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §5.4，表 5</a>；<a class="src" href="https://arxiv.org/abs/2007.00398" target="_blank" rel="noopener">DocVQA 基准</a>）。</p>
+      </div>
+      <div>
+        <p><b>② 裁判本身靠谱吗？</b>论文做了校准：人类标注员独立盲评 100 个答案，与 LLM 裁判的一致率 SPIQA 95%、SlideVQA 86%；检索到的图上下文对标准答案的证据召回率最高 76.8%——SPR 与人类判断对齐，不是裁判自嗨（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §5.2，表 3</a>）。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🧬 消融 I：语义锚定对所有架构都有效</h3>
+    <p>在 SlideVQA 上去掉 Phase I（w/o Semantic Anchor），Qwen3-VL（32B）的 SPR 从 67.3% 跌到 56.8%。换 6 个模型重测，提升无一例外（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §5.5，表 6</a>）：</p>
+    <table class="tbl">
+      <tr><th>模型</th><th>w/o Phase I</th><th>完整 DeCoRAG</th><th>Δ</th></tr>
+      <tr><td>Phi-3.5-Vis（4B）</td><td>47.7%</td><td>52.3%</td><td class="win">+4.6%</td></tr>
+      <tr><td>InternVL2.5（8B）</td><td>49.2%</td><td>52.7%</td><td class="win">+3.5%</td></tr>
+      <tr><td>LLaVA-OV（7B）</td><td>45.4%</td><td>53.2%</td><td class="win">+7.8%</td></tr>
+      <tr><td>Pixtral-12B</td><td>47.9%</td><td>53.7%</td><td class="win">+5.8%</td></tr>
+      <tr><td>LLaVA-v1.6（34B）</td><td>48.8%</td><td>56.4%</td><td class="win">+7.6%</td></tr>
+      <tr><td>Qwen3-VL（32B）</td><td>56.8%</td><td>67.3%</td><td class="win">+10.5%</td></tr>
+    </table>
+  </div>
+
+  <div class="card fade-up">
+    <h3>✂️ 消融 II：双流缺一不可，省了 40.8% 的 token</h3>
+    <p>在 50 个 FetaTab 查询上拆开 RAP-Crop 的两条支流（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §5.6，表 7</a>）：</p>
+    <table class="tbl">
+      <tr><th>变体</th><th>抽取 prompt tokens</th><th>抽取总 tokens</th><th>LLM QA 通过率</th></tr>
+      <tr><td>仅视觉密度流</td><td>660K</td><td>1.015M</td><td>86.0%</td></tr>
+      <tr><td>仅语义锚定流</td><td>216K</td><td>0.322M</td><td>84.0%</td></tr>
+      <tr><td class="hl">双流 RAP-Crop</td><td class="hl">411K</td><td class="hl">0.772M</td><td class="hl">86.0%</td></tr>
+    </table>
+    <p style="margin-top:12px">视觉流准但贵（保留了太多密集区域），语义流省但会漏细小视觉结构（84.0%）。双流保住视觉流的 86.0% 通过率，同时比视觉流省 37.7% prompt token。图规模也印证互补性：仅语义流 2.2K 节点/3.3K 边，双流 6.2K 节点/11.2K 边，追平仅视觉流的 6.2K/11.0K。</p>
+    <p>全量离线建图成本（FetaTab 高分辨率图像，模拟工业负载）：</p>
+    <table class="tbl">
+      <tr><th>设置</th><th>离线耗时</th><th>VLM 请求数</th><th>Prompt Tokens</th><th>输出 Tokens</th><th>总 Tokens</th></tr>
+      <tr><td>无 RAP-Crop</td><td>41.85h</td><td>124,958</td><td>99.54M</td><td>36.75M</td><td>136.29M</td></tr>
+      <tr><td>有 RAP-Crop</td><td>38.06h</td><td>125,112</td><td>58.91M</td><td>37.07M</td><td>95.98M</td></tr>
+      <tr><td class="hl">变化</td><td class="win">−9.1%</td><td>+0.1%</td><td class="win">−40.8%</td><td>+0.9%</td><td class="win">−29.6%</td></tr>
+    </table>
+    <div class="keyfact">请求数几乎不变（+0.1%）说明：省的不是「少处理文档」，而是每次请求里的冗余视觉像素——这正是结构化视觉稀疏性诊断的直接兑现（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §5.6，表 8</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH4 局限与意义 ============ -->
+<section class="chapter" id="ch4">
+  <div class="chap-head"><span class="chap-num">第 4 章</span><h2>局限与意义</h2></div>
+  <p class="oneline">机制诊断 → 系统设计 → 全面验证，这篇论文的价值在「先搞清病因，再开刀」。</p>
+
+  <div class="card fade-up">
+    <h3>⚠️ 作者自己列的三条局限</h3>
+    <table class="tbl">
+      <tr><th>局限</th><th>风险</th><th>未来方向</th></tr>
+      <tr><td>依赖阶段 I 的语义锚</td><td>锚点本身若严重幻觉，错误会沿流水线<b>级联</b></td><td>Agentic 自我纠错机制</td></tr>
+      <tr><td>Stream A 依赖形态学启发式</td><td>严重污损/退化的文档上可能失效</td><td>端到端可微分的区域路由</td></tr>
+      <tr><td>目前面向单页建图</td><td>跨页工业文档推理尚未覆盖</td><td>页间图谱构建（Inter-Page Graph）</td></tr>
+    </table>
+    <p style="margin-top:12px">（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §6</a>）</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🌟 意义：把「注意力沉没」从观察变成了可修复的工程对象</h3>
+    <p>这篇论文的贡献可以拆成三层（<a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">论文 §1 贡献列表、§7</a>）：</p>
+    <p><b>① 机制层面</b>：把「视觉注意力沉没」确认为耦合式多模态建图所暴露的<b>模型级失败模式</b>，并用注意力可视化 + 配对干预实验排除了「左上角内容伪影」的替代解释——沉没是边界驱动的，锚定才能治本。<b>② 系统层面</b>：认知解耦的 Describe-then-Extract 范式，把宏观语义规划与细粒度证据落地分开；RAP-Crop 作为「定向 token 剪枝器」，40.8% 的 prompt token 削减不以精度为代价。<b>③ 评测层面</b>：五个基准 + 人类校准的 LLM 裁判协议，端到端 SPR 与人类判断一致。</p>
+    <div class="analogy">这篇文章的范式像医生治病：先做造影（注意力可视化）找到病灶（沉没），再做对照实验确认病理（边界驱动），最后对症下药（语义锚 + 裁剪）——而不是直接给病人换一颗更强壮的心脏（更大的 VLM）。</div>
+    <div class="keyfact">一句话记住 DeCoRAG：<b>先让模型「看图说话」写下摘要当锚，再按锚把图剪成小块精读</b>——注意力不飘了，图谱就准了；背景扔掉了，账单就瘦了。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📎 原文与延伸阅读</h3>
+    <p>
+      📄 论文：<a class="src" href="https://arxiv.org/abs/2607.24554" target="_blank" rel="noopener">DeCoRAG: Cognitive Decoupling and Semantic-Aware Cropping for Complex Document Understanding（arXiv:2607.24554）</a>
+      · <a class="src" href="https://arxiv.org/pdf/2607.24554" target="_blank" rel="noopener">PDF 全文</a><br>
+      🏫 作者团队：QiYuanLab（北京）+ 北京邮电大学（通讯作者：Fang Xi）<br>
+      📚 相关工作：<a class="src" href="https://arxiv.org/abs/2404.16130" target="_blank" rel="noopener">GraphRAG（Microsoft）</a> · <a class="src" href="https://arxiv.org/abs/2407.01449" target="_blank" rel="noopener">ColPali</a> · <a class="src" href="https://arxiv.org/abs/2410.10594" target="_blank" rel="noopener">VisRAG</a> · <a class="src" href="https://arxiv.org/abs/2507.20804" target="_blank" rel="noopener">MMGraphRAG</a> · <a class="src" href="https://arxiv.org/abs/2309.17453" target="_blank" rel="noopener">StreamingLLM（注意力沉没）</a> · <a class="src" href="https://arxiv.org/abs/2309.16588" target="_blank" rel="noopener">ViT Registers</a> · <a class="src" href="https://arxiv.org/abs/2308.12966" target="_blank" rel="noopener">Qwen-VL</a>
+    </p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    本页基于 arXiv 论文《DeCoRAG: Cognitive Decoupling and Semantic-Aware Cropping for Complex Document Understanding》（arXiv:2607.24554v1，2026-07-27）整理制作 · 2026-07<br>
+    通俗类比与演示动画仅用于帮助理解，演示中的热力图、页面布局与 token 曲线为教学示意；所有实验数字均直接摘自论文表 1–8，技术细节以
+    <a class="src-inline" href="https://arxiv.org/abs/2607.24554" target="_blank" rel="noopener">原文</a> 为准 · 文中所有标注 ↗ 的链接均指向原始出处
+  </div>
+</footer>
+
+<script>
+/* ============ 入场动画 ============ */
+const io = new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('show');
+    e.target.querySelectorAll('.scorebar i').forEach(b=>b.style.width=b.dataset.w+'%');
+  }
+}),{threshold:.15});
+document.querySelectorAll('.fade-up').forEach(el=>io.observe(el));
+
+/* ============ 工具：高清 canvas ============ */
+function setupCanvas(id){
+  const cv=document.getElementById(id);
+  const dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx:ctx,W:W,H:H};
+}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;
+  let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;
+  return((t^t>>>14)>>>0)/4294967296;};}
+
+/* ============ ① 注意力热力图：沉没 vs 锚定 ============ */
+const SINK_COLS=24,SINK_ROWS=14;
+const sinkRng=mulberry32(7);
+const SINK_NOISE=[];
+for(let i=0;i<SINK_COLS*SINK_ROWS;i++)SINK_NOISE.push(sinkRng()*0.10);
+// 语义区域（锚定模式的热点中心，模拟图表内容区）
+const SINK_BLOBS=[{x:0.30,y:0.62,w:0.9},{x:0.62,y:0.55,w:0.75},{x:0.78,y:0.78,w:0.6},{x:0.45,y:0.85,w:0.55}];
+function sinkHeat(mode){
+  const h=[];
+  for(let r=0;r<SINK_ROWS;r++){
+    for(let c=0;c<SINK_COLS;c++){
+      const u=(c+0.5)/SINK_COLS,v=(r+0.5)/SINK_ROWS;
+      let val=SINK_NOISE[r*SINK_COLS+c];
+      if(mode==='base'){
+        // 左上角强热点 + 全图微弱散布
+        const d=Math.hypot(u-0.04,v-0.04);
+        val+=1.6*Math.exp(-(d*d)/(2*0.09*0.09));
+        val+=0.10*Math.exp(-(Math.hypot(u-0.6,v-0.6)**2)/(2*0.2*0.2));
+      }else{
+        // 左上角被压到极低 + 语义区热点
+        const d=Math.hypot(u-0.04,v-0.04);
+        val+=0.25*Math.exp(-(d*d)/(2*0.09*0.09));
+        SINK_BLOBS.forEach(b=>{
+          const dd=Math.hypot(u-b.x,v-b.y);
+          val+=b.w*Math.exp(-(dd*dd)/(2*0.11*0.11));
+        });
+      }
+      h.push(val);
+    }
+  }
+  return h;
+}
+const HEAT_BASE=sinkHeat('base'),HEAT_OURS=sinkHeat('ours');
+const HEAT_MAX=Math.max.apply(null,HEAT_BASE.concat(HEAT_OURS));
+let sinkMode='base',sinkAnim=null,sinkFrac=1;
+function drawSink(){
+  const o=setupCanvas('sink-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=10,padT=26,cw=(W-padL-10)/SINK_COLS,ch=(H-padT-10)/SINK_ROWS;
+  // 角落标记
+  ctx.fillStyle='#7f92b8';ctx.font='11px sans-serif';ctx.textAlign='left';
+  ctx.fillText('↖ 图片左上角',padL,14);
+  const src=sinkMode==='base'?HEAT_OURS:HEAT_BASE;
+  const dst=sinkMode==='base'?HEAT_BASE:HEAT_OURS;
+  for(let r=0;r<SINK_ROWS;r++){
+    for(let c=0;c<SINK_COLS;c++){
+      const i=r*SINK_COLS+c;
+      const raw=src[i]+(dst[i]-src[i])*sinkFrac;
+      const t=Math.min(1,raw/HEAT_MAX);
+      // 深蓝→蓝→琥珀→红 渐变色带
+      let cr,cg,cb;
+      if(t<0.33){const k=t/0.33;cr=20+23*k;cg=40+90*k;cb=90+165*k;}
+      else if(t<0.66){const k=(t-0.33)/0.33;cr=43+204*k;cg=130+53*k;cb=255-206*k;}
+      else{const k=(t-0.66)/0.34;cr=247+8*k;cg=183-76*k;cb=49-42*k;}
+      ctx.fillStyle='rgb('+Math.round(cr)+','+Math.round(cg)+','+Math.round(cb)+')';
+      ctx.fillRect(padL+c*cw+1,padT+r*ch+1,cw-2,ch-2);
+    }
+  }
+  // 左上角诊断窗口虚线框
+  ctx.setLineDash([4,4]);ctx.strokeStyle='rgba(255,255,255,.75)';ctx.lineWidth=1.5;
+  ctx.strokeRect(padL,padT,cw*5,ch*4);ctx.setLineDash([]);
+}
+function sinkReadout(){
+  if(sinkMode==='base'){
+    document.getElementById('sink-result').innerHTML=
+      '注意力死死盯在<b style="color:#ff6b6b">左上角</b>：COCR = <b style="color:#ff6b6b">3.49</b>（全图平均密度的 3.5 倍），TL Mass = 0.0146。'+
+      '典型案例：图中 28 条真值关系只抽出 <b style="color:#ff6b6b">8 条</b>（丢失超 70%），且退化成 above / left of 式平庸方位词。'+
+      '<br><span style="font-size:12.5px;color:#7f92b8">数字出自论文 §3.2 与表 1（Original 行）。</span>';
+  }else{
+    document.getElementById('sink-result').innerHTML=
+      '语义锚定后，注意力回流到<b style="color:#2bc48a">内容区域</b>：COCR = <b style="color:#2bc48a">0.80</b>（−77%），TL Mass = 0.0045（−69%）。'+
+      '典型案例恢复全部 <b style="color:#2bc48a">28 条</b>三元组，包含 non-overlap、part of 等高阶逻辑关系。'+
+      '<br><span style="font-size:12.5px;color:#7f92b8">数字出自论文 §3.4、§3.5 表 1（Semantic anchor 行：88/100 样本改善，p ≈ 1.9×10⁻¹⁵）。</span>';
+  }
+}
+function sinkPlay(){
+  if(sinkAnim)cancelAnimationFrame(sinkAnim);
+  const t0=performance.now(),dur=650;
+  const step=t=>{
+    sinkFrac=Math.min(1,(t-t0)/dur);
+    drawSink();
+    if(sinkFrac<1)sinkAnim=requestAnimationFrame(step);
+  };
+  sinkAnim=requestAnimationFrame(step);
+}
+document.getElementById('sink-base').addEventListener('click',()=>{
+  if(sinkMode==='base')return;sinkMode='base';
+  document.getElementById('sink-base').classList.add('active');
+  document.getElementById('sink-ours').classList.remove('active');
+  sinkPlay();sinkReadout();
+});
+document.getElementById('sink-ours').addEventListener('click',()=>{
+  if(sinkMode==='ours')return;sinkMode='ours';
+  document.getElementById('sink-ours').classList.add('active');
+  document.getElementById('sink-base').classList.remove('active');
+  sinkPlay();sinkReadout();
+});
+drawSink();sinkReadout();
+
+/* ============ ② RAP-Crop 五步流水线 ============ */
+// 页面坐标系 100×70；墨迹簇 + 框（x,y,w,h）
+const RAP_INK=[
+  {x:14,y:14,n:26,r:7},{x:44,y:20,n:30,r:8},{x:70,y:12,n:22,r:6},
+  {x:20,y:48,n:34,r:8},{x:55,y:50,n:24,r:7},
+  {x:86,y:42,n:5,r:2.2}  // 孤立小字（关键词，视觉流漏检）
+];
+const RAP_BOX_A=[ // Stream A 视觉密度框（蓝）
+  {x:9,y:9,w:12,h:10},{x:38,y:14,w:14,h:11},{x:65,y:8,w:11,h:9},
+  {x:14,y:43,w:14,h:11},{x:50,y:45,w:12,h:10}
+];
+const RAP_BOX_B=[ // Stream B 语义 OCR 框（绿）
+  {x:40,y:16,w:11,h:9},{x:82,y:39,w:9,h:7}
+];
+const RAP_COI=[ // 贪心合并后（橙）
+  {x:9,y:9,w:12,h:10},{x:38,y:14,w:14,h:11},{x:65,y:8,w:11,h:9},
+  {x:14,y:43,w:14,h:11},{x:50,y:45,w:12,h:10},{x:82,y:39,w:9,h:7}
+];
+const RAP_PAD=1.5;
+let rapStep=0;
+const RAP_STEPS=[
+  '第 1 步 · 输入：高分辨率文档图。灰点是「墨迹像素」（文字、线条、数据标记），其余全是空白背景——<b style="color:#ffd97a">结构化视觉稀疏性</b>：有效信息离散分布，大部分像素没有信息。',
+  '第 2 步 · <b style="color:#4d9fff">Stream A 视觉密度流</b>：自适应阈值 + 形态学膨胀，把相邻墨迹连成蓝色候选框。注意右侧中部的孤立小字<b style="color:#ff6b6b">漏检了</b>——它在降采样描述里被提到过，但墨迹太少连不成块。',
+  '第 3 步 · <b style="color:#2bc48a">Stream B 语义锚定流</b>：从语义锚里正则抽出关键词，轻量 OCR 定位回坐标，补上绿色框——<b style="color:#2bc48a">孤立小字被救回</b>，同时给密集区加了一道「语义相关性」确认。',
+  '第 4 步 · <b style="color:#f7b731">贪心合并</b>：按面积从大到小处理，距离小于 τ = 0.08 × min(w, h) 的框两两合并。蓝色大框与绿色小框重叠 → 合并为橙色兴趣簇（CoI）。',
+  '第 5 步 · <b style="color:#f7b731">加 padding 物理裁剪</b>：每个 CoI 外扩 10% 裁出高分辨率子图，其余背景<b style="color:#ff6b6b">整块丢弃</b>——冗余 token 从此不再进入 Transformer。论文实测 prompt token −40.8%（表 8）。'
+];
+function rapXY(x,y,o){return {X:o.px+x/100*o.pw,Y:o.py+y/70*o.ph};}
+function rapBox(b,o){const a=rapXY(b.x,b.y,o);return {X:a.X,Y:a.Y,W:b.w/100*o.pw,H:b.h/70*o.ph};}
+function drawRap(){
+  const o0=setupCanvas('rap-canvas'),ctx=o0.ctx,W=o0.W,H=o0.H;
+  ctx.clearRect(0,0,W,H);
+  const pw=W-24,ph=H-24,px=12,py=12;
+  const o={pw:pw,ph:ph,px:px,py:py};
+  // 页面
+  if(rapStep>=4){ctx.fillStyle='#111d38';}else{ctx.fillStyle='#13203f';}
+  ctx.fillRect(px,py,pw,ph);
+  ctx.strokeStyle='#3a5078';ctx.lineWidth=1.5;ctx.strokeRect(px,py,pw,ph);
+  // 墨迹点
+  const inkRng=mulberry32(99);
+  RAP_INK.forEach(cl=>{
+    for(let i=0;i<cl.n;i++){
+      const a=inkRng()*Math.PI*2,d=Math.sqrt(inkRng())*cl.r;
+      const p=rapXY(cl.x+Math.cos(a)*d,cl.y+Math.sin(a)*d*0.7,o);
+      ctx.fillStyle=rapStep>=4?'rgba(150,170,210,.55)':'#9db4dd';
+      ctx.fillRect(p.X-1.2,p.Y-1.2,2.4,2.4);
+    }
+  });
+  function strokeBoxes(boxes,color,width){
+    boxes.forEach(b=>{
+      const r=rapBox(b,o);
+      ctx.strokeStyle=color;ctx.lineWidth=width||2;
+      ctx.strokeRect(r.X,r.Y,r.W,r.H);
+    });
+  }
+  if(rapStep===1)strokeBoxes(RAP_BOX_A,'#4d9fff');
+  if(rapStep===2){strokeBoxes(RAP_BOX_A,'rgba(77,159,255,.45)');strokeBoxes(RAP_BOX_B,'#2bc48a');}
+  if(rapStep===3)strokeBoxes(RAP_COI,'#f7b731');
+  if(rapStep>=4){
+    // 背景调暗 + padding 裁剪框
+    ctx.fillStyle='rgba(6,10,22,.72)';ctx.fillRect(px,py,pw,ph);
+    RAP_COI.forEach(b=>{
+      const bp={x:b.x-RAP_PAD,y:b.y-RAP_PAD,w:b.w+RAP_PAD*2,h:b.h+RAP_PAD*2};
+      const r=rapBox(bp,o);
+      ctx.fillStyle='#13203f';ctx.fillRect(r.X,r.Y,r.W,r.H);
+      ctx.strokeStyle='#f7b731';ctx.lineWidth=2.5;ctx.strokeRect(r.X,r.Y,r.W,r.H);
+      // 重画框内墨迹
+      const inkRng2=mulberry32(99);
+      RAP_INK.forEach(cl=>{
+        for(let i=0;i<cl.n;i++){
+          const a=inkRng2()*Math.PI*2,d=Math.sqrt(inkRng2())*cl.r;
+          const ix=cl.x+Math.cos(a)*d,iy=cl.y+Math.sin(a)*d*0.7;
+          if(ix>=bp.x&&ix<=bp.x+bp.w&&iy>=bp.y&&iy<=bp.y+bp.h){
+            const p=rapXY(ix,iy,o);
+            ctx.fillStyle='#dfe8ff';ctx.fillRect(p.X-1.2,p.Y-1.2,2.4,2.4);
+          }
+        }
+      });
+    });
+  }
+  // 步骤指示
+  ctx.fillStyle='#8fb8ff';ctx.font='bold 12px sans-serif';ctx.textAlign='left';
+  ctx.fillText('STEP '+(rapStep+1)+' / 5',px+4,py-2<14?py+14:py-2);
+}
+function rapReadout(){
+  document.getElementById('rap-result').innerHTML=RAP_STEPS[rapStep];
+  document.getElementById('rap-next').textContent=rapStep>=4?'▶ 已到最后一步':'▶ 下一步';
+}
+document.getElementById('rap-next').addEventListener('click',()=>{
+  if(rapStep<4){rapStep++;drawRap();rapReadout();}
+});
+document.getElementById('rap-reset').addEventListener('click',()=>{
+  rapStep=0;drawRap();rapReadout();
+});
+drawRap();rapReadout();
+
+/* ============ ③ 保留面积 vs token / 计算量 ============ */
+function tokDemo(){
+  const pct=parseInt(document.getElementById('tok-pct').value);
+  document.getElementById('tok-pctv').textContent=pct+'%';
+  const o=setupCanvas('tok-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=40,padR=14,padT=22,padB=34;
+  const iw=W-padL-padR,ih=H-padT-padB;
+  // 网格
+  ctx.strokeStyle='#1c2c4e';ctx.lineWidth=1;
+  for(let g=0;g<=4;g++){
+    const y=padT+ih*g/4;
+    ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();
+    ctx.fillStyle='#5f7099';ctx.font='10px sans-serif';ctx.textAlign='right';
+    ctx.fillText(String(100-g*25),padL-6,y+3);
+  }
+  ctx.fillStyle='#5f7099';ctx.textAlign='center';
+  ctx.fillText('保留面积占比 →',padL+iw/2,H-8);
+  ctx.save();ctx.translate(11,padT+ih/2);ctx.rotate(-Math.PI/2);
+  ctx.fillText('相对开销（整页 = 100）',0,0);ctx.restore();
+  function curve(fn,color){
+    ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.beginPath();
+    for(let i=0;i<=100;i++){
+      const x=padL+iw*i/100,y=padT+ih*(1-fn(i)/100);
+      if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+  curve(p=>p,'#4d9fff');            // token：线性
+  curve(p=>p*p/100,'#f7b731');      // 注意力计算：平方
+  // 论文实测点：−40.8% prompt token → 保留约 59.2%
+  const pxp=padL+iw*59.2/100,pyp=padT+ih*(1-59.2/100);
+  ctx.setLineDash([5,4]);ctx.strokeStyle='#2bc48a';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(pxp,padT+ih);ctx.lineTo(pxp,pyp);ctx.lineTo(padL,pyp);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#2bc48a';ctx.beginPath();ctx.arc(pxp,pyp,5,0,7);ctx.fill();
+  ctx.font='11px sans-serif';ctx.textAlign='left';
+  ctx.fillText('论文实测：prompt token −40.8%（表 8）',Math.min(padL+8,pxp-150),pyp-8);
+  // 图例
+  ctx.fillStyle='#4d9fff';ctx.fillRect(padL+10,padT+6,14,4);
+  ctx.fillStyle='#9db4dd';ctx.fillText('prompt token（∝ 面积）',padL+30,padT+12);
+  ctx.fillStyle='#f7b731';ctx.fillRect(padL+190,padT+6,14,4);
+  ctx.fillStyle='#9db4dd';ctx.fillText('注意力计算（∝ token²）',padL+210,padT+12);
+  // 当前滑杆位置
+  const cx=padL+iw*pct/100;
+  ctx.setLineDash([3,3]);ctx.strokeStyle='rgba(255,217,122,.6)';
+  ctx.beginPath();ctx.moveTo(cx,padT);ctx.lineTo(cx,padT+ih);ctx.stroke();ctx.setLineDash([]);
+  const tok=(99.54*pct/100),save=(100-pct),comp=(pct*pct/100);
+  document.getElementById('tok-result').innerHTML=
+    '保留 <b style="color:#ffd97a">'+pct+'%</b> 面积 → prompt token 约 <b style="color:#4d9fff">'+tok.toFixed(1)+'M</b>（整页 99.54M 的 '+pct+'%，省 '+save+'%）；'+
+    '注意力计算量只剩 <b style="color:#ffd97a">'+comp.toFixed(0)+'%</b>（省 '+(100-comp).toFixed(0)+'%）。'+
+    (pct<=30?'裁剪越狠省得越多，但可能切掉有效证据——RAP-Crop 的意义正在于「只扔背景、不伤内容」。':
+     pct>=90?'接近整页处理，几乎没省——这正是未优化管线的处境。':
+     '论文实测点（绿色虚线）在 59% 附近：prompt token −40.8%，端到端精度持平（90.3% → 90.6%）。');
+}
+document.getElementById('tok-pct').addEventListener('input',tokDemo);
+tokDemo();
+</script>
+</body>
+</html>

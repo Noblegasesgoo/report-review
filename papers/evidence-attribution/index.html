@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>看懂证据归因：答对了却指错地方？问题不在「眼睛」，在「嘴上」</title>
+<style>
+  :root{
+    --blue:#1783ff; --blue-d:#0b5cc4; --red:#ff6b6b; --amber:#f7b731;
+    --purple:#a55eea; --green:#2bc48a; --ink:#1b2430; --ink-soft:#48566a;
+    --bg:#f6f8fc; --card:#ffffff; --line:#e4eaf3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.8}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+
+  /* ===== Hero ===== */
+  .hero{background:linear-gradient(160deg,#0a1a3f 0%,#103a8c 55%,#1783ff 100%);
+    color:#fff;padding:72px 0 56px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+    padding:4px 14px;border-radius:99px;font-size:13px;letter-spacing:1px;margin-bottom:18px}
+  .hero h1{font-size:clamp(26px,4.6vw,44px);line-height:1.3;margin-bottom:14px}
+  .hero p.sub{font-size:clamp(14px,1.8vw,18px);opacity:.88;max-width:860px}
+  .hero .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);
+    border-radius:16px;padding:14px 22px;min-width:150px}
+  .stat b{display:block;font-size:26px;font-weight:800}
+  .stat span{font-size:13px;opacity:.85}
+
+  /* ===== Nav ===== */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  nav.toc .inner{display:flex;gap:6px;overflow-x:auto;padding:10px 22px;max-width:1060px;margin:0 auto}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--ink-soft);text-decoration:none;
+    padding:6px 12px;border-radius:99px;transition:.2s}
+  nav.toc a:hover{background:#eaf2ff;color:var(--blue-d)}
+
+  /* ===== Sections ===== */
+  section.chapter{padding:56px 0 8px}
+  .chap-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  .chap-num{font-size:14px;font-weight:800;color:#fff;background:var(--blue);
+    border-radius:10px;padding:3px 12px;letter-spacing:1px}
+  .chap-head h2{font-size:clamp(21px,3vw,30px)}
+  .oneline{color:var(--blue-d);font-weight:600;margin:4px 0 22px;font-size:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:0 2px 14px rgba(20,50,110,.05)}
+  .card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card p{margin-bottom:12px;color:#2c3a4e}
+  .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
+    border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
+  .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
+  .keyfact{position:relative;background:#eef5ff;border-left:4px solid var(--blue);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";position:absolute;left:16px;top:12px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .demo-box{background:#0e1830;border-radius:18px;padding:22px;margin:16px 0;color:#dfe8ff;
+    position:relative;overflow:hidden}
+  .demo-title{color:#8fb8ff;font-size:13px;letter-spacing:2px;font-weight:700;margin-bottom:14px;text-transform:uppercase}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:99px;padding:9px 22px;font-size:14px;
+    cursor:pointer;font-weight:600;transition:.2s;box-shadow:0 4px 14px rgba(23,131,255,.35)}
+  .btn:hover{background:var(--blue-d);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);box-shadow:none;color:#dfe8ff}
+  .btn.ghost.active{background:rgba(23,131,255,.22);border-color:#6db4ff;color:#fff}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border-radius:12px;overflow:hidden}
+  table.tbl th{background:#103a8c;color:#fff;padding:10px 12px;text-align:left;font-weight:600}
+  table.tbl td{padding:10px 12px;border-bottom:1px solid var(--line)}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl tr:nth-child(even) td{background:#f7faff}
+  .tbl-scroll{overflow-x:auto}
+  .hl{color:var(--blue-d);font-weight:700}
+  .good{color:#0d9463;font-weight:700}
+  .bad{color:#d4382c;font-weight:700}
+
+  /* ===== 公式（纯 HTML/CSS，无 MathJax）===== */
+  .formula{background:#0e1830;border-radius:14px;padding:20px 22px;margin:14px 0;color:#eaf1ff;
+    font-size:clamp(15px,2.2vw,19px);text-align:center;overflow-x:auto;line-height:2;
+    font-family:"STIX Two Math","Cambria Math",Georgia,serif}
+  .formula .op{color:#8fb8ff}
+  .formula .cond{font-size:.82em;color:#9db4dd}
+  .frac{display:inline-flex;flex-direction:column;vertical-align:middle;margin:0 2px;line-height:1.4}
+  .frac .num{border-bottom:1.5px solid currentColor;padding:0 7px}
+  .frac .den{padding:0 7px}
+  .fnote{font-size:13px;color:#7f92b8;margin-top:10px;text-align:center;line-height:1.7;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  .formula var{font-style:italic}
+
+  /* ===== 结果条形图 ===== */
+  .scorebar{height:10px;border-radius:99px;background:#e7edf6;overflow:hidden;margin:4px 0 12px}
+  .scorebar i{display:block;height:100%;border-radius:99px;width:0;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+  .pair-row{display:grid;grid-template-columns:150px 1fr 1fr;gap:14px;align-items:center;margin-bottom:12px;font-size:13.5px}
+  .pair-row .nm{font-weight:600;color:#2c3a4e}
+  .pbar{position:relative;height:22px;border-radius:8px;background:#eef2f9;overflow:hidden}
+  .pbar i{position:absolute;left:0;top:0;bottom:0;border-radius:8px;width:0;transition:width 1.2s cubic-bezier(.4,0,.2,1)}
+  .pbar b{position:absolute;right:8px;top:0;line-height:22px;font-size:12px;color:#48566a;font-variant-numeric:tabular-nums}
+  .pbar.coord i{background:linear-gradient(90deg,#ff9a9a,#ff6b6b)}
+  .pbar.lang i{background:linear-gradient(90deg,#3fd9a4,#2bc48a)}
+  .legend{display:flex;gap:18px;font-size:13px;color:#48566a;margin:6px 0 16px;flex-wrap:wrap}
+  .legend span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:6px;vertical-align:-1px}
+  .legend .lg-c::before{background:#ff6b6b}
+  .legend .lg-l::before{background:#2bc48a}
+  @media(max-width:640px){.pair-row{grid-template-columns:96px 1fr 1fr}}
+
+  /* ===== 滑杆 ===== */
+  .slider-row{display:flex;align-items:center;gap:14px;margin:14px 0 6px;flex-wrap:wrap}
+  .slider-row label{font-size:14px;color:#9db4dd;white-space:nowrap}
+  .slider-row input[type=range]{flex:1;min-width:160px;accent-color:var(--amber)}
+  .slider-row output{color:#ffd97a;font-weight:700;min-width:56px;text-align:right;font-variant-numeric:tabular-nums}
+  canvas.chart{width:100%;display:block;border-radius:10px;background:#0a1326}
+  .demo-readout{margin-top:14px;font-size:14.5px;line-height:1.8}
+  .caption{font-size:12.5px;color:#7f92b8;margin-top:8px;line-height:1.6}
+
+  /* ===== 来源标注 ===== */
+  .src{color:var(--blue-d);text-decoration:none;font-size:.8em;font-weight:600;
+    border-bottom:1px dashed #9db8e8;padding:0 1px;white-space:nowrap}
+  .src:hover{color:var(--blue);border-bottom-style:solid;background:#eaf2ff;border-radius:4px}
+  .src::after{content:"↗";font-size:.85em;margin-left:1px}
+  .demo-box .src, .formula .src{color:#8fb8ff;border-bottom-color:#3a5078}
+  .demo-box .src:hover{color:#cfe2ff;background:rgba(23,131,255,.15)}
+
+  footer{margin-top:64px;padding:34px 0 46px;color:#7f8ca3;font-size:13px;text-align:center;
+    border-top:1px solid var(--line);line-height:2}
+  .fade-up{opacity:0;transform:translateY(26px);transition:all .7s cubic-bezier(.3,.7,.3,1)}
+  .fade-up.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">arXiv 论文交互解读 · 多模态大模型 / 视觉文档理解</span>
+    <h1>看懂证据归因：答对了却指错地方？问题不在「眼睛」，在「嘴上」</h1>
+    <p class="sub">阿尔托大学团队发现：让视觉语言模型用<b>坐标框</b>指出答案的证据区域时，即使答案正确，召回率也几乎为零——这不是能力缺失，而是「坐标接口」本身的表达瓶颈。改用模型最擅长的<b>自然语言原文引用</b>＋检索定位，证据召回从最多 8.1% 跃升到 26%–47%，幻觉率大致减半；再叠加一套不需要任何区域标注的 GRPO 训练，8B 模型的严格归因准确率从 22.4 提到 33.8。</p>
+    <div class="stats">
+      <div class="stat"><b>8.1 → 46.9</b><span>证据召回率（%）：坐标接口最好成绩 → 语言接口最好成绩</span></div>
+      <div class="stat"><b>97.0 → 38.6</b><span>归因幻觉率（%）区间端点变化，大致减半</span></div>
+      <div class="stat"><b>6 模型 × 4 家族</b><span>8B–31B 开源 VLM 一致复现该现象</span></div>
+      <div class="stat"><b>22.4 → 33.8</b><span>8B 模型严格归因准确率 SAA：GRPO 训练前后</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="toc"><div class="inner">
+  <a href="#ch0">🕵️ 热身：归因失效</a>
+  <a href="#ch1">📏 概念基础</a>
+  <a href="#ch2">🧩 核心方法：引用-检索</a>
+  <a href="#ch3">📊 实验结果</a>
+  <a href="#ch4">⚖️ 讨论与局限</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ============ CH0 热身 ============ -->
+<section class="chapter" id="ch0">
+  <div class="chap-head"><span class="chap-num">第 0 章</span><h2>热身：什么是「归因失效」</h2></div>
+  <p class="oneline">模型答对了问题，却指错了证据所在的位置——在金融、法律、医疗场景里，这等于没说。</p>
+
+  <div class="card fade-up">
+    <h3>📄 任务：答案必须「有据可查」</h3>
+    <p>视觉文档理解的任务设定是：一份文档 <var>D</var> 是 <var>N</var> 页页面图像的序列 (p<sub>1</sub>, …, p<sub>N</sub>)，给定问题 <var>q</var>，系统不仅要给出答案 <var>y</var>，还要给出<b>引用集</b> <var>C</var> = {(k<sub>j</sub>, b<sub>j</sub>)}——每条引用是「第几页 k + 页上一个边界框 b」。判定引用是否命中标准答案的证据框，用的是目标检测里的经典指标 <b>IoU（交并比）</b>：两个框重叠面积占并集面积的比例，同页且 IoU ≥ 0.5 才算命中（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §3</a>）：</p>
+    <div class="formula">
+      IoU(<var>b</var>, <var>b</var>*) =
+      <span class="frac"><span class="num">|<var>b</var> ∩ <var>b</var>*|</span><span class="den">|<var>b</var> ∪ <var>b</var>*|</span></span>
+      ≥ 0.5 &nbsp;<span class="cond">⟹ 命中（hit）</span>
+      <div class="fnote">白话翻译：你画的框和标准答案的框，重叠部分要占到两框总面积的一半以上。论文还区分「页级定位」（找对页）和「元素级定位」（找对页上的段落/表格/图）——标注粒度是元素级。</div>
+    </div>
+    <div class="analogy">像法庭上的证人：光说出「凶手用的是磷青铜」不够，还必须走到物证柜前，<b>把那份证据指出来</b>。答对案情却指错物证柜，证词依然不可采信。</div>
+    <p>此前的主流做法是<b>坐标接口</b>：模型直接输出边界框的坐标数字。但在 CiteVQA 这类基准上，开源模型暴露出诡异的现象——答案分可以很高（最高 91.8），证据召回却几乎为零（最好也只有 8.1%），这种「答对却指错」被称为<b>归因幻觉（Attribution Hallucination）</b>（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §1、§4</a>）。</p>
+    <div class="keyfact">本文要回答两个层层递进的问题：① 这个失败是模型<b>没有定位能力</b>，还是<b>坐标这种「说法」表达不出来</b>？② 能不能在不依赖昂贵区域标注的前提下，把归因能力练出来？（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §1</a>）</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🎬 一个真实例子：同一道题，两种「说法」</h3>
+    <p>论文 Figure 1 记录了 Qwen3-VL-8B 在一本 24 页文档上的真实表现。问题是「内部接触针脚用的具体是什么合金」。两种接口下<b>答案都正确</b>（磷青铜 phosphor-bronze），唯一的区别是证据怎么表达（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 Figure 1</a>）：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 同一个正确答案，两种指认方式（基于论文 Figure 1 复刻）</div>
+      <div class="btn-row" style="margin-top:0;margin-bottom:14px">
+        <button class="btn ghost active" id="a1-mode-coord">🔴 坐标接口：输出 bbox 坐标</button>
+        <button class="btn ghost" id="a1-mode-lang">🟢 语言接口：原文引用 + 检索</button>
+        <button class="btn" id="a1-play">▶ 播放</button>
+      </div>
+      <canvas class="chart" id="a1-canvas" width="960" height="380" style="height:auto"></canvas>
+      <div class="demo-readout" id="a1-readout">选择一种接口，点 ▶ 播放：看模型如何把「证据」表达出来。</div>
+      <div class="caption">页面布局为示意重绘；坐标模式的错框位置、IoU 0 → miss 与引用模式的 IoU 0.85 → hit 均取自论文 Figure 1 的原始记录（Qwen3-VL-8B，24 页文档第 2 页）。</div>
+    </div>
+    <div class="analogy">坐标接口像要求证人<b>默写物证柜的经纬度</b>——他心里清楚证据在哪，一落到坐标就写错行。语言接口则让他<b>把证据原文复述一遍</b>，再由书记员（检索器）按内容找回柜子——各干各擅长的。</div>
+  </div>
+</section>
+
+<!-- ============ CH1 概念基础 ============ -->
+<section class="chapter" id="ch1">
+  <div class="chap-head"><span class="chap-num">第 1 章</span><h2>概念基础：基准、语义块与指标家族</h2></div>
+  <p class="oneline">看懂后文只需三件道具：CiteVQA 评测怎么搭、版式解析器切出的「语义块」、以及六个评分指标。</p>
+
+  <div class="card fade-up">
+    <h3>🗂️ CiteVQA 与「已验证评测集」</h3>
+    <p>评测基于 <a class="src" href="https://arxiv.org/abs/2605.12882" target="_blank" rel="noopener">CiteVQA</a>（<a class="src" href="https://github.com/opendatalab/CiteVQA" target="_blank" rel="noopener">GitHub</a>）的单文档部分——一个要求模型同时给出答案和元素级框引用的双语基准。论文只做了一件谨慎的事：剔除源 PDF 已失效或标注与文档对不上的题目，留下 <b>987 题中的 719 题（72.9%）</b>，覆盖 <b>440 份 PDF</b>，页数中位数 <b>34 页</b>、最长 <b>182 页</b>。由于筛选只看标注和文档内容、不看模型输出，对两种接口一视同仁（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §4、附录 B</a>）。</p>
+    <p>标注把证据分成两类：<b>必要元素（necessary）</b>——任何正确答案都必须引用；<b>附加支持元素</b>——引了不加分、但也不算错。这个区分会直接影响下面指标的定义。</p>
+    <div class="keyfact">评测的六个模型覆盖四个家族、8B–31B：Qwen3-VL-8B / Qwen3-VL-30B-A3B、Qwen3.5-9B / Qwen3.5-27B、Gemma-3-12B、Gemma-4-31B，涵盖 dense 与 MoE、thinking 与非 thinking 变体（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §4</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🧱 语义块：版式解析器切好的「候选货架」</h3>
+    <p>语言接口的关键配角是<b>版式解析器（layout parser）</b>。论文用 <a class="src" href="https://arxiv.org/abs/2409.18839" target="_blank" rel="noopener">MinerU</a> 把每页文档切成一组带类型的<b>语义块（semantic blocks）</b>：段落、表格、图、图注……每个块 β 自带页码 k(β) 和边界框 b(β)，全部块的集合记作 B(D) = {β<sub>1</sub>, …, β<sub>n</sub>}（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §3.2</a>）。</p>
+    <div class="analogy">超市理货员提前把整本长文档<b>分格摆上货架</b>（每格贴好「页码+位置」标签）。模型不用再背坐标，只需说出「我要的那件商品长什么样」，检索器去货架上把最像的那格取下来——格子的标签就是引用框。</div>
+    <p>注意一个重要的 honest trade-off：既然引用框只能从货架格子里选，就存在<b>解析器上限（parser ceiling）</b>——即使检索完美，召回也只能达到 <b>88.2%</b>（IoU 0.5），因为有些标注元素和任何块的边界都对不齐。论文用独立的解析器 Docling 复测（上限 87.8%），确认这是文档属性而非某个解析器的偏见（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §5.2、附录 E</a>）。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🚥 指标家族：两个几何分 + 两个裁判分 + 两个综合判决</h3>
+    <table class="tbl">
+      <tr><th>指标</th><th>定义（白话）</th><th>看点</th></tr>
+      <tr><td><b>Rec</b> 召回</td><td>必要证据元素里，被同页 IoU≥0.5 命中的比例（宏平均）</td><td>「该指的指到了多少」</td></tr>
+      <tr><td><b>Prec</b> 精确率</td><td>模型引用的框里，命中任意标注证据（含附加元素）的比例</td><td>「指的东西有多少是靠谱的」</td></tr>
+      <tr><td><b>Rel</b> 相关性</td><td>裁判模型给证据相关性打 0–5 分（报告时 ×20）</td><td>裁判读了引用区域的裁剪图</td></tr>
+      <tr><td><b>Ans</b> 答案质量</td><td>裁判模型给答案打 0–5 分（×20）</td><td>答得好不好，与指得准不准分开算</td></tr>
+      <tr><td><b>SAA</b> 严格归因准确率</td><td>见下方公式</td><td>「答对 <b>且</b> 指对」的比例</td></tr>
+      <tr><td><b>AH</b> 归因幻觉率 ↓</td><td>见下方公式</td><td>「答对了却指不对」的比例，越低越好</td></tr>
+    </table>
+    <div class="formula">
+      SAA = <b>1</b><span class="cond">[</span> Ans ≥ 4 <span class="op">∧</span> ( Rel ≥ 4 <span class="op">∨</span> Rec ≥ 0.6 ) <span class="cond">]</span>
+      &nbsp;&nbsp;;&nbsp;&nbsp;
+      AH = ℙ( SAA = 0 <span class="op">|</span> Ans ≥ 4 )
+      <div class="fnote">白话翻译：SAA 要求「答案好（≥4 分）<b>并且</b>证据站得住（裁判相关性 ≥4 分 <b>或</b> 几何召回 ≥0.6）」。AH 则在所有<b>答对了</b>的题里，统计归因不达标的比例——这正是「答对却指错」的严格量化（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §4</a>）。评测裁判是 Gemini-3.5-Flash，与训练奖励裁判不是同一个模型。</div>
+    </div>
+    <div class="analogy">SAA 像驾照考试的「双科联考」：笔试（答案）和路考（指认）都过才算过。AH 则专门统计「笔试满分、路考挂科」的比例——挂科率最高时达到 97%。</div>
+  </div>
+</section>
+
+<!-- ============ CH2 核心方法 ============ -->
+<section class="chapter" id="ch2">
+  <div class="chap-head"><span class="chap-num">第 2 章</span><h2>核心方法：把「指认」拆成「复述 + 检索」</h2></div>
+  <p class="oneline">模型只负责用它最擅长的语言说出证据原文；把这段话「落」到页面区域上的脏活，交给检索管线。</p>
+
+  <div class="card fade-up">
+    <h3>🗣️ 语言接口：证据就是「原文引用」</h3>
+    <p>对比坐标接口 <var>C</var> = f<sub>θ</sub>(q, D)（模型直接吐坐标数字），语言接口让模型输出一个 JSON：一段自由答案 + 一组<b>逐字引用（verbatim quotes）</b> <var>U</var> = f<sub>θ</sub>(q, D)。每条引用必须是从某个页面区域<b>原样摘抄</b>的片段，粒度可以是句子、表格行、表格单元格、图注或脚注（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §3.1</a>）：</p>
+    <div class="formula">
+      坐标接口：<var>C</var> = f<sub>θ</sub>(<var>q</var>, <var>D</var>)
+      &nbsp;&nbsp;&nbsp;
+      语言接口：<var>C</var> = <var>A</var><span class="cond">(</span> f(<var>U</var>), f(<var>B</var>(<var>D</var>)) <span class="cond">)</span>
+      <div class="fnote">白话翻译：f 把「引用」和「候选语义块」都变成向量，A 做一对一指派。模型只产出文字 U，引用集 C 在模型之外装配出来。</div>
+    </div>
+    <p>为什么必须「逐字」而不能「自由描述」？因为一段图注、一个单元格在整本文档里几乎是唯一的，检索时一锚一个准；而对一张图的自由描述可能匹配到任何主题相似的图。这个设计还顺带解决了非文本证据：表格和图通过它们的<b>标题、单元格、注释</b>来引用——文档里约三成证据本来就是非文本的（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §3.1、§3.2</a>）。</p>
+    <div class="analogy">自由描述像跟图书管理员说「找一本讲人工智能的红皮书」——可能抱来一堆；逐字引用则像报出书里的一句原话——图书馆员按全文检索一翻就定位到那一页那一行。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔍 检索管线：裁剪图嵌入 + 匈牙利一对一指派</h3>
+    <p>引用怎么「落」到块上？四步流水线（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §3.2，式 (1)</a>）：</p>
+    <table class="tbl">
+      <tr><th>步骤</th><th>做什么</th><th>关键细节</th></tr>
+      <tr><td>① 切块</td><td>MinerU 把每页切成语义块 β<sub>1</sub>…β<sub>n</sub></td><td>每块带页码和边界框</td></tr>
+      <tr><td>② 嵌入</td><td>每块<b>渲染成裁剪图</b>，用多模态编码器（Qwen3-VL-Embedding-2B）转向量；每条引用同编码器转向量</td><td>嵌「图」而非「提取出的文本」——约 30% 证据是非文本的，渲染表格与纯文字引用在文本空间里相似度很低</td></tr>
+      <tr><td>③ 全文候选</td><td>在<b>整本文档</b>所有块里算余弦相似度 S<sub>jℓ</sub> = cos(f(u<sub>j</sub>), f(β<sub>ℓ</sub>))</td><td>故意忽略模型自己预测的页码（不可靠），避免页码错误变得不可挽回</td></tr>
+      <tr><td>④ 一对一指派</td><td>解线性指派问题，把 m 条引用配给 n 个块</td><td>匈牙利算法求解；每个块最多接收一条引用</td></tr>
+    </table>
+    <div class="formula">
+      π* = <span class="op">arg max</span><sub>π∈Π</sub>
+      <span style="font-size:1.3em">∑</span><sub><var>j</var>=1</sub><sup><var>m</var></sup>
+      <var>S</var><sub><var>j</var>,π(<var>j</var>)</sub>
+      &nbsp;&nbsp;⟹&nbsp;&nbsp;
+      <var>C</var> = { ( k(β<sub>π*(j)</sub>), b(β<sub>π*(j)</sub>) ) }<sub><var>j</var>=1</sub><sup><var>m</var></sup>
+      <div class="fnote">白话翻译：Π 是所有「每条引用各配一个互不重复的块」的方案集合，π* 是总相似度最大的那个方案。配上之后，块的页码和框直接成为引用（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §3.2 式 (1)</a>）。</div>
+    </div>
+    <p>为什么要「一对一」而不是「各找最像的」？点下面的逐步演示，看两条引用抢同一个块时，匈牙利算法如何全局调和：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 引用 → 语义块的一对一指派（示意数据）</div>
+      <div class="btn-row" style="margin-top:0;margin-bottom:14px">
+        <button class="btn" id="a2-step">▶ 下一步</button>
+        <button class="btn ghost" id="a2-reset">↺ 重置</button>
+      </div>
+      <canvas class="chart" id="a2-canvas" width="960" height="360" style="height:auto"></canvas>
+      <div class="demo-readout" id="a2-readout">3 条引用、5 个候选块。点「下一步」开始。</div>
+      <div class="caption">相似度数值为教学示意。规则与论文一致：整文档候选、余弦相似度、匈牙利算法一对一指派（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §3.2</a>）。</div>
+    </div>
+    <div class="analogy">像给 m 位客人在 n 个座位里排座：每人心里都有「最想坐的位子」，但一个位子不能坐两人。匈牙利算法就是那个<b>总满意度最大</b>的全局排座方案——有人让步坐次选，换来整体最优。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🏋️ 不用区域标注的训练：GRPO + 「答案门控」奖励</h3>
+    <p>区域级证据标注对长文档极贵。论文的巧思是：把上面这条「引用-检索」管线原封不动地当成<b>训练脚手架</b>——奖励完全由现成材料算出：问题、模型答案、<b>标准答案</b>（不是区域标注！）、以及检索回来的块裁剪图。一个 VLM 裁判看这四样东西，打三个 0–5 的整数分：答案正确性 a、证据相关性 e<sub>rel</sub>、证据覆盖度 e<sub>cov</sub>。裁判看的是<b>裁剪图而不是引用原文</b>——这样「引用得流利但配错了块」照样得低分，奖励与框级评测对齐（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §3.3</a>）。奖励定义（式 2）：</p>
+    <div class="formula">
+      <var>r</var> =
+      <span class="frac"><span class="num"><var>a</var></span><span class="den">5</span></span>
+      <span class="op">·</span>
+      <span class="frac"><span class="num"><var>e</var><sub>rel</sub> + <var>e</var><sub>cov</sub></span><span class="den">10</span></span>
+      <div class="fnote">白话翻译：证据分（满分 1）先被答案分（a/5）<b>乘性门控</b>——答案错了，证据再好也是 0 分，精准对应「归因幻觉只发生在答案正确时」的设定；两个证据分相加，则保证组内奖励有足够的方差，GRPO 才有梯度信号（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §3.3 式 (2)</a>）。</div>
+    </div>
+    <p>拖一拖三个分数，亲手感受「答案门控」的杀伤力：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 奖励公式 r = (a/5)·(e_rel + e_cov)/10</div>
+      <div class="slider-row"><label>答案正确性 a（0–5）</label><input type="range" id="rw-a" min="0" max="5" step="1" value="5"><output id="rw-av">5</output></div>
+      <div class="slider-row"><label>证据相关性 e_rel（0–5）</label><input type="range" id="rw-r" min="0" max="5" step="1" value="4"><output id="rw-rv">4</output></div>
+      <div class="slider-row"><label>证据覆盖度 e_cov（0–5）</label><input type="range" id="rw-c" min="0" max="5" step="1" value="3"><output id="rw-cv">3</output></div>
+      <canvas class="chart" id="rw-canvas" width="960" height="90" style="height:auto"></canvas>
+      <div class="demo-readout" id="rw-readout"></div>
+      <div class="caption">把 a 拖到 0：即使两个证据分全满，奖励也立刻归零——这就是乘性门控。训练用 <a class="src" href="https://arxiv.org/abs/2402.03300" target="_blank" rel="noopener">GRPO</a>：每题采样 8 个回答，组内归一化算优势，配 DAPO 非对称裁剪与 KL 惩罚；动态采样丢弃平均奖励落在保留带之外的组（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §3.3、附录 A</a>）。</div>
+    </div>
+    <div class="keyfact">训练配置：骨干 Qwen3-VL-8B（语言模型上挂 LoRA，视觉塔冻结），训练集为 LongDocURL 构建的 <b>1,584</b> 道长文档题（83 道留作验证，与评测 PDF 零重叠），奖励裁判 Qwen3.5-9B，温度 1.0 采样 n=8，训 3 个 epoch 共 144 步，用 <a class="src" href="https://github.com/hiyouga/EasyR1" target="_blank" rel="noopener">EasyR1</a> 框架；人工框标注<b>只用于验证和报告</b>，从不进入奖励（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §4</a>）。</div>
+    <div class="analogy">传统做法像请老师傅在每张考卷上<b>逐个标注证据位置</b>（区域标注，贵）；本文的做法是只给阅卷裁判一份<b>标准答案</b>，让他对照考生答案和考生翻开的课本页面打分——标注成本从「逐题画框」降成「只有答案」。</div>
+  </div>
+</section>
+
+<!-- ============ CH3 实验结果 ============ -->
+<section class="chapter" id="ch3">
+  <div class="chap-head"><span class="chap-num">第 3 章</span><h2>实验结果：换个「说法」，能力就回来了</h2></div>
+  <p class="oneline">同一批模型、同一批题，只改证据的表达方式：召回率提升近一个数量级，幻觉率大致减半。</p>
+
+  <div class="card fade-up">
+    <h3>📊 主对比：坐标 vs 语言（Table 1）</h3>
+    <p>坐标接口下，框召回率从未超过 <b>8.1%</b>，AH 在 <b>82.1%–97.0%</b> 之间——哪怕答案分高达 91.8。语言接口下，同样的骨干和输入，召回率升到 <b>25.9%–46.9%</b>，AH 降到 <b>38.6%–65.4%</b>；精确率同样从 ≤8.6% 升到 22.9%–52.7%。答案质量六个骨干里有五个在 2.3 分以内持平（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §5.1 Table 1</a>）。滚动到下面看动态对比：</p>
+    <div class="btn-row" style="margin:4px 0 12px">
+      <button class="btn ghost active tgl" data-metric="rec" style="border-color:#9db8e8;color:#48566a">召回 Rec.5</button>
+      <button class="btn ghost tgl" data-metric="ah" style="border-color:#9db8e8;color:#48566a">幻觉率 AH ↓</button>
+      <button class="btn ghost tgl" data-metric="saa" style="border-color:#9db8e8;color:#48566a">严格归因 SAA</button>
+    </div>
+    <div class="legend"><span class="lg-c">坐标接口</span><span class="lg-l">语言接口（ours）</span></div>
+    <div id="bars"></div>
+    <div class="tbl-scroll" style="margin-top:18px">
+    <table class="tbl">
+      <tr><th>模型</th><th>Rec.5</th><th>Prec</th><th>Rel</th><th>Ans</th><th>SAA</th><th>AH ↓</th></tr>
+      <tr><td colspan="7" style="background:#fdf0f0;font-weight:700">(a) 坐标接口（CiteVQA 协议复现）</td></tr>
+      <tr><td>Qwen3-VL-8B</td><td>0.3</td><td>0.3</td><td>15.0</td><td>59.6</td><td>1.4</td><td class="bad">97.0</td></tr>
+      <tr><td>Qwen3-VL-30B-A3B</td><td>1.3</td><td>4.6</td><td>15.7</td><td>61.9</td><td>3.8</td><td class="bad">92.1</td></tr>
+      <tr><td>Qwen3.5-9B</td><td>4.0</td><td>5.9</td><td>21.1</td><td>89.7</td><td>11.0</td><td class="bad">87.3</td></tr>
+      <tr><td>Qwen3.5-27B</td><td>8.1</td><td>8.6</td><td>29.1</td><td>91.8</td><td>16.1</td><td class="bad">82.1</td></tr>
+      <tr><td>Gemma-3-12B</td><td>0.3</td><td>0.3</td><td>28.0</td><td>39.5</td><td>1.0</td><td class="bad">95.9</td></tr>
+      <tr><td>Gemma-4-31B</td><td>7.8</td><td>6.6</td><td>33.0</td><td>78.7</td><td>9.2</td><td class="bad">87.1</td></tr>
+      <tr><td colspan="7" style="background:#eef9f3;font-weight:700">(b) 语言接口（本文）：同骨干，引用经检索解析</td></tr>
+      <tr><td>Qwen3-VL-8B</td><td class="good">39.9</td><td>37.6</td><td>52.0</td><td>53.4</td><td>22.4</td><td class="good">41.2</td></tr>
+      <tr><td>Qwen3-VL-30B-A3B</td><td class="good">34.9</td><td>35.1</td><td>42.7</td><td>60.3</td><td>24.7</td><td class="good">47.0</td></tr>
+      <tr><td>Qwen3.5-9B</td><td class="good">25.9</td><td>50.6</td><td>33.7</td><td>89.6</td><td>29.6</td><td class="good">65.4</td></tr>
+      <tr><td>Qwen3.5-27B</td><td class="good">46.9</td><td>52.7</td><td>52.9</td><td>90.0</td><td>51.5</td><td class="good">40.5</td></tr>
+      <tr><td>Gemma-3-12B</td><td class="good">29.9</td><td>22.9</td><td>45.8</td><td>37.2</td><td>10.7</td><td class="good">48.0</td></tr>
+      <tr><td>Gemma-4-31B</td><td class="good">44.5</td><td>45.7</td><td>56.4</td><td>77.0</td><td>42.4</td><td class="good">38.6</td></tr>
+      <tr><td>Qwen3-VL-8B + GRPO（本文）</td><td class="good"><b>51.3</b></td><td>26.5</td><td>57.4</td><td>60.4</td><td><b>33.8</b></td><td class="good"><b>28.4</b></td></tr>
+    </table>
+    </div>
+    <p style="font-size:13px;color:#7f8ca3;margin-top:8px">单位均为百分比；Rec.5 = IoU 0.5 框召回；每条件 n = 681–719。所有召回、SAA、AH 的提升均通过配对 bootstrap 与 McNemar 显著性检验（论文附录 D Table 8）。</p>
+    <div class="keyfact">答案分的两个例外都解释得通：Qwen3-VL-8B 在语言接口下降 6.2 分，可能是「必须引用」挤占了它本就不大的输出预算；Gemma-3-12B 两种接口下答案分都低，源于其较弱的中文表现而非接口效应（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §5.1、附录 C</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📉 阈值实验：坐标丢掉的是「几何」，不是「页码」</h3>
+    <p>把 IoU 要求从松到紧逐步上调，两种接口的命运截然不同。以 Qwen3-VL-8B 为例（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §5.2 Figure 3、附录 Table 4</a>）：坐标接口从页级召回 <b>30.7%</b> 崩到 IoU 0.1 的 <b>5.8%</b>、IoU 0.7 的 <b>0.0%</b>——模型常常<b>找对了页，却画不对框</b>；语言接口则从 42.3% 到 39.2% 几乎<b>拉成一条平线</b>——因为引用继承的是解析器块的天然几何，一旦配对正确，天然就是元素级精确。拖动滑杆看三个阈值下的读数：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · Qwen3-VL-8B 召回率随 IoU 阈值的变化（真实数据）</div>
+      <canvas class="chart" id="iou-canvas" width="960" height="300" style="height:auto"></canvas>
+      <div class="slider-row">
+        <label>重叠要求</label>
+        <input type="range" id="iou-t" min="0" max="4" step="1" value="3">
+        <output id="iou-tv">IoU ≥ 0.5</output>
+      </div>
+      <div class="demo-readout" id="iou-readout"></div>
+      <div class="caption">数据取自论文附录 Table 4（n=719）。虚线为解析器上限：检索完美的理论天花板。语言接口的「平」是设计使然；坐标接口的「崩」说明它在元素粒度上失效（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §5.2</a>）。</div>
+    </div>
+    <div class="analogy">坐标模型像记得「书在二楼」却记错书架格子的人；语言接口则像报出书名让管理员取——取到就是那一本，不存在「差不多那一格」。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🧪 归因消融：提升到底该记在谁头上（Table 2）</h3>
+    <p>语言条件比坐标条件多了三个部件（解析器、检索器、指派），会不会是部件本身而不是「模型的语言表达」带来了提升？论文用三组对照实验逐一排除（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §5.3 Table 2</a>）：</p>
+    <div class="tbl-scroll">
+    <table class="tbl">
+      <tr><th>骨干</th><th>raw（坐标）</th><th>+snap（坐标贴块）</th><th>q（问题检索）</th><th>q+a（问题+答案检索）</th><th>lex（词面匹配引用）</th><th>quotes（完整管线）</th></tr>
+      <tr><td>Qwen3-VL-8B</td><td>0.3</td><td>9.8</td><td>27.1</td><td>38.4</td><td>28.5</td><td class="hl">39.9</td></tr>
+      <tr><td>Qwen3-VL-30B</td><td>1.3</td><td>5.0</td><td>27.6</td><td>37.4</td><td>24.3</td><td class="hl">34.8</td></tr>
+      <tr><td>Qwen3.5-9B</td><td>3.9</td><td>14.8</td><td>22.7</td><td>32.5</td><td>20.7</td><td class="hl">25.2</td></tr>
+      <tr><td>Qwen3.5-27B</td><td>7.8</td><td>22.9</td><td>25.8</td><td>40.5</td><td>32.4</td><td class="hl">44.5</td></tr>
+      <tr><td>Gemma-3-12B</td><td>0.3</td><td>6.5</td><td>29.1</td><td>41.8</td><td>25.5</td><td class="hl">29.9</td></tr>
+      <tr><td>Gemma-4-31B</td><td>7.8</td><td>23.5</td><td>27.3</td><td>42.8</td><td>33.9</td><td class="hl">44.5</td></tr>
+      <tr><td>8B + GRPO</td><td>–</td><td>–</td><td>35.6</td><td>52.0</td><td>37.6</td><td class="hl">51.2</td></tr>
+    </table>
+    </div>
+    <p style="font-size:13px;color:#7f8ca3;margin-top:8px">单位：IoU 0.5 召回率，n=719（Table 1 用 judged 子集故略有出入）。</p>
+    <table class="tbl" style="margin-top:14px">
+      <tr><th>对照</th><th>结论</th></tr>
+      <tr><td><b>+snap</b>：把坐标框「贴」到同页重叠最大的块上</td><td>阈值崩塌消失，但召回仍只有 5.0%–23.5%，被各自的页级召回封死——<b>粒度不是缺失的那块拼图，页码才是</b></td></tr>
+      <tr><td><b>q / q+a</b>：不用引用，改用问题（+模型答案）当查询检索</td><td>仅问题检索每个骨干都输给引用管线 13–19 分；加上答案后差距大幅收窄——说明<b>位置信息本来就编码在模型生成的语言里</b>。但两种读法常命中不同的块：引用额外贡献 11.1 分覆盖，引用通道并不可省（附录 F）</td></tr>
+      <tr><td><b>lex</b>：同样的引用，用词面/BM25 匹配代替裁剪图嵌入</td><td>掉 5–14 分——多模态嵌入能解析「改述的引用」，不只靠原文照抄</td></tr>
+    </table>
+    <div class="keyfact">消融总结论：恢复出来的归因能力，靠的是<b>模型自己生成的那几段语言</b>——检索部件只是把它「翻译」成几何位置（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §5.3</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🚀 训练效果：8B 模型不花一分区域标注钱</h3>
+    <div class="grid2">
+      <div class="keyfact" style="margin:0">召回率 <b>39.9 → 51.3</b>；SAA <b>22.4 → 33.8</b>；AH <b>41.2 → 28.4</b>；页级召回 63.2 → 73.8，各 IoU 阈值均匀提升；评测裁判给相关性和答案质量都打了更高分（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §5.4</a>）。</div>
+      <div class="keyfact" style="margin:0">代价：每条回答引用数 <b>2.1 → 4.6</b> 个，引用精确率 <b>37.6 → 26.5</b>，框 F1 <b>32.2 → 28.8</b> 不升反降——部分召回提升是「多引用」买来的（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §5.4</a>）。</div>
+    </div>
+    <p style="margin-top:14px">多出来的引用是噪声吗？标注本身说不清（精确率把标注外的一切都算错）。独立裁判给出更干净的信号：在更严格的 SAA 变体（Ans≥4 ∧ Rel≥4，去掉召回析取项）下，训练模型从 <b>19.1 提到 27.4</b>（McNemar p = 6×10⁻⁷）——多引的区域大多落在标注未覆盖但确有支持作用的材料上，策略是在认真改进引用，而不是钻奖励的空子（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §6.3、附录 D</a>）。</p>
+    <p>残留错误分析还显示：训练前的漏召回大头是「<b>模型根本没引用</b>」而非检索排错序，训练的召回增益几乎全部来自这一类别——这正是奖励里覆盖度项 e<sub>cov</sub> 的设计目的（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §6.3、附录 H</a>）。</p>
+    <div class="analogy">训练前学生答题只翻一页课本；训练后学会「多翻几页、页页相关」——翻得多导致偶尔翻到无关页（精确率降），但裁判确认大多翻得对。奖励里的「覆盖度」就是在鼓励「该翻的页别落下」。</div>
+  </div>
+</section>
+
+<!-- ============ CH4 讨论 ============ -->
+<section class="chapter" id="ch4">
+  <div class="chap-head"><span class="chap-num">第 4 章</span><h2>讨论与局限：不是学不会，是没学过</h2></div>
+  <p class="oneline">坐标归因的失败是「接口伪影」而非「能力鸿沟」——但这条路线也有自己的天花板和代价。</p>
+
+  <div class="card fade-up">
+    <h3>🧭 三个支持「接口伪影」判决的证据</h3>
+    <table class="tbl">
+      <tr><th>证据</th><th>内容</th></tr>
+      <tr><td>① 换接口即恢复</td><td>若模型真的缺定位能力，换接口不该有用；实际上召回提升近一个数量级。四个家族、四倍参数量跨度上模式一致——<b>最强的坐标答题者仍有 82.1% 的正确答案指错证据，堆参数救不了坐标归因</b>（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §6.1</a>）</td></tr>
+      <tr><td>② 阈值分解</td><td>坐标框丢的是区域几何、不是页码——预测框往往是「大致正确区域」周围的粗糙矩形（论文 §6.1）</td></tr>
+      <tr><td>③ 模型「自发」用语言</td><td>坐标提示下，Qwen3-VL-30B-A3B 只有 <b>33.1%</b> 的回答能解析出框；人工检查发现其余回答不是拒答或截断，而是<b>答完题后直接用语言描述位置</b>——页码、章节标题、表名。被要求说坐标时，模型常常擅自切换成了本文提出的语言接口（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §6.2</a>）</td></tr>
+    </table>
+    <p>坐标格式并非「不可学」：闭源的 Gemini-3.1-Pro 用同样的坐标格式达到 68.9 召回、76.0 SAA（CiteVQA 完整单文档集、不同裁判，仅供参照）；自然图像上的检测式坐标输出也早已成功。结论是「<b>不是学不会，而是没学过</b>」——缺少专门定位监督的开源模型，用坐标失败、用语言成功（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §6.1、附录 Table 5</a>）。</p>
+    <div class="analogy">开源模型像一个心里门儿清但<b>从没练过默写地图坐标</b>的向导：逼他写坐标就出错，让他用嘴描述路线反而头头是道。闭源大厂给向导专门补过「坐标课」，所以人家能写对——这是训练覆盖的差异，不是智力的差异。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>⚠️ 诚实的局限清单</h3>
+    <table class="tbl">
+      <tr><th>局限</th><th>具体表现</th><th>出处</th></tr>
+      <tr><td>解析器天花板</td><td>引用框只能选解析器切出的块，IoU 0.5 上限 88.2%（多数「不可达」元素其实是粒度不匹配——块里确实含着证据）；跨解析器（Docling 87.8%）复测稳健</td><td><a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">§5.2、§6.3、附录 E</a></td></tr>
+      <tr><td>图类证据最难</td><td>元素级召回：文本 38.1–51.1、表格 34.7–44.6，图仅 9.9–19.7——图只能靠图注锚定</td><td><a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">附录 C Table 7</a></td></tr>
+      <tr><td>训练的代价</td><td>GRPO 后引用数翻倍（2.1→4.6），精确率 37.6→26.5，F1 略降；多引的引用大多有效但不是全部</td><td><a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">§5.4、§6.3</a></td></tr>
+      <tr><td>格式遵从是「因模型而异」的</td><td>语言接口也有自己的合规成本：Qwen3.5-9B 只有 49.2% 的回答含可解析引用（坐标侧最差的是 30B 的 33.1%）</td><td><a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">§6.2</a></td></tr>
+      <tr><td>依赖外部部件</td><td>需要版式解析器 + 多模态嵌入检索器；残留错误分三类：解析器未覆盖、模型没引用、指派冲突</td><td><a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">§6.3、附录 H</a></td></tr>
+    </table>
+    <div class="keyfact">意义：这项工作把「归因失败」从「模型能力问题」重新定性为「接口与监督问题」，并给出一条实用路线——<b>不需要坐标接口、不需要昂贵的区域级监督</b>，仅靠标准答案 + 检索管线做奖励，就能持续提升开源 VLM 的证据归因（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">论文 §7</a>）。对金融、法律、医疗这类「答案必须可核查」的场景，这意味着可信文档智能的门槛显著降低。</div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <p>本页面为 arXiv 论文 <a class="src" href="https://arxiv.org/abs/2607.24651" target="_blank" rel="noopener">《Evidence Attribution in Visual Document Understanding without Coordinates or Region Labels》</a>（arXiv:2607.24651，Aalto University）的中文交互解读，仅用于学习交流。</p>
+  <p>文中所有实验数字均取自论文原文（<a class="src" href="https://arxiv.org/pdf/2607.24651" target="_blank" rel="noopener">PDF</a>）：主结果 Table 1、消融 Table 2、阈值实验 Figure 3 与附录 Table 4、显著性检验附录 Table 8；动画中的相似度与页面布局为教学示意，已在图注中注明。评测基准：<a class="src" href="https://arxiv.org/abs/2605.12882" target="_blank" rel="noopener">CiteVQA</a>；解析器：<a class="src" href="https://arxiv.org/abs/2409.18839" target="_blank" rel="noopener">MinerU</a>；训练算法：<a class="src" href="https://arxiv.org/abs/2402.03300" target="_blank" rel="noopener">GRPO</a>；训练数据：<a class="src" href="https://arxiv.org/abs/2412.18426" target="_blank" rel="noopener">LongDocURL</a>；训练框架：<a class="src" href="https://github.com/hiyouga/EasyR1" target="_blank" rel="noopener">EasyR1</a>。</p>
+  <p>零依赖单文件页面 · 公式为手写 HTML/CSS · 动画为原生 Canvas/CSS</p>
+</footer>
+
+<script>
+/* ============ 入场淡入 ============ */
+(function(){
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('show'); io.unobserve(e.target); } });
+  }, {threshold:.12});
+  document.querySelectorAll('.fade-up').forEach(function(el){ io.observe(el); });
+})();
+
+/* ============ 通用 canvas 辅助 ============ */
+function ctx2d(id){
+  var c = document.getElementById(id);
+  var dpr = window.devicePixelRatio || 1;
+  var w = c.width, h = c.height;
+  c.width = w * dpr; c.height = h * dpr;
+  c.getContext('2d').setTransform(dpr,0,0,dpr,0,0);
+  c.style.maxWidth = '100%';
+  return {cv:c, ctx:c.getContext('2d'), w:w, h:h};
+}
+function rr(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+function lerp(a,b,t){ return a+(b-a)*t; }
+function clamp01(t){ return Math.max(0, Math.min(1, t)); }
+
+/* ============ A1：坐标 vs 语言 对比动画 ============ */
+(function(){
+  var env = ctx2d('a1-canvas'), ctx = env.ctx, W = env.w, H = env.h;
+  var mode = 'coord', playing = false, t0 = 0, DUR = 3000;
+  var page = {x:28, y:18, w:400, h:344};
+  var blocks = [
+    {x:page.x+20, y:page.y+16,  w:360, h:26,  label:'标题', tgt:false},
+    {x:page.x+20, y:page.y+56,  w:360, h:52,  label:'正文段落', tgt:false},
+    {x:page.x+20, y:page.y+122, w:170, h:96,  label:'示意图', tgt:false},
+    {x:page.x+210,y:page.y+122, w:170, h:96,  label:'正文段落', tgt:false},
+    {x:page.x+20, y:page.y+236, w:360, h:88,  label:'表格 · Pin: Phosphor-bronze', tgt:true}
+  ];
+  var wrongBox = {x:page.x+14, y:page.y+116, w:184, h:108};
+  var out = document.getElementById('a1-readout');
+
+  function drawPage(){
+    ctx.fillStyle = '#f4f7fc'; rr(ctx,page.x,page.y,page.w,page.h,8); ctx.fill();
+    ctx.strokeStyle = '#31456e'; ctx.lineWidth = 1.5; rr(ctx,page.x,page.y,page.w,page.h,8); ctx.stroke();
+    blocks.forEach(function(b){
+      ctx.fillStyle = b.tgt ? '#e3ecff' : '#dde5f2';
+      rr(ctx,b.x,b.y,b.w,b.h,5); ctx.fill();
+      ctx.strokeStyle = '#9fb2d8'; ctx.lineWidth = 1; rr(ctx,b.x,b.y,b.w,b.h,5); ctx.stroke();
+      ctx.fillStyle = '#4a5b80'; ctx.font = '12px sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText(b.label, b.x+8, b.y+ (b.tgt? 22 : b.h/2+4));
+      if(b.tgt){
+        ctx.fillStyle = '#31456e'; ctx.font = '13px monospace';
+        ctx.fillText('| Pin  | Phosphor-bronze |', b.x+14, b.y+50);
+        ctx.fillText('| ...  | ...             |', b.x+14, b.y+70);
+      }
+    });
+    ctx.fillStyle = '#8ea2cc'; ctx.font = '12px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('文档第 2 页（共 24 页）· 语义块为示意', page.x+6, page.y+page.h+18);
+  }
+  function drawAnswer(){
+    ctx.fillStyle = '#13224a'; rr(ctx,470,26,462,64,10); ctx.fill();
+    ctx.strokeStyle = '#2e4a8c'; rr(ctx,470,26,462,64,10); ctx.stroke();
+    ctx.fillStyle = '#8fb8ff'; ctx.font = '12px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('问题：内部接触针脚用的是什么合金？', 486, 48);
+    ctx.fillStyle = '#7fe3b0'; ctx.font = 'bold 14px sans-serif';
+    ctx.fillText('answer: “…are made of phosphor bronze” ✓ 两种接口都答对', 486, 72);
+  }
+  function drawGroundTruth(alpha){
+    var b = blocks[4];
+    ctx.save(); ctx.globalAlpha = alpha;
+    ctx.strokeStyle = '#2bc48a'; ctx.lineWidth = 2; ctx.setLineDash([7,5]);
+    rr(ctx,b.x-4,b.y-4,b.w+8,b.h+8,7); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#2bc48a'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('ground truth 证据框', b.x+10, b.y-10);
+    ctx.restore();
+  }
+  function frameCoord(t){
+    drawPage(); drawAnswer();
+    var p1 = clamp01(t/1200);            // 画错框
+    if(p1 > 0){
+      ctx.strokeStyle = '#ff6b6b'; ctx.lineWidth = 3;
+      var per = 2*(wrongBox.w+wrongBox.h)*p1, x=wrongBox.x, y=wrongBox.y, d;
+      ctx.beginPath(); ctx.moveTo(x,y);
+      d = Math.min(per, wrongBox.w); ctx.lineTo(x+d,y); per -= d;
+      if(per>0){ d=Math.min(per,wrongBox.h); ctx.lineTo(x+wrongBox.w,y+d); per-=d; }
+      if(per>0){ d=Math.min(per,wrongBox.w); ctx.lineTo(x+wrongBox.w-d,y+wrongBox.h); per-=d; }
+      if(per>0){ d=Math.min(per,wrongBox.h); ctx.lineTo(x,y+wrongBox.h-d); }
+      ctx.stroke();
+      ctx.fillStyle = '#ff6b6b'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'left';
+      if(p1>=1) ctx.fillText('<bbox page="2" x1="34" y1="134" x2="218" y2="242"/>', wrongBox.x-6, wrongBox.y-8);
+    }
+    if(t > 1400){ drawGroundTruth(clamp01((t-1400)/400)); }
+    if(t > 1900){
+      var a = clamp01((t-1900)/300);
+      ctx.save(); ctx.globalAlpha = a;
+      ctx.fillStyle = '#3a1620'; rr(ctx,470,120,462,86,10); ctx.fill();
+      ctx.strokeStyle = '#ff6b6b'; rr(ctx,470,120,462,86,10); ctx.stroke();
+      ctx.fillStyle = '#ff9a9a'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText('IoU 0 ⟶ miss ❌', 490, 152);
+      ctx.fillStyle = '#dfe8ff'; ctx.font = '13px sans-serif';
+      ctx.fillText('框画在了别的段落上：答案对，指认错 → 归因幻觉', 490, 178);
+      ctx.restore();
+    }
+  }
+  function frameLang(t){
+    drawPage(); drawAnswer();
+    var chip = {x:470, y:120, w:462, h:56};
+    var p1 = clamp01(t/600);
+    if(p1 > 0){
+      ctx.save(); ctx.globalAlpha = p1;
+      ctx.fillStyle = '#122b22'; rr(ctx,chip.x,chip.y,chip.w,chip.h,10); ctx.fill();
+      ctx.strokeStyle = '#2bc48a'; rr(ctx,chip.x,chip.y,chip.w,chip.h,10); ctx.stroke();
+      ctx.fillStyle = '#7fe3b0'; ctx.font = 'bold 13px monospace'; ctx.textAlign = 'left';
+      ctx.fillText('"quote": "Pin: Phosphor-bronze"', chip.x+18, chip.y+34);
+      ctx.restore();
+    }
+    var tgt = blocks[4];
+    var sx = chip.x+30, sy = chip.y+chip.h;
+    var ex = tgt.x+tgt.w-30, ey = tgt.y+tgt.h/2;
+    if(t > 700){
+      var p2 = clamp01((t-700)/900);
+      var mx = lerp(sx,ex,p2), my = lerp(sy,ey,p2) - Math.sin(p2*Math.PI)*60;
+      ctx.strokeStyle = 'rgba(43,196,138,.45)'; ctx.lineWidth = 2; ctx.setLineDash([4,6]);
+      ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(mx,my); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = '#ffd97a'; ctx.beginPath(); ctx.arc(mx,my,6,0,7); ctx.fill();
+      if(p2 >= 1){
+        ctx.strokeStyle = '#2bc48a'; ctx.lineWidth = 3;
+        rr(ctx,tgt.x-4,tgt.y-4,tgt.w+8,tgt.h+8,7); ctx.stroke();
+        ctx.fillStyle = '#2bc48a'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'left';
+        ctx.fillText('检索命中：嵌入 + 一对一指派', tgt.x+36, tgt.y-10);
+      }
+    }
+    if(t > 1900){
+      drawGroundTruth(clamp01((t-1900)/300));
+      var a = clamp01((t-1900)/300);
+      ctx.save(); ctx.globalAlpha = a;
+      ctx.fillStyle = '#0f2e22'; rr(ctx,470,196,462,86,10); ctx.fill();
+      ctx.strokeStyle = '#2bc48a'; rr(ctx,470,196,462,86,10); ctx.stroke();
+      ctx.fillStyle = '#7fe3b0'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText('IoU 0.85 ⟶ hit ✅', 490, 228);
+      ctx.fillStyle = '#dfe8ff'; ctx.font = '13px sans-serif';
+      ctx.fillText('模型只说原文，检索器把引用「落」到正确的块上', 490, 254);
+      ctx.restore();
+    }
+  }
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#0a1326'; ctx.fillRect(0,0,W,H);
+    if(playing){
+      var t = performance.now() - t0;
+      if(t > DUR){ t = DUR; playing = false; }
+      if(mode === 'coord') frameCoord(t); else frameLang(t);
+      if(playing) requestAnimationFrame(draw);
+    } else {
+      drawPage(); drawAnswer();
+      ctx.fillStyle = '#7f92b8'; ctx.font = '14px sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText(mode === 'coord' ? '坐标接口：模型直接输出边界框坐标……' : '语言接口：模型输出原文引用，检索器定位……', 470, 150);
+    }
+  }
+  function setMode(m){
+    mode = m; playing = false;
+    document.getElementById('a1-mode-coord').classList.toggle('active', m==='coord');
+    document.getElementById('a1-mode-lang').classList.toggle('active', m==='lang');
+    out.textContent = m === 'coord'
+      ? '坐标接口：答案正确，但 bbox 画错了位置（IoU 0 → miss）。'
+      : '语言接口：引用原文经嵌入检索命中正确块（IoU 0.85 → hit）。';
+    draw();
+  }
+  document.getElementById('a1-mode-coord').addEventListener('click', function(){ setMode('coord'); });
+  document.getElementById('a1-mode-lang').addEventListener('click', function(){ setMode('lang'); });
+  document.getElementById('a1-play').addEventListener('click', function(){
+    playing = true; t0 = performance.now(); requestAnimationFrame(draw);
+  });
+  draw();
+})();
+
+/* ============ A2：引用 → 块 一对一指派 流程动画 ============ */
+(function(){
+  var env = ctx2d('a2-canvas'), ctx = env.ctx, W = env.w, H = env.h;
+  var out = document.getElementById('a2-readout');
+  var btn = document.getElementById('a2-step');
+  var quotes = [
+    {t:'Q1 “Pin: Phosphor-bronze”', y:30,  col:'#8fb8ff'},
+    {t:'Q2 “Revenue rose 12% YoY…”', y:120, col:'#c9a7ff'},
+    {t:'Q3 “…bronze pins are gold-plated”', y:210, col:'#ffcf8a'}
+  ];
+  var blocksA2 = [
+    {n:'B1 段落 · p2', y:14,  pg:'p2'},
+    {n:'B2 表格 · p2', y:80,  pg:'p2'},
+    {n:'B3 段落 · p3', y:146, pg:'p3'},
+    {n:'B4 表格 · p7', y:212, pg:'p7'},
+    {n:'B5 图注 · p9', y:278, pg:'p9'}
+  ];
+  var qx = 30, qw = 300, qh = 60, bx = 630, bw = 300, bh = 50;
+  var sims = [
+    [[1,0.85],[2,0.61]],
+    [[3,0.79],[0,0.55]],
+    [[1,0.81],[2,0.74]]
+  ];
+  var assign = [1,3,2]; // Q1→B2, Q2→B4, Q3→B3
+  var step = 0;
+  var msgs = [
+    '3 条引用、5 个候选块。点「下一步」开始。',
+    '① 模型输出 3 条逐字引用（verbatim quotes）。',
+    '② MinerU 已把文档切成 5 个候选语义块，各带页码与框。',
+    '③ 同一个多模态编码器嵌入引用与块裁剪图，算余弦相似度（每条引用只画出最像的 2 个候选）。',
+    '④ 冲突！Q1 和 Q3 都最像 B2——但一个块只能接收一条引用。',
+    '⑤ 匈牙利算法解出总相似度最大的一对一指派：Q1→B2（0.85）、Q2→B4（0.79）、Q3→B3（0.74，次选）。块的页码+框成为引用集 C。'
+  ];
+  function qcy(i){ return quotes[i].y + qh/2; }
+  function bcy(j){ return blocksA2[j].y + bh/2; }
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#0a1326'; ctx.fillRect(0,0,W,H);
+    var i, j, k;
+    if(step >= 3){
+      for(i=0;i<3;i++){
+        for(k=0;k<sims[i].length;k++){
+          j = sims[i][k][0]; var s = sims[i][k][1];
+          var hot = (step >= 4 && j === 1 && (i === 0 || i === 2));
+          ctx.strokeStyle = hot ? '#ff6b6b' : 'rgba(143,184,255,.30)';
+          ctx.lineWidth = hot ? 2.5 : 1.2;
+          ctx.beginPath(); ctx.moveTo(qx+qw, qcy(i)); ctx.lineTo(bx, bcy(j)); ctx.stroke();
+          ctx.fillStyle = hot ? '#ff9a9a' : '#8fb8ff';
+          ctx.font = '11px monospace'; ctx.textAlign = 'center';
+          ctx.fillText(s.toFixed(2), lerp(qx+qw,bx,0.5), lerp(qcy(i),bcy(j),0.5)-6);
+        }
+      }
+    }
+    if(step >= 5){
+      for(i=0;i<3;i++){
+        j = assign[i];
+        ctx.strokeStyle = '#2bc48a'; ctx.lineWidth = 3.5;
+        ctx.beginPath(); ctx.moveTo(qx+qw, qcy(i)); ctx.lineTo(bx-2, bcy(j)); ctx.stroke();
+        ctx.fillStyle = '#2bc48a';
+        ctx.beginPath(); ctx.moveTo(bx-2,bcy(j)); ctx.lineTo(bx-14,bcy(j)-6); ctx.lineTo(bx-14,bcy(j)+6); ctx.closePath(); ctx.fill();
+      }
+    }
+    if(step >= 1){
+      for(i=0;i<3;i++){
+        ctx.fillStyle = '#13224a'; rr(ctx,qx,quotes[i].y,qw,qh,9); ctx.fill();
+        ctx.strokeStyle = quotes[i].col; ctx.lineWidth = 1.5; rr(ctx,qx,quotes[i].y,qw,qh,9); ctx.stroke();
+        ctx.fillStyle = quotes[i].col; ctx.font = '12.5px monospace'; ctx.textAlign = 'left';
+        ctx.fillText(quotes[i].t, qx+12, quotes[i].y+36);
+      }
+    }
+    if(step >= 2){
+      for(j=0;j<5;j++){
+        var hot2 = (step >= 4 && step < 5 && j === 1);
+        ctx.fillStyle = hot2 ? '#3a1620' : '#1a2438';
+        rr(ctx,bx,blocksA2[j].y,bw,bh,8); ctx.fill();
+        ctx.strokeStyle = hot2 ? '#ff6b6b' : (step >= 5 && assign.indexOf(j) >= 0 ? '#2bc48a' : '#31456e');
+        ctx.lineWidth = hot2 ? 2.5 : 1.5;
+        rr(ctx,bx,blocksA2[j].y,bw,bh,8); ctx.stroke();
+        ctx.fillStyle = '#c8d6f5'; ctx.font = '13px sans-serif'; ctx.textAlign = 'left';
+        ctx.fillText(blocksA2[j].n, bx+14, blocksA2[j].y+31);
+      }
+    }
+    if(step === 4){
+      ctx.fillStyle = '#ff9a9a'; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('⚠ B2 被两条引用同时抢', 480, 344);
+    }
+    if(step === 5){
+      ctx.fillStyle = '#7fe3b0'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('C = {(p2, B2 的框), (p7, B4 的框), (p3, B3 的框)} —— 总相似度 2.38，全局最优', 480, 344);
+    }
+  }
+  btn.addEventListener('click', function(){
+    if(step < 5){ step++; out.textContent = msgs[step]; draw(); }
+    if(step === 5) btn.textContent = '✓ 完成';
+  });
+  document.getElementById('a2-reset').addEventListener('click', function(){
+    step = 0; out.textContent = msgs[0]; btn.textContent = '▶ 下一步'; draw();
+  });
+  draw();
+})();
+
+/* ============ A3：奖励公式滑杆 ============ */
+(function(){
+  var env = ctx2d('rw-canvas'), ctx = env.ctx, W = env.w, H = env.h;
+  var sa = document.getElementById('rw-a'), sr = document.getElementById('rw-r'), sc = document.getElementById('rw-c');
+  var out = document.getElementById('rw-readout');
+  function calc(){
+    var a = +sa.value, er = +sr.value, ec = +sc.value;
+    document.getElementById('rw-av').textContent = a;
+    document.getElementById('rw-rv').textContent = er;
+    document.getElementById('rw-cv').textContent = ec;
+    var r = (a/5) * ((er+ec)/10);
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#0a1326'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = '#1a2438'; rr(ctx,30,26,W-60,34,17); ctx.fill();
+    var grad = ctx.createLinearGradient(30,0,W-30,0);
+    grad.addColorStop(0,'#1783ff'); grad.addColorStop(1,'#2bc48a');
+    if(r > 0){ ctx.fillStyle = grad; rr(ctx,30,26,(W-60)*r,34,17); ctx.fill(); }
+    ctx.fillStyle = '#eaf1ff'; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('r = ' + r.toFixed(2) + '（满分 1.0）', W/2, 49);
+    var gate = a === 0 ? '—— 答案错误（a=0），证据分再高也被乘性门控清零。'
+      : (a < 4 ? '—— 答案分偏低，证据分被等比压缩。' : '—— 答案可靠，证据分全额计入奖励。');
+    out.innerHTML = 'r = (a/5)·(e<sub>rel</sub>+e<sub>cov</sub>)/10 = (' + a + '/5)·(' + er + '+' + ec + ')/10 = <b style="color:#ffd97a">' + r.toFixed(2) + '</b> ' + gate;
+  }
+  sa.addEventListener('input', calc); sr.addEventListener('input', calc); sc.addEventListener('input', calc);
+  calc();
+})();
+
+/* ============ A4：主结果成对条形图 ============ */
+(function(){
+  var DATA = [
+    {n:'Qwen3-VL-8B',      c:{rec:0.3,ah:97.0,saa:1.4},  l:{rec:39.9,ah:41.2,saa:22.4}},
+    {n:'Qwen3-VL-30B-A3B', c:{rec:1.3,ah:92.1,saa:3.8},  l:{rec:34.9,ah:47.0,saa:24.7}},
+    {n:'Qwen3.5-9B',       c:{rec:4.0,ah:87.3,saa:11.0}, l:{rec:25.9,ah:65.4,saa:29.6}},
+    {n:'Qwen3.5-27B',      c:{rec:8.1,ah:82.1,saa:16.1}, l:{rec:46.9,ah:40.5,saa:51.5}},
+    {n:'Gemma-3-12B',      c:{rec:0.3,ah:95.9,saa:1.0},  l:{rec:29.9,ah:48.0,saa:10.7}},
+    {n:'Gemma-4-31B',      c:{rec:7.8,ah:87.1,saa:9.2},  l:{rec:44.5,ah:38.6,saa:42.4}},
+    {n:'8B + GRPO（ours）', c:null,                        l:{rec:51.3,ah:28.4,saa:33.8}}
+  ];
+  var box = document.getElementById('bars'), metric = 'rec';
+  function build(){
+    box.innerHTML = '';
+    DATA.forEach(function(m){
+      var row = document.createElement('div'); row.className = 'pair-row';
+      var nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = m.n;
+      var bc = document.createElement('div'); bc.className = 'pbar coord';
+      var bl = document.createElement('div'); bl.className = 'pbar lang';
+      if(m.c){
+        bc.innerHTML = '<i></i><b>' + m.c[metric].toFixed(1) + '</b>';
+        bc.querySelector('i').style.width = '0%';
+        bc.querySelector('i').dataset.w = m.c[metric];
+      } else {
+        bc.innerHTML = '<b style="color:#9aa7bf">—</b>';
+      }
+      bl.innerHTML = '<i></i><b>' + m.l[metric].toFixed(1) + '</b>';
+      bl.querySelector('i').style.width = '0%';
+      bl.querySelector('i').dataset.w = m.l[metric];
+      row.appendChild(nm); row.appendChild(bc); row.appendChild(bl);
+      box.appendChild(row);
+    });
+    setTimeout(function(){
+      box.querySelectorAll('i').forEach(function(i){ i.style.width = i.dataset.w + '%'; });
+    }, 60);
+  }
+  document.querySelectorAll('.tgl').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('.tgl').forEach(function(x){ x.classList.remove('active'); });
+      b.classList.add('active');
+      metric = b.dataset.metric;
+      build();
+    });
+  });
+  var shown = false;
+  var io2 = new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting && !shown){ shown = true; build(); io2.disconnect(); } });
+  }, {threshold:.2});
+  io2.observe(box);
+})();
+
+/* ============ A5：IoU 阈值曲线 ============ */
+(function(){
+  var env = ctx2d('iou-canvas'), ctx = env.ctx, W = env.w, H = env.h;
+  var labels = ['页级','IoU ≥ 0.1','IoU ≥ 0.3','IoU ≥ 0.5','IoU ≥ 0.7'];
+  var coord = [30.7, 5.8, 1.2, 0.3, 0.0];
+  var lang  = [63.2, 42.3, 40.7, 39.9, 39.2];
+  var ceil  = [100, 95.2, 90.3, 88.2, 86.4];
+  var slider = document.getElementById('iou-t'), ov = document.getElementById('iou-tv');
+  var out = document.getElementById('iou-readout');
+  var pad = {l:56, r:20, t:26, b:44};
+  function X(i){ return pad.l + (W-pad.l-pad.r) * i/4; }
+  function Y(v){ return H-pad.b - (H-pad.t-pad.b) * v/100; }
+  function line(arr, color, dash){
+    ctx.strokeStyle = color; ctx.lineWidth = 2.5;
+    if(dash) ctx.setLineDash([8,6]);
+    ctx.beginPath();
+    arr.forEach(function(v,i){ if(i===0) ctx.moveTo(X(i),Y(v)); else ctx.lineTo(X(i),Y(v)); });
+    ctx.stroke(); ctx.setLineDash([]);
+    arr.forEach(function(v,i){
+      ctx.fillStyle = color; ctx.beginPath(); ctx.arc(X(i),Y(v),4.5,0,7); ctx.fill();
+    });
+  }
+  function draw(){
+    var sel = +slider.value;
+    ov.textContent = labels[sel];
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#0a1326'; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle = '#22304f'; ctx.lineWidth = 1;
+    [0,25,50,75,100].forEach(function(v){
+      ctx.beginPath(); ctx.moveTo(pad.l,Y(v)); ctx.lineTo(W-pad.r,Y(v)); ctx.stroke();
+      ctx.fillStyle = '#7f92b8'; ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
+      ctx.fillText(v, pad.l-8, Y(v)+4);
+    });
+    labels.forEach(function(lb,i){
+      ctx.fillStyle = i===sel ? '#ffd97a' : '#7f92b8'; ctx.font = (i===sel?'bold ':'') + '12px sans-serif';
+      ctx.textAlign = 'center'; ctx.fillText(lb, X(i), H-18);
+    });
+    line(ceil, '#5a6f9e', true);
+    line(coord, '#ff6b6b', false);
+    line(lang, '#2bc48a', false);
+    ctx.strokeStyle = 'rgba(255,217,122,.6)'; ctx.lineWidth = 1.5; ctx.setLineDash([4,5]);
+    ctx.beginPath(); ctx.moveTo(X(sel), pad.t); ctx.lineTo(X(sel), H-pad.b); ctx.stroke(); ctx.setLineDash([]);
+    ctx.font = '12px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillStyle = '#ff6b6b'; ctx.fillText('● 坐标接口', pad.l+14, pad.t+6);
+    ctx.fillStyle = '#2bc48a'; ctx.fillText('● 语言接口', pad.l+104, pad.t+6);
+    ctx.fillStyle = '#5a6f9e'; ctx.fillText('┄ 解析器上限', pad.l+194, pad.t+6);
+    out.innerHTML = '在 <b style="color:#ffd97a">' + labels[sel] + '</b> 这一档：坐标接口 <b style="color:#ff9a9a">' + coord[sel].toFixed(1) + '%</b>，语言接口 <b style="color:#7fe3b0">' + lang[sel].toFixed(1) + '%</b>，解析器上限 ' + ceil[sel].toFixed(1) + '%。' +
+      (sel === 0 ? ' 坐标接口还能找对近三成页面——丢的是页内的几何。' : (sel === 4 ? ' 坐标接口彻底归零；语言接口从 0.1 到 0.7 只掉了 3.1 个点。' : ''));
+  }
+  slider.addEventListener('input', draw);
+  draw();
+})();
+</script>
+</body>
+</html>

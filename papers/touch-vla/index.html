@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>看懂 τ：给机器人装上「指尖」，用未来的画面教它手感</title>
+<style>
+  :root{
+    --blue:#1783ff; --blue-d:#0b5cc4; --red:#ff6b6b; --amber:#f7b731;
+    --purple:#a55eea; --green:#2bc48a; --ink:#1b2430; --ink-soft:#48566a;
+    --bg:#f6f8fc; --card:#ffffff; --line:#e4eaf3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.8}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+
+  /* ===== Hero ===== */
+  .hero{background:linear-gradient(160deg,#14093f 0%,#3a1c86 55%,#8a4dff 100%);
+    color:#fff;padding:72px 0 56px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+    padding:4px 14px;border-radius:99px;font-size:13px;letter-spacing:1px;margin-bottom:18px}
+  .hero h1{font-size:clamp(26px,4.6vw,44px);line-height:1.3;margin-bottom:14px}
+  .hero p.sub{font-size:clamp(14px,1.8vw,18px);opacity:.88;max-width:820px}
+  .hero .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);
+    border-radius:16px;padding:14px 22px;min-width:150px}
+  .stat b{display:block;font-size:26px;font-weight:800}
+  .stat span{font-size:13px;opacity:.85}
+
+  /* ===== Nav ===== */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  nav.toc .inner{display:flex;gap:6px;overflow-x:auto;padding:10px 22px;max-width:1060px;margin:0 auto}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--ink-soft);text-decoration:none;
+    padding:6px 12px;border-radius:99px;transition:.2s}
+  nav.toc a:hover{background:#f0eaff;color:#5a2ea6}
+
+  /* ===== Sections ===== */
+  section.chapter{padding:56px 0 8px}
+  .chap-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  .chap-num{font-size:14px;font-weight:800;color:#fff;background:var(--purple);
+    border-radius:10px;padding:3px 12px;letter-spacing:1px}
+  .chap-head h2{font-size:clamp(21px,3vw,30px)}
+  .oneline{color:#5a2ea6;font-weight:600;margin:4px 0 22px;font-size:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:0 2px 14px rgba(60,30,110,.05)}
+  .card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card p{margin-bottom:12px;color:#2c3a4e}
+  .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
+    border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
+  .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
+  .keyfact{position:relative;background:#f1ebff;border-left:4px solid var(--purple);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";position:absolute;left:16px;top:12px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .demo-box{background:#160f2e;border-radius:18px;padding:22px;margin:16px 0;color:#e6dfff;
+    position:relative;overflow:hidden}
+  .demo-title{color:#c4a8ff;font-size:13px;letter-spacing:2px;font-weight:700;margin-bottom:14px;text-transform:uppercase}
+  .btn{background:var(--purple);color:#fff;border:none;border-radius:99px;padding:9px 22px;font-size:14px;
+    cursor:pointer;font-weight:600;transition:.2s;box-shadow:0 4px 14px rgba(138,77,255,.35)}
+  .btn:hover{background:#7d3ff0;transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);box-shadow:none;color:#e6dfff}
+  .btn.ghost.active{background:rgba(165,94,234,.25);border-color:#c4a8ff;color:#fff}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border-radius:12px;overflow:hidden}
+  table.tbl th{background:#3a1c86;color:#fff;padding:10px 12px;text-align:left;font-weight:600}
+  table.tbl td{padding:10px 12px;border-bottom:1px solid var(--line)}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl tr:nth-child(even) td{background:#faf8ff}
+  .hl{color:#5a2ea6;font-weight:700}
+  .tbl-scroll{overflow-x:auto;border-radius:12px}
+
+  /* ===== 公式（纯 HTML/CSS，无 MathJax）===== */
+  .formula{background:#160f2e;border-radius:14px;padding:20px 22px;margin:14px 0;color:#f0eaff;
+    font-size:clamp(15px,2.2vw,19px);text-align:center;overflow-x:auto;line-height:2;
+    font-family:"STIX Two Math","Cambria Math",Georgia,serif}
+  .formula .op{color:#c4a8ff}
+  .formula .cond{font-size:.82em;color:#b3a3dd}
+  .frac{display:inline-flex;flex-direction:column;vertical-align:middle;margin:0 2px;line-height:1.4}
+  .frac .num{border-bottom:1.5px solid currentColor;padding:0 7px}
+  .frac .den{padding:0 7px}
+  .fnote{font-size:13px;color:#9d90c0;margin-top:10px;text-align:center;line-height:1.7;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  .formula var{font-style:italic}
+
+  /* ===== 结果条形图 ===== */
+  .scorebar{height:10px;border-radius:99px;background:#ece7f6;overflow:hidden;margin:4px 0 12px}
+  .scorebar i{display:block;height:100%;border-radius:99px;width:0;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+  .bar-row{display:grid;grid-template-columns:170px 1fr 64px;gap:12px;align-items:center;margin-bottom:10px;font-size:14px}
+  @media(max-width:640px){.bar-row{grid-template-columns:110px 1fr 56px}}
+  .bar-row b{text-align:right;font-variant-numeric:tabular-nums}
+
+  /* ===== 滑杆 ===== */
+  .slider-row{display:flex;align-items:center;gap:14px;margin:14px 0 6px;flex-wrap:wrap}
+  .slider-row label{font-size:14px;color:#b3a3dd;white-space:nowrap}
+  .slider-row input[type=range]{flex:1;min-width:180px;accent-color:var(--amber)}
+  .slider-row output{color:#ffd97a;font-weight:700;min-width:56px;text-align:right;font-variant-numeric:tabular-nums}
+  canvas.chart{width:100%;height:240px;display:block;border-radius:10px;background:#0f0a22}
+  .demo-readout{margin-top:14px;font-size:14.5px;line-height:1.8}
+  .caption{font-size:12.5px;color:#9d90c0;margin-top:8px;line-height:1.6}
+
+  /* ===== JEPA 流程动画 ===== */
+  .flow-stage{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;margin:8px 0 4px}
+  .flow-node{flex:1;min-width:120px;background:rgba(255,255,255,.06);border:1.5px solid rgba(196,168,255,.35);
+    border-radius:12px;padding:12px 10px;text-align:center;font-size:13px;line-height:1.5;
+    transition:all .45s ease;color:#cbbde8}
+  .flow-node b{display:block;font-size:14px;color:#e6dfff;margin-bottom:3px}
+  .flow-node.lit{background:rgba(165,94,234,.30);border-color:#c4a8ff;transform:translateY(-3px);
+    box-shadow:0 6px 18px rgba(138,77,255,.35);color:#fff}
+  .flow-node.lit b{color:#ffd97a}
+  .flow-arrow{align-self:center;color:#8a76b8;font-size:18px}
+  @media(max-width:760px){.flow-arrow{display:none}}
+
+  /* ===== 来源标注 ===== */
+  .src{color:var(--blue-d);text-decoration:none;font-size:.8em;font-weight:600;
+    border-bottom:1px dashed #9db8e8;padding:0 1px;white-space:nowrap}
+  .src:hover{color:var(--blue);border-bottom-style:solid;background:#eaf2ff;border-radius:4px}
+  .src::after{content:"↗";font-size:.85em;margin-left:1px}
+  .demo-box .src, .formula .src{color:#c4a8ff;border-bottom-color:#4a3a78}
+  .demo-box .src:hover{color:#e6dfff;background:rgba(138,77,255,.18)}
+  .src-inline{color:inherit;border-bottom:1px dashed #9db8e8;text-decoration:none}
+  .src-inline:hover{color:var(--blue)}
+
+  footer{margin-top:64px;padding:34px 0 46px;color:#7f8ca3;font-size:13px;text-align:center;
+    border-top:1px solid var(--line);line-height:2}
+  .fade-up{opacity:0;transform:translateY(26px);transition:all .7s cubic-bezier(.3,.7,.3,1)}
+  .fade-up.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">arXiv 论文交互解读 · 具身智能与机器人</span>
+    <h1>看懂 τ：给机器人装上「指尖」，用未来的画面教它手感</h1>
+    <p class="sub">北京交通大学与北京通用人工智能研究院团队提出的触觉增强 VLA 框架：在预训练 π0.5 上接入视觉式触觉传感器，再借 JEPA 思想加一条「只存在于训练期」的预测分支——让触觉表征学会预判「我这么做，世界接下来会变成什么样」。插插头、插 USB、盖章、擦白板四个接触密集型任务上，平均完整任务成功率从最强基线的 30% 提升到 71.25%。</p>
+    <div class="stats">
+      <div class="stat"><b>71.25%</b><span>四任务平均完整成功率（τ-WristSup.）</span></div>
+      <div class="stat"><b>+41.25 pt</b><span>相对最强基线 ForceVLA†（30.00%）的提升</span></div>
+      <div class="stat"><b>400 条</b><span>TacAura 数据集：4 任务 × 100 条示教</span></div>
+      <div class="stat"><b>0 开销</b><span>自监督分支仅训练期使用，推理时直接移除</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="toc"><div class="inner">
+  <a href="#ch0">🤖 热身：VLA 与「手感」</a>
+  <a href="#ch1">🧮 概念基础</a>
+  <a href="#ch2">🔧 核心方法：τ</a>
+  <a href="#ch3">🗃️ TacAura 数据集</a>
+  <a href="#ch4">📊 实验结果</a>
+  <a href="#ch5">⚖️ 局限与意义</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ============ CH0 热身 ============ -->
+<section class="chapter" id="ch0">
+  <div class="chap-head"><span class="chap-num">第 0 章</span><h2>热身：会看的机器人，为什么还缺一双「有感觉的手」</h2></div>
+  <p class="oneline">VLA 模型让机器人「看懂世界、听懂指令、动手操作」，但在插 USB 这类活儿上，光靠眼睛是玩不转的。</p>
+
+  <div class="card fade-up">
+    <h3>👀 VLA 是什么：眼睛 + 耳朵 + 手，装进一个模型</h3>
+    <p><b>Vision-Language-Action（VLA）模型</b>是近两年通用机器人操作的新范式：把相机图像、语言指令和机器人本体状态一起喂进一个大模型，直接输出未来一段动作序列（action chunk）。<a class="src" href="https://arxiv.org/abs/2410.24164" target="_blank" rel="noopener">π0</a>、<a class="src" href="https://www.physicalintelligence.company/blog/pi05" target="_blank" rel="noopener">π0.5</a>、<a class="src" href="https://arxiv.org/abs/2406.09246" target="_blank" rel="noopener">OpenVLA</a> 等通过大规模多任务、多本体预训练，让「一个模型干多种家务」成为现实（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §1</a>）。</p>
+    <p>但这条路线有个结构性短板：<b>它几乎只依赖视觉</b>。而接触密集型操作（contact-rich manipulation）——插插头、按印章、擦白板——成败取决于物理交互的动态：接触没有、力怎么分布、物体有没有变形。这些信息<b>很难从画面里推出来</b>（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §1</a>）。</p>
+    <div class="analogy">你自己插 USB 的时候，最后那几毫米从来不是靠眼睛：插头早把接口挡住了。你靠的是指尖的「手感」——碰到了、方向偏了、用多大力——全靠触觉反馈实时微调。机器人没有这个手感，就像蒙着指尖插 USB。</div>
+    <div class="keyfact">触觉感知天然提供视觉难以推断的信息：接触状态、力分布、形变模式。这正是本文要把「触觉」接进 VLA 的动机（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §1</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🧱 把触觉接进 VLA，难在哪？数据与建模两道坎</h3>
+    <p>论文把现有工作的困难拆成两个层面（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文摘要</a>）：</p>
+    <table class="tbl">
+      <tr><th>层面</th><th>困难</th><th>现有路线的妥协</th></tr>
+      <tr><td>数据层面</td><td>任务特定示教有限，触觉表征质量上不去</td><td>大规模触觉预训练（如 <a class="src" href="https://arxiv.org/abs/2211.12498" target="_blank" rel="noopener">Touch and Go</a> 一类）有效但成本高昂</td></tr>
+      <tr><td>建模层面</td><td>高维触觉信号的「时序交互动态」没人建好</td><td>要么只编码<b>瞬时接触状态</b>；要么用 <b>6D 力/力矩序列</b> 建模全局力动态，丢失了视觉式触觉里细粒度的空间接触模式</td></tr>
+    </table>
+    <p style="margin-top:14px">于是本文的问题非常具体：<b>在数据和算力都有限的前提下，如何让机器人从高维触觉信号里学到「交互随时间怎么演化」的表征，并无缝接入预训练 VLA？</b>（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §1</a>）</p>
+    <div class="analogy">瞬时接触状态像「照片」：只告诉你现在碰没碰上。6D 力矩序列像「体重秤读数」：知道总力多大，却不知道压力在指尖上怎么分布、怎么变化。本文想要的，是一部「指尖上的电影」——既要空间细节，也要时间演化。</div>
+  </div>
+</section>
+
+<!-- ============ CH1 概念基础 ============ -->
+<section class="chapter" id="ch1">
+  <div class="chap-head"><span class="chap-num">第 1 章</span><h2>概念基础：三件道具</h2></div>
+  <p class="oneline">看懂 τ 只需要先认识三样东西：会「拍照」的触觉传感器、VLA 骨干 π0.5、以及 JEPA 的「在潜空间里预测未来」。</p>
+
+  <div class="card fade-up">
+    <h3>① 视觉式触觉传感器：把「手感」拍成照片</h3>
+    <p>τ 使用的 <b>DM-Tac WS</b> 是一种<b>视觉式触觉传感器（vision-based tactile sensor）</b>，直接替换 Franka 夹爪的两片手指，以 320×240 分辨率、约 40 FPS 输出触觉画面（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §3.3</a>）。这类传感器（GelSight 家族）的原理是：指尖垫一层弹性体，受压形变时内部涂层的光影随之变化，垫子里的小相机把形变拍下来——所以触觉信号本身就是一张「照片」，天然携带<b>法向与剪切形变</b>的细粒度空间分布（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §3.1 式 (1)</a>）。</p>
+    <div class="analogy">按一下指纹打卡机：你的指纹纹路在玻璃上压出明暗图案。视觉式触觉传感器就是给机器人指尖装了一台「指纹打卡机」——压力分布、滑移、边缘接触，全都变成画面里看得见的纹理。</div>
+    <div class="keyfact">关键属性：触觉信号是<b>高维图像</b>（而不是单个力数值），所以需要一个编码器把它变成向量，更需要一种能建模「时间演化」的学习信号（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §1、§3.1</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>② π0.5 骨干：一个已经「很会干活」的通用底座</h3>
+    <p>τ 不做从零训练，而是站在预训练 VLA——<a class="src" href="https://www.physicalintelligence.company/blog/pi05" target="_blank" rel="noopener">π0.5</a>——的肩膀上。每个时刻 <var>t</var>，VLA 接收观测 <var>o<sub>t</sub></var> = {<var>I<sub>t</sub></var>, ℓ̃<sub>t</sub>}：多视角 RGB 图像经视觉编码器变成<b>视觉 token</b>，任务描述拼接机器人本体状态后经词嵌入变成<b>文本 token</b>；大语言模型融合这些 token，再由<b>动作专家（action expert）</b>通过条件流匹配（conditional flow matching）从噪声中「去噪」出未来 <var>H</var> 步的动作块（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §3.1</a>）。</p>
+    <div class="formula">
+      <var>a</var><sup><var>s</var></sup><sub><var>t</var>:<var>t</var>+<var>H</var></sub> = <var>s</var>·<var>a</var><sub><var>t</var>:<var>t</var>+<var>H</var></sub> + (1−<var>s</var>)·ε，&nbsp;&nbsp;
+      <var>u</var> = <span class="frac"><span class="num">∂<var>a</var><sup><var>s</var></sup></span><span class="den">∂<var>s</var></span></span> = <var>a</var><sub><var>t</var>:<var>t</var>+<var>H</var></sub> − ε
+      <div class="fnote">流匹配的白话版：把「真实动作」和「随机噪声」按比例 <var>s</var> 混合，模型学习「往哪个方向走能回到真实动作」。训练时学方向，推理时从纯噪声一步步走回干净动作（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §3.2 式 (6)(7)</a>）。</div>
+    </div>
+    <div class="analogy">π0.5 像一位经验丰富的老司机：路况（视觉）、导航指令（语言）都懂，方向盘油门（动作）也熟练。τ 要做的是给这位司机「接上指尖的触觉神经」——而且不能破坏他原有的驾驶技术。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>③ JEPA：不重建像素，只在「抽象空间」里预测未来</h3>
+    <p><b>Joint-Embedding Predictive Architecture（JEPA）</b> 是 LeCun 等人提出的自监督思想（<a class="src" href="https://openreview.net/forum?id=BZ5a1r-kVsf" target="_blank" rel="noopener">LeCun et al. 2022</a>）：与其逐像素重建未来画面（计算昂贵且容易纠缠无关细节），不如<b>在编码后的潜空间里预测未来的表征</b>——模型只需抓住「语义上会发生什么变化」（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §1、§2.2</a>）。</p>
+    <p>τ 把这个思想改造成<b>跨模态、带动作条件</b>的版本：当前触觉表征 + 接下来要做的动作 → 预测<b>未来视觉特征的变化量</b>。视觉信号在这里充当「免费的监督老师」——真实未来画面的特征由预训练视觉编码器直接给出，不需要人工标注（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §3.1</a>）。</p>
+    <div class="analogy">教练考运动员，不要求他默写整段比赛录像的每一帧（像素重建），只问：「你这个动作做下去，球会往哪走？」（潜空间预测）。答得准，说明他真的「懂」这个手感—— τ 就是用视觉当考官，考触觉模块的预判能力。</div>
+    <div class="keyfact">此前跨模态自监督多为对比学习或掩码重建（如 Touch and Go、Tactile MAE 等）；τ 首次把 JEPA 式预测引入触觉增强 VLA 的策略学习，用「动作条件 ↔ 未来视觉变化」的对应关系学交互感知表征（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §2.2</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH2 核心方法 ============ -->
+<section class="chapter" id="ch2">
+  <div class="chap-head"><span class="chap-num">第 2 章</span><h2>核心方法：τ 的三大组件</h2></div>
+  <p class="oneline">一个翻译模块把触觉「方言」翻成 VLA 听得懂的 token；一条训练期专属的预测分支逼触觉表征学会预判；两个损失一起端到端训练。</p>
+
+  <!-- 组件 1 -->
+  <div class="card fade-up">
+    <h3>🔌 组件一：触觉编码与适配模块（Tactile Encoding & Adaptation）</h3>
+    <p>观测从 <var>o<sub>t</sub></var> = {<var>I<sub>t</sub></var>, ℓ̃<sub>t</sub>} 扩展为 õ<sub>t</sub> = {<var>I<sub>t</sub></var>, ℓ̃<sub>t</sub>, <var>T<sub>t</sub></var>}，其中 <var>T<sub>t</sub></var> 是左右两指触觉信号。先由<b>触觉编码器</b> <var>E</var><sub>tou</sub> 提取特征，再由可学习的<b>触觉适配器</b> <var>A</var><sub>tou</sub> 把它投影到与预训练 VLA 相同的潜空间（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §3.1 式 (1)(2)</a>）：</p>
+    <div class="formula">
+      <var>z</var><sup>touch</sup><sub><var>t</var></sub> = <var>E</var><sub>tou</sub>(<var>T<sub>t</sub></var>)，&nbsp;&nbsp;
+      <var>Z</var><sup>touch</sup><sub><var>t</var></sub> = <var>A</var><sub>tou</sub>(<var>z</var><sup>touch</sup><sub><var>t</var></sub>)
+      <div class="fnote">第一步「读懂手感」（编码法向/剪切形变），第二步「对齐语义」（投影到 LLM 的 token 空间）。</div>
+    </div>
+    <p>适配后的触觉 token 与视觉、文本 token 拼接成统一序列 <var>Z<sub>t</sub></var> = [<var>Z</var><sup>vision</sup>; <var>Z</var><sup>language</sup>; <var>Z</var><sup>touch</sup>]，送进大语言模型融合，动作专家据此预测动作块——预训练 VLA 的原有能力被完整保留（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §3.1</a>）。</p>
+    <div class="analogy">像给国际会议请来一位方言翻译：指尖「说」的语言（触觉特征）先被翻译成通用语（LLM token 空间），再和视觉、语言坐到同一张桌子上讨论。翻译是新增的，但会议本身的议事规则（预训练 VLA）原封不动。</div>
+  </div>
+
+  <!-- 组件 2 -->
+  <div class="card fade-up">
+    <h3>🔮 组件二：JEPA 式预测自监督分支（仅训练期存在）</h3>
+    <p>这是 τ 的灵魂。适配后的触觉 token <var>Z</var><sup>touch</sup><sub>t</sub> 与<b>动作条件 token</b> <var>Z</var><sup>action</sup><sub>t:t+H</sub>（动作序列向量化后过两层 MLP 编码器 <var>E</var><sub>act</sub>，式 (4)）拼接，送入一个<b>三层 MLP 预测器 P</b>（GELU 激活），预测未来若干时刻的视觉潜表征（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §3.1 式 (3)(4)(5)</a>）：</p>
+    <div class="formula">
+      { ẑ<sup>vision</sup><sub><var>t</var>+∆<var>k</var></sub> }<sub><var>k</var>=1</sub><sup><var>K</var></sup> = <var>P</var>( <var>Z</var><sup>touch</sup><sub><var>t</var></sub>, <var>Z</var><sup>action</sup><sub><var>t</var>:<var>t</var>+<var>H</var></sub> )
+      <div class="fnote">「给定现在的手感 + 接下来的动作，预测未来画面的特征」。∆<var>k</var> 是预定义的时间偏移。</div>
+    </div>
+    <p>预测目标（teacher）由预训练视觉编码器 <var>E</var><sub>vis</sub> 编码真实未来画面得到：{ z<sup>vision</sup><sub>t+∆k</sub> } = <var>E</var><sub>vis</sub>({ I<sub>t+∆k</sub> })。注意这条分支<b>只在训练时存在，推理时整个移除</b>——它不产生任何部署开销（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文摘要、§3.1 图 1</a>）。</p>
+
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 预测分支的五步流程（点「下一步」）</div>
+      <div class="flow-stage" id="jepa-flow">
+        <div class="flow-node" data-step="0"><b>① 现在的手感</b>触觉 token Z<sup>touch</sup><sub>t</sub><br>（指尖拍到什么）</div>
+        <span class="flow-arrow">＋</span>
+        <div class="flow-node" data-step="1"><b>② 接下来的动作</b>动作 token Z<sup>action</sup><br>（我打算怎么做）</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node" data-step="2"><b>③ 预测器 P</b>三层 MLP<br>预测未来视觉变化 Δẑ</div>
+        <span class="flow-arrow">vs</span>
+        <div class="flow-node" data-step="3"><b>④ 真实未来</b>E<sub>vis</sub>(未来画面)<br>目标变化 Δz（不参与梯度）</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-node" data-step="4"><b>⑤ 对齐考试</b>余弦相似度打分<br>梯度回传，改进触觉模块</div>
+      </div>
+      <div class="demo-readout" id="jepa-readout"></div>
+      <div class="btn-row">
+        <button class="btn" id="jepa-next">下一步 ▶</button>
+        <button class="btn ghost" id="jepa-reset">重置</button>
+      </div>
+      <div class="caption">要点：动作是「条件」——同样按下去，插对和插偏的未来画面完全不同；所以预测器必须同时看手感和动作才能押中未来。该分支推理时移除，部署零开销（论文 §3.1）。</div>
+    </div>
+    <div class="analogy">像学开车时的「脑内预演」：手上握着方向盘（触觉），心里想着「我现在这么打方向，车头会往哪摆」（动作条件的未来预测）。教练（视觉编码器）只对答案、不替你开车；等你练熟了，教练就退场了——车上（推理时）根本没有教练这个位置。</div>
+  </div>
+
+  <!-- 组件 3 -->
+  <div class="card fade-up">
+    <h3>⚖️ 组件三：训练目标——预测「变化量」，按「手感变化幅度」加权</h3>
+    <p>两个细节让这个目标更聪明。<b>第一，预测相对变化而非绝对特征</b>——逼模型关注「交互引起的演化」而不是静态场景内容（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §3.2 式 (8)</a>）：</p>
+    <div class="formula">
+      ∆ẑ<sup>vision</sup><sub>t+∆k</sub> = ẑ<sup>vision</sup><sub>t+∆k</sub> − z<sup>vision</sup><sub>t</sub>，&nbsp;&nbsp;
+      ∆z<sup>vision</sup><sub>t+∆k</sub> = z<sup>vision</sup><sub>t+∆k</sub> − z<sup>vision</sup><sub>t</sub>
+    </div>
+    <p><b>第二，用「触觉变化幅度」给每个未来时刻打分加权</b>：手感变化越剧烈的时刻（比如接触建立、滑移发生），预测它越有价值（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §3.2 式 (9)</a>）：</p>
+    <div class="formula">
+      <var>w</var><sub><var>t</var>+∆<var>k</var></sub> = clip( ‖ <var>Z</var><sup>touch</sup><sub><var>t</var>+∆<var>k</var></sub> − <var>Z</var><sup>touch</sup><sub><var>t</var></sub> ‖<sub>2</sub>, <var>w</var><sub>min</sub>, <var>w</var><sub>max</sub> )
+      <div class="fnote">clip 上下限防止「几乎没变化的时刻被忽略」或「异常抖动主导损失」。</div>
+    </div>
+    <p>最终自监督损失是<b>加权余弦对齐损失</b>，与模仿学习损失联合优化（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §3.2 式 (10)(11)</a>）：</p>
+    <div class="formula">
+      <span class="op">L</span><sub>SSL</sub> =
+      <span class="frac"><span class="num">Σ<sub><var>k</var></sub> <var>w</var><sub><var>t</var>+∆<var>k</var></sub> ( 1 − cos(∆ẑ<sup>vision</sup><sub><var>t</var>+∆<var>k</var></sub>, ∆z<sup>vision</sup><sub><var>t</var>+∆<var>k</var></sub>) )</span><span class="den">Σ<sub><var>k</var></sub> <var>w</var><sub><var>t</var>+∆<var>k</var></sub> + δ</span></span>
+      &nbsp;&nbsp;,&nbsp;&nbsp;
+      <span class="op">L</span><sub>total</sub> = <span class="op">L</span><sub>IL</sub> + λ<span class="op">L</span><sub>SSL</sub>
+      <div class="fnote">余弦相似度只比「方向」不比「大小」：预测的变化趋势对就行。λ 平衡两个目标的贡献。</div>
+    </div>
+
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 余弦对齐损失（拖动夹角 θ）</div>
+      <canvas class="chart" id="cos-canvas"></canvas>
+      <div class="slider-row">
+        <label>预测向量与目标向量的夹角 θ</label>
+        <input type="range" id="cos-theta" min="0" max="180" step="1" value="35">
+        <output id="cos-thetav">35°</output>
+      </div>
+      <div class="demo-readout" id="cos-result"></div>
+      <div class="caption">教学示意：两条向量分别代表「预测的未来变化 Δẑ」与「真实未来变化 Δz」。损失 1−cos θ 只看方向夹角——θ=0° 时押题全中（损失 0），θ=180° 时完全相反（损失 2）。</div>
+    </div>
+    <div class="keyfact">整个训练端到端进行：模仿学习让策略会用触觉，自监督让触觉表征更有信息量。训练用 batch 32、动作视界 32、峰值学习率 5e-5、30,000 步、两块 A800 80GB（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §4.1</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH3 数据集 ============ -->
+<section class="chapter" id="ch3">
+  <div class="chap-head"><span class="chap-num">第 3 章</span><h2>TacAura：给 VLA 数据管线「即插即用」地加一路触觉</h2></div>
+  <p class="oneline">不只改模型，还要修数据基建：最小侵入地把触觉塞进现有 VLA 轨迹格式，同步、对齐、重采样，全套工具将开源。</p>
+
+  <div class="card fade-up">
+    <h3>🛠️ 采集系统：一台 Franka + 两片「会拍照的指尖」+ 外骨骼遥操作</h3>
+    <table class="tbl">
+      <tr><th>部件</th><th>配置</th></tr>
+      <tr><td>机械臂</td><td>Franka Research 3 + Franka Hand，手指替换为 DM-Tac WS 视觉式触觉传感器（3D 打印转接件安装）</td></tr>
+      <tr><td>触觉</td><td>左右双指，320×240，约 40 FPS</td></tr>
+      <tr><td>视觉</td><td>第三视角 RealSense D435i × 2 + 腕部 RealSense D405 × 1，均 640×480 @ 15 FPS</td></tr>
+      <tr><td>示教</td><td>与 Franka 运动学同构的外骨骼臂遥操作，映射到关节位置控制</td></tr>
+    </table>
+    <div class="analogy">相当于给机器人拍「多机位教学片」：两台场外机位、一台第一人称机位，再加两路「指尖特写」——演员是隔着外骨骼「附身」机械臂的人类操作员（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §3.3</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>⏱️ 同步管线：把五路「各走各的表」对齐到同一个节拍</h3>
+    <p>各路设备启动延迟和采样率都不同（触觉 ~40 FPS、相机 15 FPS……），原始录像不能直接训练。管线的三步是（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §3.3</a>）：<b>(i)</b> 每路流在源头打时间戳；<b>(ii)</b> 以最近时间戳关联，把所有模态对齐到统一时钟；<b>(iii)</b> 重采样到统一的 <b>10 Hz 控制频率</b>，并附上任务描述标注。最终触觉流作为「每一步的附加字段」装进预训练 VLA 已经在用的轨迹格式——<b>同一份数据既能喂纯视觉 VLA 也能喂 τ，保证了严格可控的基线对比</b>。</p>
+
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 多流对齐到 10 Hz（点击按钮）</div>
+      <canvas class="chart" id="sync-canvas" style="height:210px"></canvas>
+      <div class="btn-row">
+        <button class="btn" id="sync-btn">对齐到 10 Hz ▶</button>
+        <button class="btn ghost" id="sync-reset">打散</button>
+      </div>
+      <div class="caption">教学示意：三种颜色代表三路不同采样率的信号（触觉 ~40 FPS / 相机 15 FPS / 动作）。竖虚线是 10 Hz 的统一节拍；「对齐」就是每条记录吸附到最近的节拍点（最近时间戳关联 + 重采样）。点的位置为演示随机生成。</div>
+    </div>
+    <div class="keyfact">TacAura 规模：<b>4 个任务 × 每任务 100 条高质量示教 = 400 条轨迹</b>，物体位姿随机化，每条轨迹配自然语言指令。四个任务：插插头、插 USB、盖章、擦白板（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §3.3 图 2</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH4 实验结果 ============ -->
+<section class="chapter" id="ch4">
+  <div class="chap-head"><span class="chap-num">第 4 章</span><h2>实验结果：成功率翻倍，「最后一公里」不再崩</h2></div>
+  <p class="oneline">真机评测，每模型每任务 20 次试验。基线们「抓得起、对得准，就是插不进」；τ 把最后的接触执行阶段守住了。</p>
+
+  <div class="card fade-up">
+    <h3>🏆 主结果：平均 71.25% vs 最强基线 30.00%</h3>
+    <p>论文选取的对比对象包括通用 VLA（π0、π0.5）与接触操作专门方法（ForceVLA†、ForceFlow† 等；† 表示为适配本套视觉式触觉信号，用 τ 的触觉编码器提取了等价特征输入）。表 1 为真机结果：每个任务分三个阶段，以<b>完整任务成功率</b>为最终指标（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §4.2–4.4 表 1</a>）：</p>
+    <div class="tbl-scroll">
+    <table class="tbl" style="min-width:760px">
+      <tr><th>模型</th><th>插插头<br>抓/对/插</th><th>插 USB<br>抓/对/插</th><th>盖章<br>取/触/印</th><th>擦白板<br>取/触/擦</th><th>平均</th></tr>
+      <tr><td>π0</td><td>100/25/0</td><td>100/25/15</td><td>100/65/30</td><td>100/100/35</td><td>20.00</td></tr>
+      <tr><td>π0.5</td><td>100/50/20</td><td>100/35/20</td><td>100/70/35</td><td>100/100/40</td><td>28.75</td></tr>
+      <tr><td><a class="src" href="https://arxiv.org/abs/2505.22159" target="_blank" rel="noopener">ForceVLA</a>†</td><td>100/85/0</td><td>100/45/5</td><td>100/100/70</td><td>100/100/45</td><td><b>30.00</b></td></tr>
+      <tr><td>ForceFlow†</td><td>90/40/0</td><td>85/30/0</td><td>90/60/45</td><td>95/95/50</td><td>23.75</td></tr>
+      <tr><td>τ-WristSup.</td><td>100/75/60</td><td>100/50/40</td><td>100/100/90</td><td>100/100/95</td><td class="hl">71.25</td></tr>
+      <tr><td>τ-FrontSup.</td><td>100/80/65</td><td>100/70/50</td><td>100/100/75</td><td>100/100/85</td><td class="hl">68.75</td></tr>
+      <tr><td>τ-DualViewSup.</td><td>100/70/55</td><td>100/50/35</td><td>100/100/65</td><td>100/100/75</td><td class="hl">57.50</td></tr>
+    </table>
+    </div>
+    <p style="margin-top:14px">最刺眼的对比在<b>阶段衰减</b>上：ForceVLA† 插插头任务对齐成功率 85%，最终插入却是 <b>0%</b>；ForceFlow† 擦白板接触成功 95%，擦干净只有 50%。基线普遍「前面都顺、最后一步崩」，而 τ 的最佳变体在四个任务上分别拿到 <b>65 / 50 / 90 / 95</b>，比对应最强基线高 <b>+45 / +30 / +20 / +45</b> 个百分点（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §4.4</a>）。</p>
+
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 分任务成功率（切换任务查看各模型三阶段表现）</div>
+      <div class="btn-row" id="task-row" style="margin-top:0;margin-bottom:14px">
+        <button class="btn ghost" data-task="0">🔌 插插头</button>
+        <button class="btn ghost" data-task="1">💾 插 USB</button>
+        <button class="btn ghost" data-task="2">🖋️ 盖章</button>
+        <button class="btn ghost" data-task="3">🧽 擦白板</button>
+      </div>
+      <div id="stage-bars"></div>
+      <div class="caption" id="stage-caption">数据为论文表 1 真机成功率（%），每格三阶段。注意观察基线在最后一个阶段的「断崖」。</div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>👁️ 三种监督视角：考官坐在哪，成绩不一样</h3>
+    <p>τ 的三个变体区别在于 JEPA 分支用哪个视角的视觉表征当「考官」：腕部视角（WristSup.）、正面第三视角（FrontSup.）、双视角（DualViewSup.）。结论有明显的任务依赖性（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §4.4</a>）：</p>
+    <table class="tbl">
+      <tr><th>变体</th><th>擅长任务</th><th>论文解释</th></tr>
+      <tr><td>τ-FrontSup.（68.75）</td><td>两个插入任务（65 / 50）</td><td>正面视角提供孔位定位所需的空间线索，对齐成功率更高</td></tr>
+      <tr><td>τ-WristSup.（71.25）</td><td>盖章 / 擦白板（90 / 95）</td><td>腕部视角提供更直接的局部接触信息，适合几何约束少、遮挡少的任务</td></tr>
+      <tr><td>τ-DualViewSup.（57.50）</td><td>—</td><td>双视角不一定互补，甚至盖章任务上略低于 ForceVLA†，说明视角融合机制还需改进</td></tr>
+    </table>
+    <div class="analogy">押题考官的「座位」很重要：考「穿针引线」（插入），考官得坐正面看全景；考「擦桌子」（擦拭），考官贴在手腕上看局部更清楚。两个考官一起考，学生反而被两套标准搞糊涂了。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🌍 泛化：没见过的东西、乱糟糟的桌面，还能行吗？</h3>
+    <p>用「见过的 USB / 板擦」训练，零样本测试两个未见物体实例和两组未见干扰物场景（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §4.5 图 4、图 5</a>）：</p>
+    <div class="grid2">
+      <div>
+        <p style="margin-bottom:6px"><b>💾 插 USB（精密任务）</b></p>
+        <div class="bar-row"><span>见过的物体</span><div class="scorebar"><i data-w="40" style="background:#a55eea"></i></div><b>40</b></div>
+        <div class="bar-row"><span>未见物体 1/2</span><div class="scorebar"><i data-w="25" style="background:#a55eea"></i></div><b>25 / 35</b></div>
+        <div class="bar-row"><span>干扰场景 1/2</span><div class="scorebar"><i data-w="20" style="background:#ff6b6b"></i></div><b>20 / 25</b></div>
+        <p style="font-size:13.5px;color:#48566a">物体泛化均值 30%；场景泛化均值 22.5%，比分布内掉 17.5 pt——视觉杂波严重干扰孔位定位与精密对正。</p>
+      </div>
+      <div>
+        <p style="margin-bottom:6px"><b>🧽 擦白板（持续接触任务）</b></p>
+        <div class="bar-row"><span>见过的物体</span><div class="scorebar"><i data-w="95" style="background:#2bc48a"></i></div><b>95</b></div>
+        <div class="bar-row"><span>未见物体 1/2</span><div class="scorebar"><i data-w="90" style="background:#2bc48a"></i></div><b>90 / 90</b></div>
+        <div class="bar-row"><span>干扰场景 1/2</span><div class="scorebar"><i data-w="95" style="background:#2bc48a"></i></div><b>95 / 95</b></div>
+        <p style="font-size:13.5px;color:#48566a">几乎不掉点：擦拭接触面大、全程有持续触觉反馈，对物体外观和场景变化都不敏感。</p>
+      </div>
+    </div>
+    <div class="keyfact">论文结论：泛化能力强烈依赖任务属性——持续接触、触觉反馈丰富的任务迁移顺畅；而精密插入对物体几何与场景组成的变化更脆弱（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §4.5</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🧪 消融实验：挨个拆零件，看谁最要命</h3>
+    <p>分别移除三个组件，平均完整任务成功率的变化（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §4.6 表 2</a>）：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 拆掉一个组件，成功率掉多少？</div>
+      <div class="btn-row" id="abl-row" style="margin-top:0;margin-bottom:14px">
+        <button class="btn ghost" data-abl="0">完整 τ</button>
+        <button class="btn ghost" data-abl="1">拆掉动作条件</button>
+        <button class="btn ghost" data-abl="2">拆掉 SSL 预测</button>
+        <button class="btn ghost" data-abl="3">拆掉触觉模块</button>
+      </div>
+      <canvas class="chart" id="abl-canvas" style="height:250px"></canvas>
+      <div class="demo-readout" id="abl-result"></div>
+      <div class="caption">数据为论文表 2：四任务完整成功率（插插头/插 USB/盖章/擦白板）与平均值。注意论文提醒：这些降幅<b>不可相加</b>——组件之间会相互作用。</div>
+    </div>
+    <table class="tbl">
+      <tr><th>变体</th><th>平均成功率</th><th>降幅</th><th>论文解读</th></tr>
+      <tr><td>完整 τ</td><td class="hl">71.25</td><td>—</td><td>—</td></tr>
+      <tr><td>w/o 动作序列条件</td><td>58.75</td><td>−12.50</td><td>动作条件主要服务最终执行，捕捉连续动作间的时序依赖；对依赖精细力控的盖章/擦拭影响最大（−15/−20）</td></tr>
+      <tr><td>w/o SSL 预测分支</td><td>51.25</td><td>−20.00</td><td>表征质量下降；擦白板掉 35 pt 最狠——预测目标专门帮助建模持续接触中的触觉演化</td></tr>
+      <tr><td>w/o 触觉编码适配模块</td><td>28.75</td><td>−42.50</td><td>最致命：连中间阶段（对齐、接触建立）都大幅退化；但抓取仍是 100%——粗略交互不需要触觉，精细接触推理必须靠它</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ============ CH5 局限与意义 ============ -->
+<section class="chapter" id="ch5">
+  <div class="chap-head"><span class="chap-num">第 5 章</span><h2>局限与意义</h2></div>
+  <p class="oneline">τ 把「小数据触觉增强 VLA」做出了翻倍的成功率，但它依然是一套「轻量改造」，不是终极答案。</p>
+
+  <div class="card fade-up">
+    <h3>⚠️ 值得注意的局限</h3>
+    <p>· <b>双视角监督没有带来增益</b>：DualViewSup. 反而低于任一单视角变体，多视角监督信号如何有效融合仍是开放问题（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §4.4</a>）。</p>
+    <p>· <b>精密插入的泛化仍脆弱</b>：未见 USB 上成功率从 40% 掉到平均 30%，干扰场景下掉到 22.5%——抗杂波的视觉定位与几何变化适应是明确的改进方向（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §4.5</a>）。</p>
+    <p>· <b>未与世界模型类方法对比</b>：作者明言目标是有限资源下的高效微调，因此没有纳入引入触觉的世界模型基线（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §4.2</a>）。</p>
+    <p>· <b>评测规模有限</b>：4 个任务、每任务 100 条示教、每模型 20 次试验，是「真机小样本」口径；更长时序、多阶段任务留给了未来工作（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §5</a>）。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🌟 为什么这项工作值得读</h3>
+    <p>· <b>思路巧</b>：把 JEPA「在潜空间预测未来」的思想改造成「动作条件 + 跨模态」的监督信号，让视觉在训练期免费当触觉的老师——不需要任何人工标注，也不增加推理成本。</p>
+    <p>· <b>工程克制</b>：不预训练、不改数据管线、不破坏预训练 VLA——一个适配器 + 一条训练期分支，100 条示教就把触觉接进 π0.5。数据基建（遥操作工具、同步转换工具、TacAura 数据集）将开源（<a class="src" href="https://arxiv.org/pdf/2607.24485" target="_blank" rel="noopener">论文 §3.3</a>）。</p>
+    <p>· <b>证据扎实</b>：主结果、视角消融、泛化分析、组件消融四层证据链互相印证，尤其「拆触觉模块后抓取仍 100%、精细接触全崩」干净地证明了触觉究竟在哪一段起作用。</p>
+    <div class="keyfact">一句话总结：<b>用「未来的眼睛」教「现在的指尖」</b>——τ 让触觉表征在小数据下学会预判交互动态，推理时教练退场、零成本上线（<a class="src" href="https://arxiv.org/abs/2607.24485" target="_blank" rel="noopener">arXiv:2607.24485</a>）。</div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    本页基于 arXiv 论文《τ: Learning Touch-Augmented Vision-Language-Action Models from Future Visual Supervision》（arXiv:2607.24485v1，2026-07-27）整理制作 · 2026-07<br>
+    通俗类比与演示动画仅用于帮助理解，演示中的信号时序与向量夹角为教学示意；所有实验数字均直接摘自论文表 1–2 与图 5，技术细节以
+    <a class="src-inline" href="https://arxiv.org/abs/2607.24485" target="_blank" rel="noopener">原文</a> 为准 · 文中所有标注 ↗ 的链接均指向原始出处
+  </div>
+</footer>
+
+<script>
+/* ============ 入场动画 ============ */
+const io = new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('show');
+    e.target.querySelectorAll('.scorebar i').forEach(b=>b.style.width=b.dataset.w+'%');
+  }
+}),{threshold:.15});
+document.querySelectorAll('.fade-up').forEach(el=>io.observe(el));
+
+/* ============ 工具：高清 canvas ============ */
+function setupCanvas(id){
+  const c=document.getElementById(id);
+  const dpr=window.devicePixelRatio||1;
+  const w=c.clientWidth,h=c.clientHeight;
+  c.width=w*dpr;c.height=h*dpr;
+  const ctx=c.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx,W:w,H:h};
+}
+
+/* ============ 动画1：JEPA 流程（逐步点亮） ============ */
+const JEPA_STEPS=[
+  '① <b>现在的手感</b>：指尖传感器拍到当前接触状态（压力分布、滑移、形变），经编码器+适配器变成触觉 token。它是预测的「出发点」。',
+  '② <b>加上接下来的动作</b>：把未来 H 步动作序列向量化、过两层 MLP 编码成动作 token。同样按下去，「插得正」和「插得偏」走向完全不同的未来——所以动作是必须的条件。',
+  '③ <b>预测器押题</b>：三层 MLP（GELU）根据「手感+动作」预测未来若干时刻视觉特征的变化量 Δẑ。只押「变化」，不押静态画面。',
+  '④ <b>考官给标准答案</b>：预训练视觉编码器直接编码真实未来画面，算出真实变化 Δz。它是 detached 目标——只评分、不接受梯度。',
+  '⑤ <b>对齐考试打分</b>：加权余弦损失 1−cos(Δẑ, Δz)，权重来自触觉变化幅度。梯度只回传给触觉模块与预测器——这条分支推理时整个移除，部署零开销。'
+];
+let jepaStep=-1;
+function jepaRender(){
+  document.querySelectorAll('#jepa-flow .flow-node').forEach(n=>{
+    n.classList.toggle('lit',parseInt(n.dataset.step)<=jepaStep);
+  });
+  document.getElementById('jepa-readout').innerHTML=
+    jepaStep<0?'点击「下一步 ▶」，看预测分支如何用「未来的画面」考「现在的手感」。':JEPA_STEPS[jepaStep];
+  document.getElementById('jepa-next').textContent=
+    jepaStep>=JEPA_STEPS.length-1?'已完成 ✔':'下一步 ▶';
+}
+document.getElementById('jepa-next').addEventListener('click',()=>{
+  if(jepaStep<JEPA_STEPS.length-1){jepaStep++;jepaRender();}
+});
+document.getElementById('jepa-reset').addEventListener('click',()=>{jepaStep=-1;jepaRender();});
+jepaRender();
+
+/* ============ 动画2：余弦对齐损失（滑杆） ============ */
+function cosDemo(){
+  const thetaDeg=parseInt(document.getElementById('cos-theta').value);
+  document.getElementById('cos-thetav').textContent=thetaDeg+'°';
+  const theta=thetaDeg*Math.PI/180;
+  const cosv=Math.cos(theta);
+  const loss=1-cosv;
+  const o=setupCanvas('cos-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const ox=W/2,oy=H-36,len=Math.min(W,H)*0.42;
+  // 目标向量（固定朝右上 -60°）
+  const ax=ox+len*Math.cos(-Math.PI/3),ay=oy+len*Math.sin(-Math.PI/3);
+  // 预测向量（相对目标偏 theta）
+  const bx=ox+len*Math.cos(-Math.PI/3+theta),by=oy+len*Math.sin(-Math.PI/3+theta);
+  function arrow(x1,y1,x2,y2,color,label,dy){
+    ctx.strokeStyle=color;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    const ang=Math.atan2(y2-y1,x2-x1);
+    ctx.fillStyle=color;ctx.beginPath();
+    ctx.moveTo(x2,y2);
+    ctx.lineTo(x2-12*Math.cos(ang-0.4),y2-12*Math.sin(ang-0.4));
+    ctx.lineTo(x2-12*Math.cos(ang+0.4),y2-12*Math.sin(ang+0.4));
+    ctx.closePath();ctx.fill();
+    ctx.font='bold 13px sans-serif';ctx.textAlign='center';
+    ctx.fillText(label,(x1+x2)/2,(y1+y2)/2+dy);
+  }
+  // 夹角弧
+  ctx.strokeStyle='#ffd97a';ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
+  ctx.beginPath();ctx.arc(ox,oy,42,-Math.PI/3,-Math.PI/3+theta,theta<0);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#ffd97a';ctx.font='12px sans-serif';ctx.textAlign='left';
+  ctx.fillText('θ='+thetaDeg+'°',ox+50,oy-8);
+  arrow(ox,oy,ax,ay,'#2bc48a','目标 Δz（真实未来）',-12);
+  arrow(ox,oy,bx,by,'#a55eea','预测 Δẑ',20);
+  const verdict=thetaDeg<=20?'押题几乎全中：预测准确捕捉了未来的变化方向 ✅':
+    thetaDeg<=60?'方向大致正确，仍有可改进的偏差':
+    thetaDeg<=120?'预测与真实变化明显偏离，梯度会用力纠正 ⚠️':
+    '方向南辕北辙：惩罚接近最大值，触觉表征需要大幅调整 ❌';
+  document.getElementById('cos-result').innerHTML=
+    'cos θ = <b style="color:#ffd97a">'+cosv.toFixed(3)+'</b>，损失 1−cos θ = <b style="color:#ffd97a">'+loss.toFixed(3)+'</b>。'+verdict;
+}
+document.getElementById('cos-theta').addEventListener('input',cosDemo);
+cosDemo();
+
+/* ============ 动画3：多流对齐到 10 Hz ============ */
+const SYNC_STREAMS=[
+  {name:'触觉 ~40 FPS',color:'#a55eea',n:37,y:0.22},
+  {name:'相机 15 FPS',color:'#4d9fff',n:14,y:0.52},
+  {name:'动作',color:'#ffd97a',n:9,y:0.82}
+];
+let syncRngSeed=7;
+function syncRand(){syncRngSeed=(syncRngSeed*1103515245+12345)%2147483648;return syncRngSeed/2147483648;}
+let syncPts=[];
+function syncInit(){
+  syncRngSeed=7;syncPts=[];
+  SYNC_STREAMS.forEach((s,si)=>{
+    for(let i=0;i<s.n;i++){
+      // 围绕 10 Hz 节拍（11 个节拍点）加随机偏移
+      const tick=Math.floor(syncRand()*11);
+      const jitter=(syncRand()-0.5)*0.055;
+      syncPts.push({stream:si,tick:tick,off:jitter,p:0});
+    }
+  });
+}
+let syncAnim=null;
+function syncDraw(){
+  const o=setupCanvas('sync-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=110,padR=24;
+  const xSpan=W-padL-padR;
+  // 10 Hz 节拍竖线
+  ctx.strokeStyle='rgba(196,168,255,.30)';ctx.lineWidth=1;ctx.setLineDash([4,5]);
+  for(let k=0;k<=10;k++){
+    const x=padL+k/10*xSpan;
+    ctx.beginPath();ctx.moveTo(x,14);ctx.lineTo(x,H-14);ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.fillStyle='#9d90c0';ctx.font='11px sans-serif';ctx.textAlign='center';
+  for(let k=0;k<=10;k+=2){
+    ctx.fillText((k*100)+'ms',padL+k/10*xSpan,H-4);
+  }
+  // 流标签与点
+  SYNC_STREAMS.forEach((s,si)=>{
+    const y=H*s.y;
+    ctx.fillStyle=s.color;ctx.font='bold 12px sans-serif';ctx.textAlign='right';
+    ctx.fillText(s.name,padL-10,y+4);
+  });
+  syncPts.forEach(pt=>{
+    const s=SYNC_STREAMS[pt.stream];
+    const y=H*s.y;
+    const xFree=padL+(pt.tick/10+pt.off)*xSpan;
+    const xSnap=padL+(pt.tick/10)*xSpan;
+    const x=xFree+(xSnap-xFree)*pt.p;
+    ctx.beginPath();ctx.arc(x,y,4.2,0,7);
+    ctx.fillStyle=s.color;ctx.globalAlpha=0.55+0.45*pt.p;ctx.fill();ctx.globalAlpha=1;
+  });
+}
+function syncGo(){
+  if(syncAnim)cancelAnimationFrame(syncAnim);
+  const t0=performance.now();
+  function frame(t){
+    const p=Math.min(1,(t-t0)/900);
+    const ease=1-Math.pow(1-p,3);
+    syncPts.forEach(pt=>pt.p=ease);
+    syncDraw();
+    if(p<1)syncAnim=requestAnimationFrame(frame);
+  }
+  syncAnim=requestAnimationFrame(frame);
+}
+function syncScatter(){
+  if(syncAnim)cancelAnimationFrame(syncAnim);
+  syncPts.forEach(pt=>pt.p=0);
+  syncDraw();
+}
+document.getElementById('sync-btn').addEventListener('click',syncGo);
+document.getElementById('sync-reset').addEventListener('click',syncScatter);
+syncInit();syncDraw();
+
+/* ============ 动画4：分任务三阶段成功率 ============ */
+const STAGE_DATA={
+  models:['π0','π0.5','ForceVLA†','ForceFlow†','τ-WristSup.','τ-FrontSup.','τ-DualViewSup.'],
+  colors:['#8a97ad','#8a97ad','#4d9fff','#4d9fff','#a55eea','#a55eea','#a55eea'],
+  stages:[['抓','对','插'],['抓','对','插'],['取','触','印'],['取','触','擦']],
+  tasks:[
+    [[100,25,0],[100,50,20],[100,85,0],[90,40,0],[100,75,60],[100,80,65],[100,70,55]],
+    [[100,25,15],[100,35,20],[100,45,5],[85,30,0],[100,50,40],[100,70,50],[100,50,35]],
+    [[100,65,30],[100,70,35],[100,100,70],[90,60,45],[100,100,90],[100,100,75],[100,100,65]],
+    [[100,100,35],[100,100,40],[100,100,45],[95,95,50],[100,100,95],[100,100,85],[100,100,75]]
+  ]
+};
+function renderStages(taskIdx){
+  const box=document.getElementById('stage-bars');
+  const names=STAGE_DATA.stages[taskIdx];
+  let html='';
+  STAGE_DATA.models.forEach((m,mi)=>{
+    const vals=STAGE_DATA.tasks[taskIdx][mi];
+    html+='<div style="margin-bottom:12px"><div style="font-size:13px;color:#b3a3dd;margin-bottom:3px">'+m+'</div>';
+    vals.forEach((v,si)=>{
+      const emph=si===2;
+      html+='<div style="display:grid;grid-template-columns:88px 1fr 44px;gap:10px;align-items:center;margin-bottom:3px">'
+        +'<span style="font-size:12px;color:#9d90c0;text-align:right">'+names[si]+(emph?'（最终）':'')+'</span>'
+        +'<div class="scorebar" style="background:rgba(255,255,255,.10);margin:0"><i data-w="'+v+'" style="background:'+STAGE_DATA.colors[mi]+(emph?';box-shadow:0 0 8px rgba(255,217,122,.7)':'')+'"></i></div>'
+        +'<b style="font-size:13px;text-align:right;color:'+(v===0?'#ff6b6b':(emph?'#ffd97a':'#e6dfff'))+'">'+v+'</b></div>';
+    });
+    html+='</div>';
+  });
+  box.innerHTML=html;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    box.querySelectorAll('.scorebar i').forEach(b=>b.style.width=b.dataset.w+'%');
+  }));
+}
+document.querySelectorAll('#task-row button').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('#task-row button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    renderStages(parseInt(btn.dataset.task));
+  });
+});
+document.querySelector('#task-row button[data-task="0"]').classList.add('active');
+renderStages(0);
+
+/* ============ 动画5：消融 ============ */
+const ABL_DATA=[
+  {label:'完整 τ',vals:[60,40,90,95],avg:71.25,note:'三组件齐备：触觉模块提供手感，动作条件给出时序上下文，SSL 分支打磨表征。'},
+  {label:'w/o 动作序列条件',vals:[55,30,75,75],avg:58.75,note:'−12.50 pt。抓取/接触等前段几乎不变，掉的全在最终执行——动作条件负责捕捉连续动作间的时序依赖，对力控要求高的盖章/擦拭影响最大（论文 §4.6）。'},
+  {label:'w/o SSL 预测分支',vals:[50,25,70,60],avg:51.25,note:'−20.00 pt。中间阶段不变、最终阶段掉——预测目标专门提升表征质量；擦白板掉 35 pt 说明它对「持续接触中的触觉演化」帮助最大（论文 §4.6）。'},
+  {label:'w/o 触觉编码适配模块',vals:[20,20,35,40],avg:28.75,note:'−42.50 pt，最致命。连对齐、接触建立这些中间阶段也崩了；但抓取仍 100%——粗略交互不需要触觉，精细接触推理必须靠它（论文 §4.6）。'}
+];
+const ABL_TASKS=['插插头','插USB','盖章','擦白板'];
+function ablDraw(idx){
+  const d=ABL_DATA[idx];
+  const o=setupCanvas('abl-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=76,padR=50,padT=26,padB=34;
+  const plotW=W-padL-padR,plotH=H-padT-padB;
+  // 网格
+  ctx.strokeStyle='rgba(196,168,255,.18)';ctx.lineWidth=1;
+  ctx.fillStyle='#9d90c0';ctx.font='11px sans-serif';ctx.textAlign='right';
+  [0,25,50,75,100].forEach(v=>{
+    const y=padT+plotH*(1-v/100);
+    ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();
+    ctx.fillText(v+'%',padL-8,y+4);
+  });
+  const groups=ABL_TASKS.length+1;
+  const slotW=plotW/groups;
+  const barW=Math.min(46,slotW*0.5);
+  const items=ABL_TASKS.map((t,i)=>({name:t,val:d.vals[i],color:'#a55eea'}));
+  items.push({name:'平均',val:d.avg,color:'#ffd97a'});
+  items.forEach((it,i)=>{
+    const x=padL+slotW*i+(slotW-barW)/2;
+    const h=plotH*it.val/100;
+    const y=padT+plotH-h;
+    ctx.fillStyle=it.color;
+    ctx.beginPath();
+    ctx.moveTo(x,y);
+    ctx.lineTo(x+barW,y);
+    ctx.lineTo(x+barW,y+h);
+    ctx.lineTo(x,y+h);
+    ctx.closePath();ctx.globalAlpha=0.9;ctx.fill();ctx.globalAlpha=1;
+    ctx.fillStyle=it.color;ctx.font='bold 13px sans-serif';ctx.textAlign='center';
+    ctx.fillText(it.val,x+barW/2,y-6);
+    ctx.fillStyle='#cbbde8';ctx.font='12px sans-serif';
+    ctx.fillText(it.name,x+barW/2,H-14);
+  });
+  document.getElementById('abl-result').innerHTML=
+    '<b style="color:#ffd97a">'+d.label+'</b>：平均完整成功率 <b style="color:#ffd97a">'+d.avg+'%</b>。'+d.note;
+}
+document.querySelectorAll('#abl-row button').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('#abl-row button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    ablDraw(parseInt(btn.dataset.abl));
+  });
+});
+document.querySelector('#abl-row button[data-abl="0"]').classList.add('active');
+ablDraw(0);
+
+/* ============ 窗口缩放重绘 ============ */
+let rsTimer=null;
+window.addEventListener('resize',()=>{
+  clearTimeout(rsTimer);
+  rsTimer=setTimeout(()=>{cosDemo();syncDraw();},180);
+});
+</script>
+</body>
+</html>

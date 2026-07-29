@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>看懂 CFG 扩散蒸馏：两个误差互相抵消，训练目标却浑然不觉</title>
+<style>
+  :root{
+    --blue:#1783ff; --blue-d:#0b5cc4; --red:#ff6b6b; --amber:#f7b731;
+    --purple:#a55eea; --green:#2bc48a; --ink:#1b2430; --ink-soft:#48566a;
+    --bg:#f6f8fc; --card:#ffffff; --line:#e4eaf3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.8}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+
+  /* ===== Hero ===== */
+  .hero{background:linear-gradient(160deg,#0a1a3f 0%,#103a8c 55%,#1783ff 100%);
+    color:#fff;padding:72px 0 56px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+    padding:4px 14px;border-radius:99px;font-size:13px;letter-spacing:1px;margin-bottom:18px}
+  .hero h1{font-size:clamp(26px,4.4vw,42px);line-height:1.3;margin-bottom:14px}
+  .hero p.sub{font-size:clamp(14px,1.8vw,18px);opacity:.88;max-width:860px}
+  .hero .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);
+    border-radius:16px;padding:14px 22px;min-width:150px}
+  .stat b{display:block;font-size:26px;font-weight:800}
+  .stat span{font-size:13px;opacity:.85}
+
+  /* ===== Nav ===== */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  nav.toc .inner{display:flex;gap:6px;overflow-x:auto;padding:10px 22px;max-width:1060px;margin:0 auto}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--ink-soft);text-decoration:none;
+    padding:6px 12px;border-radius:99px;transition:.2s}
+  nav.toc a:hover{background:#eaf2ff;color:var(--blue-d)}
+
+  /* ===== Sections ===== */
+  section.chapter{padding:56px 0 8px}
+  .chap-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  .chap-num{font-size:14px;font-weight:800;color:#fff;background:var(--blue);
+    border-radius:10px;padding:3px 12px;letter-spacing:1px}
+  .chap-head h2{font-size:clamp(21px,3vw,30px)}
+  .oneline{color:var(--blue-d);font-weight:600;margin:4px 0 22px;font-size:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:0 2px 14px rgba(20,50,110,.05)}
+  .card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card p{margin-bottom:12px;color:#2c3a4e}
+  .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
+    border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
+  .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
+  .keyfact{position:relative;background:#eef5ff;border-left:4px solid var(--blue);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";position:absolute;left:16px;top:12px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .demo-box{background:#0e1830;border-radius:18px;padding:22px;margin:16px 0;color:#dfe8ff;
+    position:relative;overflow:hidden}
+  .demo-title{color:#8fb8ff;font-size:13px;letter-spacing:2px;font-weight:700;margin-bottom:14px;text-transform:uppercase}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:99px;padding:9px 22px;font-size:14px;
+    cursor:pointer;font-weight:600;transition:.2s;box-shadow:0 4px 14px rgba(23,131,255,.35)}
+  .btn:hover{background:var(--blue-d);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);box-shadow:none;color:#dfe8ff}
+  .btn.ghost.active{background:rgba(23,131,255,.22);border-color:#6db4ff;color:#fff}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border-radius:12px;overflow:hidden}
+  table.tbl th{background:#103a8c;color:#fff;padding:10px 12px;text-align:left;font-weight:600}
+  table.tbl td{padding:10px 12px;border-bottom:1px solid var(--line)}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl tr:nth-child(even) td{background:#f7faff}
+  .hl{color:var(--blue-d);font-weight:700}
+  .best{color:#0b5cc4;font-weight:800}
+  .bad{color:#d33;font-weight:700}
+
+  /* ===== 公式（纯 HTML/CSS，无 MathJax）===== */
+  .formula{background:#0e1830;border-radius:14px;padding:20px 22px;margin:14px 0;color:#eaf1ff;
+    font-size:clamp(15px,2.2vw,19px);text-align:center;overflow-x:auto;line-height:2;
+    font-family:"STIX Two Math","Cambria Math",Georgia,serif}
+  .formula .op{color:#8fb8ff}
+  .formula .cond{font-size:.82em;color:#9db4dd}
+  .frac{display:inline-flex;flex-direction:column;vertical-align:middle;margin:0 2px;line-height:1.4}
+  .frac .num{border-bottom:1.5px solid currentColor;padding:0 7px}
+  .frac .den{padding:0 7px}
+  .fnote{font-size:13px;color:#7f92b8;margin-top:10px;text-align:center;line-height:1.7;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  .formula var{font-style:italic}
+
+  /* ===== 滑杆 ===== */
+  .slider-row{display:flex;align-items:center;gap:14px;margin:14px 0 6px;flex-wrap:wrap}
+  .slider-row label{font-size:14px;color:#9db4dd;white-space:nowrap}
+  .slider-row input[type=range]{flex:1;min-width:180px;accent-color:var(--amber)}
+  .slider-row output{color:#ffd97a;font-weight:700;min-width:56px;text-align:right;font-variant-numeric:tabular-nums}
+  canvas.chart{width:100%;height:260px;display:block;border-radius:10px;background:#0a1326}
+  .demo-readout{margin-top:14px;font-size:14.5px;line-height:1.8}
+  .caption{font-size:12.5px;color:#7f92b8;margin-top:8px;line-height:1.6}
+
+  /* ===== 来源标注 ===== */
+  .src{color:var(--blue-d);text-decoration:none;font-size:.8em;font-weight:600;
+    border-bottom:1px dashed #9db8e8;padding:0 1px;white-space:nowrap}
+  .src:hover{color:var(--blue);border-bottom-style:solid;background:#eaf2ff;border-radius:4px}
+  .src::after{content:"↗";font-size:.85em;margin-left:1px}
+  .demo-box .src, .formula .src{color:#8fb8ff;border-bottom-color:#3a5078}
+  .demo-box .src:hover{color:#cfe2ff;background:rgba(23,131,255,.15)}
+  .src-inline{color:inherit;border-bottom:1px dashed #9db8e8;text-decoration:none}
+  .src-inline:hover{color:var(--blue)}
+
+  footer{margin-top:64px;padding:34px 0 46px;color:#7f8ca3;font-size:13px;text-align:center;
+    border-top:1px solid var(--line);line-height:2}
+  .fade-up{opacity:0;transform:translateY(26px);transition:all .7s cubic-bezier(.3,.7,.3,1)}
+  .fade-up.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">arXiv 论文交互解读 · 扩散模型蒸馏</span>
+    <h1>看懂 CFG 下的扩散蒸馏：两个分支误差互相抵消，训练目标却浑然不觉</h1>
+    <p class="sub">阿里 Qwen 团队重新审视 on-policy 蒸馏（OPD）与 classifier-free guidance（CFG）的组合：只匹配「引导后的合成速度」在分支层面是欠约束的——正、负分支的误差可以互相补偿。当教师的负分支掌握学生拿不到的特权信息时，这种补偿会演变成「负分支不对称」（NBA）：正支误差在降、负支误差却在涨。解法是把监督提前到合成之前：正支预测 + CFG 方向分别对齐（PDM）。</p>
+    <div class="stats">
+      <div class="stat"><b>∞</b><span>只约束合成误差时，满足条件的分支误差对有无穷多组（式 7）</span></div>
+      <div class="stat"><b>8.98 → 4.48</b><span>γ=1 时姿态 MPJPE：朴素 OPD vs PDM（表 3）</span></div>
+      <div class="stat"><b>132 vs 790 秒</b><span>只监督前 8/50 步 vs 全轨迹的单步训练耗时（表 5）</span></div>
+      <div class="stat"><b>600 × 3</b><span>600 段测试视频 × 姿态/深度/涂鸦三种控制模态（§4.2）</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="toc"><div class="inner">
+  <a href="#ch0">🎨 热身：扩散、CFG 与蒸馏</a>
+  <a href="#ch1">🧮 概念基础：OPD 遇上 CFG</a>
+  <a href="#ch2">⚠️ 核心发现：NBA</a>
+  <a href="#ch3">🛠️ 核心方法：PDM</a>
+  <a href="#ch4">📊 实验结果</a>
+  <a href="#ch5">⚖️ 局限与意义</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ============ 第 0 章 热身 ============ -->
+<section class="chapter fade-up" id="ch0">
+  <div class="chap-head"><span class="chap-num">第 0 章</span><h2>热身：扩散、CFG 与蒸馏</h2></div>
+  <p class="oneline">先用三个生活场景，把论文用到的三个积木摆上桌。</p>
+
+  <div class="card">
+    <h3>🌫️ 扩散模型：从一团噪声里「雕」出画面</h3>
+    <p>扩散模型的生成过程像一位雕塑家：起点是一块「噪声原石」（纯随机像素），模型一步步预测「该往哪个方向削」，每一步都把画面往目标推一点，几十步之后，清晰的人像、文字、视频就从噪声里浮现出来。这个「每步该往哪走」的预测，论文里统一用<b>速度（velocity）</b> <var>v</var> 来表示——它是模型在某个含噪状态 <var>x</var><sub>t</sub>、某个时刻 <var>t</var>、某个条件 <var>c</var> 下给出的局部行进方向
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 §2.1</a>。</p>
+    <p>「蒸馏」则是让一位<b>教师</b>（更强或掌握更多信息的模型）带一位<b>学生</b>（更弱或信息更少的模型）：学生在某个状态下给出自己的方向，教师在同一状态给出参考方向，训练目标就是让学生的方向向教师看齐。</p>
+    <div class="analogy">学书法：你（学生）临帖写得歪歪扭扭，老师（教师）握着你的手在同一个字上示范一遍正确的运笔方向。你不需要重来整张纸，只需要在「写到一半的这个位置」把笔锋调对——这就是逐状态的方向匹配。</div>
+  </div>
+
+  <div class="card">
+    <h3>🎚️ Classifier-Free Guidance：两个「导航员」再加一档力度旋钮</h3>
+    <p>现代扩散系统几乎都用 <b>CFG</b>（classifier-free guidance，
+      <a class="src" href="https://arxiv.org/abs/2207.12598" target="_blank" rel="noopener">Ho &amp; Salimans 2022</a>）来让生成更贴合提示词。关键事实：CFG 实际去噪用的那个速度，<b>从来不是网络直接输出的</b>。网络要跑两次——一次带目标文本条件（<b>正分支</b> <var>v</var><sub>+</sub>），一次带空文本或负面条件（<b>负分支</b> <var>v</var><sub>−</sub>），然后按引导强度 γ 合成
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 §1, 式 3</a>：</p>
+    <div class="formula">
+      <var>ṽ</var> <span class="op">=</span> <var>γ</var><var>v</var><sub>+</sub> <span class="op">+</span> (1 − <var>γ</var>)<var>v</var><sub>−</sub>
+      <div class="fnote">白话翻译：正分支说「往提示词那边走」，负分支说「别往泛泛的方向走」。γ = 1 时只剩正分支；γ &gt; 1 时，相当于从负分支出发、沿「正 − 负」的方向<b>走过头</b> γ 倍——过冲越多，越贴题但也越容易崩坏。γ 是推理时才拧的旋钮，训练时往往还没定。</div>
+    </div>
+
+    <div class="demo-box">
+      <div class="demo-title">动画 ① · 拧一拧 γ：合成速度是怎么「过冲」的</div>
+      <canvas id="cfg-canvas" class="chart"></canvas>
+      <div class="slider-row">
+        <label for="cfg-gamma">引导强度 γ</label>
+        <input type="range" id="cfg-gamma" min="0" max="6" step="0.5" value="4.5">
+        <output id="cfg-gammav">4.5</output>
+      </div>
+      <div class="demo-readout" id="cfg-readout"></div>
+      <div class="caption">示意向量。蓝箭头 = 正分支 v₊（朝提示词），灰箭头 = 负分支 v₋，黄箭头 = 合成速度 ṽ。注意 ṽ 的起点在 v₋ 的箭头尖上，沿 v₊−v₋ 方向延伸 γ 倍——这就是「从负分支出发走过头」。</div>
+    </div>
+    <div class="analogy">两个导航员：正导航员说「目标在东北方」，负导航员说「千万别走西南那条烂路」。CFG 的做法是：先听负导航员指出烂路，再朝着「目标方向 − 烂路方向」多走 γ 倍。γ 拧得越大，车开得越猛——贴题，但容易冲出路面（画面 artifacts）。</div>
+  </div>
+
+  <div class="card">
+    <h3>🏃 On-Policy 蒸馏：在学生「自己走到的状态」上请教师点评</h3>
+    <p>传统（off-policy）蒸馏在「数据构造的状态」上训练——比如给真实图片加噪得到的标准含噪状态。而 <b>on-policy 蒸馏（OPD）</b>让学生用自己当前的策略生成完整去噪轨迹，教师只在<b>学生实际访问过的状态</b>上做评估并给出监督
+      <a class="src" href="https://arxiv.org/abs/2605.15055" target="_blank" rel="noopener">DiffusionOPD</a>
+      <a class="src" href="https://arxiv.org/abs/2605.05204" target="_blank" rel="noopener">D-OPSD</a>
+      <a class="src" href="https://arxiv.org/abs/2605.08063" target="_blank" rel="noopener">Flow-OPD</a>。这样监督恰好覆盖学生真正会犯错的地方，再叠加每一步都有的稠密反馈，成为离线蒸馏和标量奖励优化之外的有力选择
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 §1</a>。</p>
+    <div class="analogy">驾校教练的两种方式：off-policy 是让你在模拟器里看「标准路况录像」练反应；on-policy 是教练坐副驾，你自己开车上路，<b>在你真实开到的每个路口</b>，教练立刻告诉你「刚才方向盘该往哪打」。后者教的就是你实际会遇到的状况。</div>
+    <div class="keyfact">OPD 的目标在学生访问的状态 <var>x</var><sub>t</sub><sup>S</sup> 上最小化师生预测差异，化简后（差一个时间步权重 <var>w</var>(<var>t</var>)）就是速度匹配：‖<var>v</var><sub>T</sub> − <var>v</var><sub>S</sub>‖² <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 式 2</a>。教师可以看到学生拿不到的特权信息，因此双方条件 <var>c</var><sub>T</sub>、<var>c</var><sub>S</sub> 不必相同——这一点是后面所有故事的伏笔。</div>
+  </div>
+</section>
+
+<!-- ============ 第 1 章 概念基础 ============ -->
+<section class="chapter fade-up" id="ch1">
+  <div class="chap-head"><span class="chap-num">第 1 章</span><h2>概念基础：当 OPD 遇上 CFG</h2></div>
+  <p class="oneline">把上一章的两个积木拼起来，裂缝就出现了：合成后的速度可以匹配，两个分支却可能各错各的。</p>
+
+  <div class="card">
+    <h3>🧩 最自然的做法：匹配「合成之后」的速度</h3>
+    <p>面对带 CFG 的教师，一个最自然的扩展是：师生各自算出自己的正、负分支，各自按 γ 合成，然后匹配合成结果
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 式 5</a>。记两个分支各自的误差为
+      <var>e</var><sub>+</sub> = <var>v</var><sub>T</sub><sup>+</sup> − <var>v</var><sub>S</sub><sup>+</sup>，<var>e</var><sub>−</sub> = <var>v</var><sub>T</sub><sup>−</sup> − <var>v</var><sub>S</sub><sup>−</sup>，则朴素目标只约束它们的<b>线性组合</b>：</p>
+    <div class="formula">
+      <var>L</var><sub>naive</sub> <span class="op">∝</span> ‖ <var>γ</var><var>e</var><sub>+</sub> <span class="op">+</span> (1 − <var>γ</var>)<var>e</var><sub>−</sub> ‖<sup>2</sup>
+      <div class="fnote">白话翻译：只看「按 γ 加权后的总账」。只要 γe₊ + (1−γ)e₋ 这一项为零，损失就是零——至于 e₊ 和 e₋ 各自是多少，损失函数根本不关心。</div>
+    </div>
+    <p>问题在于，一个向量等式 <var>γ</var><var>e</var><sub>+</sub> + (1−<var>γ</var>)<var>e</var><sub>−</sub> = 0 约束的是两个未知向量，<b>方程个数不够</b>——这就是论文说的「分支层面欠约束（under-identified）」
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 §2.2–3.1</a>：</p>
+    <div class="formula">
+      <var>e</var><sub>+</sub> <span class="op">=</span> <span class="frac"><span class="num"><var>γ</var> − 1</span><span class="den"><var>γ</var></span></span> <var>e</var><sub>−</sub>
+      <div class="fnote">式 7：只要正支误差与负支误差保持这个固定比例，合成预测就分毫不差。满足条件的 (<var>e</var><sub>+</sub>, <var>e</var><sub>−</sub>) 有<b>无穷多组</b>——两个误差可以互相补偿，而训练目标毫无察觉。</div>
+    </div>
+    <div class="analogy">小组作业只算总分：正支是「策划」、负支是「执行」，期末只看合成总分。策划多扣 7 分、执行多挣 7 分，总分纹丝不动——老师完全看不出两个环节各自已经偏得离谱。更糟的是，换一位用不同权重（另一个 γ）的评委来合分，藏着的偏科立刻露馅。</div>
+
+    <div class="demo-box">
+      <div class="demo-title">动画 ② · 欠约束直线：总账为零，分账随便飘</div>
+      <canvas id="under-canvas" class="chart"></canvas>
+      <div class="slider-row">
+        <label for="under-t">沿约束线滑动 |e₋| 大小</label>
+        <input type="range" id="under-t" min="0" max="100" step="1" value="45">
+        <output id="under-tv">0.45</output>
+      </div>
+      <div class="slider-row">
+        <label for="under-gtest">换一个推理 γ 重新合成</label>
+        <input type="range" id="under-gtest" min="1" max="6" step="0.5" value="1">
+        <output id="under-gtestv">1.0</output>
+      </div>
+      <div class="demo-readout" id="under-readout"></div>
+      <div class="caption">示意平面：横轴正支误差 e₊，纵轴负支误差 e₋（按式 7 同向成比例）。训练 γ = 4.5。黄线上的<b>每一个点</b>都让朴素损失为 0；但只要换一个推理 γ 重新合成，残余误差 ‖γe₊+(1−γ)e₋‖ 立刻不等于 0——线上离原点越远的点，爆得越狠。这正是 NBA 在 γ 变化时暴露的几何原理。</div>
+    </div>
+    <div class="keyfact">欠约束本身不等于失败。论文强调：如果师生负支条件相同，共享参数的更新可以让两个分支误差<b>一起下降</b>，朴素匹配依然有效；真正出问题的是教师负支握有特权信息的情形 <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 §1, §3.1</a>。下一章用两组对照实验把这件事讲清楚。</div>
+  </div>
+</section>
+
+<!-- ============ 第 2 章 核心发现 ============ -->
+<section class="chapter fade-up" id="ch2">
+  <div class="chap-head"><span class="chap-num">第 2 章</span><h2>核心发现：负分支不对称（NBA）</h2></div>
+  <p class="oneline">同一套朴素目标，在两种负支条件下走向两种命运：良性联合下降，或拮抗此消彼长。</p>
+
+  <div class="card">
+    <h3>🔬 两组对照实验：差别只在「负分支喂什么」</h3>
+    <p>论文设计了两个图像域蒸馏案例，唯一的关键差别是教师的负分支是否持有学生拿不到的信息
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 §4.1.1</a>：</p>
+    <table class="tbl">
+      <tr><th>设置</th><th>文字渲染蒸馏（共享负支）</th><th>参考条件蒸馏（特权负支）</th></tr>
+      <tr><td>基座模型</td><td>SD3.5-Medium <a class="src" href="https://arxiv.org/abs/2403.03206" target="_blank" rel="noopener">Esser et al.</a></td><td>FLUX.2-klein-base-4B <a class="src" href="https://bfl.ai/blog/flux-2" target="_blank" rel="noopener">BFL</a></td></tr>
+      <tr><td>教师正支 c⁺<sub>T</sub></td><td>提示词 y</td><td>(y, 参考图 r)</td></tr>
+      <tr><td>教师负支 c⁻<sub>T</sub></td><td>空文本 ∅</td><td><span class="bad">(∅, 参考图 r) ← 学生没有 r</span></td></tr>
+      <tr><td>学生两支</td><td>y / ∅（与教师相同）</td><td>y / ∅（没有参考图）</td></tr>
+      <tr><td>训练 γ</td><td>4.5</td><td>2</td></tr>
+      <tr><td>出处</td><td><a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">式 13</a> <a class="src" href="https://arxiv.org/abs/2605.15055" target="_blank" rel="noopener">DiffusionOPD 协议</a></td><td><a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">式 14</a> <a class="src" href="https://arxiv.org/abs/2605.05204" target="_blank" rel="noopener">D-OPSD 协议</a></td></tr>
+    </table>
+    <p style="margin-top:12px">注意第二列：很多模型的原生 CFG 方案是「负分支只换掉文本、保留参考图等辅助输入」。于是当教师掌握参考图 r 而学生没有时，<b>特权信息天然就留在教师的负分支里</b>——学生无论如何都无法从自己输入复现教师的负支目标 <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 §2.2, §3.1</a>。</p>
+  </div>
+
+  <div class="card">
+    <h3>📉 拮抗动力学：正支在进步，负支在退步</h3>
+    <p>论文全程追踪训练中的两条分支误差曲线（论文图 2）。<b>共享负支</b>时一切正常：甚至只做正支匹配，负支误差也会跟着降——正支更新顺带惠及负支；朴素匹配与 PDM 都是两个误差联合下降。<b>特权负支</b>时剧情反转：朴素匹配（和只做正支的消融）让正支误差下降的同时，<b>负支误差持续上升</b>——论文称之为拮抗性分支误差动力学，即 <b>NBA（Negative Branch Asymmetry）</b>
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 §3.1, 图 2</a>。</p>
+
+    <div class="demo-box">
+      <div class="demo-title">动画 ③ · 两种命运：联合下降 vs 拮抗此消彼长</div>
+      <div class="btn-row" style="margin:0 0 14px">
+        <button class="btn ghost active" id="dyn-shared">共享负支（良性）</button>
+        <button class="btn ghost" id="dyn-priv">特权负支（NBA）</button>
+        <button class="btn" id="dyn-play">▶ 播放训练过程</button>
+      </div>
+      <canvas id="dyn-canvas" class="chart"></canvas>
+      <div class="demo-readout" id="dyn-readout"></div>
+      <div class="caption">示意曲线，复现论文图 2 的趋势形态（数值为教学演示）：蓝线 = 正支误差 ‖e₊‖，红线 = 负支误差 ‖e₋‖，左面板 = 朴素匹配，右面板 = PDM。特权负支下，朴素匹配的负支误差一路上扬，而 PDM 通过分别约束正支预测与 CFG 方向，掐断了补偿通道。</div>
+    </div>
+    <div class="analogy">跷跷板式做账：朴素目标只看「γe₊ + (1−γ)e₋」这个合成值。正支误差往下一压，只要负支误差按固定比例往上一抬，合成值照样漂亮——训练看起来一路向好，负支其实已经悄悄烂掉。等到推理时换一个 γ 重新配比，跷跷板的平衡被打破，问题立刻显形。</div>
+  </div>
+
+  <div class="card">
+    <h3>🩺 NBA 的诊断特征：看「超额退化」，不看绝对退化</h3>
+    <p>换 γ 后性能下降本身并不能证明 NBA——教师自己可能就内在地依赖 CFG。论文给出的判据是<b>超额退化</b>：学生在换 γ 后偏离了教师的 γ 响应曲线，或比分支感知（branch-aware）的同类学生退化得更多
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 §3.1, §4.1.3</a>。</p>
+    <p>文字渲染（共享负支）的 γ 扫描证明了这一点：γ=1 时教师、朴素学生、PDM 学生的 OCR 奖励分别是 <b>75.24 / 73.87 / 74.48</b>，三者随 γ 增大同步改善——退化是教师「与生俱来」的，两种目标都没有引入额外敏感
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 表 1</a>。而参考条件蒸馏（特权负支）里，教师在 γ∈{1, 1.5, 2, 2.5} 全程保住参考风格，PDM 紧密跟随，朴素学生却在 γ=1 时出现明显的视觉失真与风格漂移（论文图 3）
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 §4.1.3</a>。</p>
+    <div class="keyfact">论文结论（Finding）：分支歧义何时有害？共享负支 → 联合下降，学生紧跟教师内在的 CFG 响应；特权负支 → 朴素匹配引发拮抗动力学与超额 γ 敏感，PDM 两者都压住。NBA 的签名是「相对教师或相对分支感知学生的超额退化」，而不是绝对的 CFG-free 性能下降 <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 §4.1.3</a>。</div>
+  </div>
+</section>
+
+<!-- ============ 第 3 章 核心方法 ============ -->
+<section class="chapter fade-up" id="ch3">
+  <div class="chap-head"><span class="chap-num">第 3 章</span><h2>核心方法：PDM 与高效监督</h2></div>
+  <p class="oneline">解法一句话：别等合成完再对账，在合成之前就把「正支预测」和「CFG 方向」分别对齐。</p>
+
+  <div class="card">
+    <h3>🎯 Positive–Direction Matching：把监督提前到合成之前</h3>
+    <p>对模型 M ∈ {教师, 学生}，定义它的 <b>CFG 条件方向</b>为两个分支之差
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 式 9</a>：</p>
+    <div class="formula">
+      <var>d</var><sub>M</sub> <span class="op">=</span> <var>v</var><sub>M</sub><sup>+</sup> <span class="op">−</span> <var>v</var><sub>M</sub><sup>−</sup>
+      <div class="fnote">白话翻译：d 就是动画 ① 里「从负分支指向正分支」的那根向量——它刻画「提示词到底把方向推了多远」，正是 CFG 在 γ &gt; 1 时过冲所沿的方向。</div>
+    </div>
+    <p>主目标 <b>PDM</b> 分别匹配正支预测和这个方向
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 式 10</a>：</p>
+    <div class="formula">
+      ℓ<sub>PDM</sub> <span class="op">=</span> ‖<var>e</var><sub>+</sub>‖<sup>2</sup> <span class="op">+</span> <var>λ</var> ‖<var>d</var><sub>T</sub> <span class="op">−</span> <var>d</var><sub>S</sub>‖<sup>2</sup> <span class="op">=</span> ‖<var>e</var><sub>+</sub>‖<sup>2</sup> <span class="op">+</span> <var>λ</var> ‖<var>e</var><sub>+</sub> <span class="op">−</span> <var>e</var><sub>−</sub>‖<sup>2</sup>
+      <div class="fnote">逐项翻译：第一项锚定正分支（学生正支必须真的像教师正支）；第二项保住 CFG 方向（正负支的「差距」必须一致）。两项联立的唯一零解是 <var>e</var><sub>+</sub> = <var>e</var><sub>−</sub> = 0——补偿自由度被彻底消除，再也不可能「保一个、烂一个」。</div>
+    </div>
+    <p>作为对照，论文还设计了 <b>IBM</b>（Independent Branch Matching）：直接分别匹配两个分支，权重保留朴素目标展开后的 γ² 与 (γ−1)²，但去掉交叉项
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 式 11</a>。PDM 与 IBM 在 γ &gt; 1 时都有唯一的分支级零解；实验上 PDM 整体更强（见第 4 章），但论文坦承这一优势目前只是经验性的。</p>
+
+    <div class="demo-box">
+      <div class="demo-title">动画 ④ · 两种目标训练后，学生的分支长什么样</div>
+      <div class="btn-row" style="margin:0 0 14px">
+        <button class="btn ghost" id="vec-naive">朴素匹配训练后</button>
+        <button class="btn ghost" id="vec-pdm">PDM 训练后</button>
+        <button class="btn" id="vec-play">▶ 播放对齐过程</button>
+      </div>
+      <canvas id="vec-canvas" class="chart"></canvas>
+      <div class="demo-readout" id="vec-readout"></div>
+      <div class="caption">示意向量（γ = 4.5）。细箭头 = 教师（蓝 v⁺<sub>T</sub>，灰 v⁻<sub>T</sub>），粗箭头 = 学生。朴素训练后：合成速度 ṽ 与教师几乎重合，但两个分支各自偏移、误差互相补偿；PDM 训练后：正支逐一对齐、方向 d（虚线）保持一致，分支误差无处遁形。</div>
+    </div>
+    <div class="analogy">从「只看总分」改成「分项批改」：朴素目标是期末只看合成总分；PDM 相当于既批改「策划卷」（正支），又单独核对「策划与执行的分差」（CFG 方向）。两张卷子都对了，任何权重的评委（任何 γ）合出来的分都对。</div>
+  </div>
+
+  <div class="card">
+    <h3>⏱️ 顺带一提：只监督前 8 步，成本省 6 倍</h3>
+    <p>视频上的全轨迹 OPD 非常贵——每个去噪状态都要评估一次教师。论文（与并行的 DanceOPD
+      <a class="src" href="https://arxiv.org/abs/2606.27377" target="_blank" rel="noopener">Zhou et al. 2026</a> 各自独立发现）只监督学生轨迹的<b>前 K 个状态</b>，学生仍跑完整轨迹，但教师只在前 K 步出场
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 §3.3, 式 12</a>。</p>
+    <table class="tbl">
+      <tr><th>监督步数 K</th><th>MPJPE ↓</th><th>PCK@0.2 ↑</th><th>FID ↓</th><th>FVD ↓</th><th>单步耗时 ↓</th></tr>
+      <tr><td>1</td><td>4.33</td><td>92.53</td><td>13.70</td><td class="best">54.41</td><td class="best">~23 秒</td></tr>
+      <tr><td>4</td><td>4.27</td><td>92.59</td><td class="best">13.58</td><td>57.08</td><td>~69 秒</td></tr>
+      <tr><td class="hl">8（论文默认）</td><td class="best">4.27</td><td class="best">92.71</td><td>13.83</td><td>58.65</td><td>~132 秒</td></tr>
+      <tr><td>50（全轨迹）</td><td>4.65</td><td>91.34</td><td>13.91</td><td>61.95</td><td class="bad">~790 秒</td></tr>
+    </table>
+    <div class="keyfact">K = 8 给出最强的控制保真度，同时单步训练耗时只有全轨迹的约 1/6（132 vs 790 秒）。讽刺的是全轨迹反而更差——监督并非越多越好。主实验统一用 K = 8、λ = 1 <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 表 5, §4.2.1</a>。</div>
+  </div>
+</section>
+
+<!-- ============ 第 4 章 实验结果 ============ -->
+<section class="chapter fade-up" id="ch4">
+  <div class="chap-head"><span class="chap-num">第 4 章</span><h2>实验结果</h2></div>
+  <p class="oneline">一个实战场景：教师看 81 帧稠密控制信号，学生只看 4 个关键帧——分支感知监督能把稠密控制知识可靠地搬过去吗？</p>
+
+  <div class="card">
+    <h3>🎬 实战设置：Wan-VACE 上的稠密→稀疏视频控制</h3>
+    <p>应用场景基于 Wan-VACE
+      <a class="src" href="https://arxiv.org/abs/2503.07598" target="_blank" rel="noopener">VACE</a>
+      <a class="src" href="https://arxiv.org/abs/2503.20314" target="_blank" rel="noopener">Wan</a>：教师接收<b>逐帧稠密</b>控制序列（姿态/深度/涂鸦），学生只看 <b>4 个稀疏关键帧</b>（第 0 帧参考图 + 第 20/40/60 帧控制），基准来自 OpenHumanVid
+      <a class="src" href="https://arxiv.org/abs/2503.19953" target="_blank" rel="noopener">Li et al. 2025</a>，按运动难度分层抽取 600 段测试视频
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 §4.2.1, 附录表 6–7</a>。注意教师的负支同样保留稠密控制（式 15），正是典型的特权负支场景。所有方法用同一学生架构与训练预算（LoRA 微调冻结的 Wan2.1-VACE-1.3B
+      <a class="src" href="https://arxiv.org/abs/2106.09685" target="_blank" rel="noopener">LoRA</a>，γ = 5，UniPC 50 步）。</p>
+    <table class="tbl">
+      <tr><th>方法</th><th>姿态 MPJPE ↓</th><th>深度 SI-RMSE ↓</th><th>涂鸦 F1 ↑</th></tr>
+      <tr><td>教师（稠密控制）</td><td>3.03</td><td>6.19</td><td>93.73</td></tr>
+      <tr><td>学生（未适配）</td><td>5.92</td><td>14.36</td><td>64.70</td></tr>
+      <tr><td>SFT</td><td>5.02</td><td>11.96</td><td>68.27</td></tr>
+      <tr><td>Off-policy 蒸馏</td><td>5.14</td><td>12.10</td><td>71.49</td></tr>
+      <tr><td>OPD（朴素）</td><td>4.43</td><td>10.69</td><td>75.00</td></tr>
+      <tr><td>OPD（IBM）</td><td>4.20</td><td>10.37</td><td>76.13</td></tr>
+      <tr><td class="hl">OPD（PDM）</td><td class="best">4.13</td><td class="best">10.31</td><td class="best">76.22</td></tr>
+    </table>
+    <div class="keyfact">即使在训练 γ = 5 的「主场」，PDM 也在全部三种模态上给出最稳的控制保真度提升，IBM 在多数指标上同样优于朴素匹配——说明分支感知监督改善的是知识迁移本身，而不只是修好了换 γ 时的退化 <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 表 2, §4.2.2</a>。</div>
+  </div>
+
+  <div class="card">
+    <h3>🎚️ 换 γ 之后：朴素 OPD 崩盘，PDM 稳如老狗</h3>
+    <p>把姿态模型（γ<sub>train</sub> = 5 训练）拿到 γ ∈ {1, 3, 5} 下评测。朴素匹配一离开训练值就急剧退化，γ=1 时 FVD 从 67.44 暴涨到 <b>507.70</b>；PDM 与 IBM 全程平稳
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 表 3, 图 4</a>：</p>
+
+    <div class="demo-box">
+      <div class="demo-title">动画 ⑤ · 拖动 γ：看朴素 OPD 的「主场幻觉」破灭</div>
+      <canvas id="sens-canvas" class="chart"></canvas>
+      <div class="slider-row">
+        <label for="sens-gamma">推理 γ（训练时 γ = 5）</label>
+        <input type="range" id="sens-gamma" min="0" max="2" step="1" value="0">
+        <output id="sens-gammav">1</output>
+      </div>
+      <div class="demo-readout" id="sens-readout"></div>
+      <div class="caption">数据直接取自论文表 3（姿态控制，MPJPE-All 与 FVD）。左面板 MPJPE ↓，右面板 FVD ↓。注意 FVD 在 γ=1 时的爆炸：朴素 507.70 vs PDM 60.97。</div>
+    </div>
+    <div class="analogy">主场幻觉：朴素学生像只在主场（γ=5）赢过球的球队——比分好看，但赢法是「两个队员互相补台」凑出来的。一去客场（γ=1），配合套路失效，真实水平露馅。PDM 学生每个位置都练扎实了，主客场发挥一样稳。</div>
+  </div>
+
+  <div class="card">
+    <h3>🧪 消融：λ 取多少合适？</h3>
+    <p>λ 控制方向匹配的强度：λ = 0 时 PDM 退化为只做正支匹配。λ = 1 给出最佳整体控制保真度（关键帧 MPJPE 最低 2.75、PCK@0.1 最高 82.12）；更大的 λ 会改善部分分布质量指标（FID 降到 12.96）但削弱控制精度。论文默认 λ = 1
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 表 4, §4.3.1</a>。</p>
+    <table class="tbl">
+      <tr><th>λ</th><th>MPJPE ↓</th><th>PCK@0.1 ↑</th><th>FID ↓</th><th>FVD ↓</th></tr>
+      <tr><td>0（仅正支）</td><td class="best">4.24</td><td>81.80</td><td>13.97</td><td>59.72</td></tr>
+      <tr><td class="hl">1（默认）</td><td>4.27</td><td class="best">82.12</td><td>13.83</td><td>58.65</td></tr>
+      <tr><td>3</td><td>4.36</td><td>81.25</td><td>13.33</td><td>61.79</td></tr>
+      <tr><td>5</td><td>4.40</td><td>80.89</td><td>12.97</td><td class="best">56.85</td></tr>
+      <tr><td>10</td><td>4.49</td><td>80.21</td><td class="best">12.96</td><td>56.91</td></tr>
+    </table>
+    <p style="margin-top:10px;font-size:14px;color:#48566a">注意 MPJPE 一栏 λ = 0 的 4.24 略低于 λ = 1 的 4.27——论文说的「最佳整体控制保真度」指的是关键帧子集（MPJPE-Key 2.75 为全场最低）与 PCK@0.1 的组合，全帧指标上两者基本持平。</p>
+  </div>
+</section>
+
+<!-- ============ 第 5 章 局限与意义 ============ -->
+<section class="chapter fade-up" id="ch5">
+  <div class="chap-head"><span class="chap-num">第 5 章</span><h2>局限与意义</h2></div>
+  <p class="oneline">这篇论文最大的贡献不是一个新的 loss，而是把一个「默认正确」的组合拆开检查了一遍。</p>
+
+  <div class="card">
+    <h3>⚖️ 论文自己承认的局限</h3>
+    <p>PDM 与 IBM 在非退化权重下共享同一个分支级零解，PDM 观察到的优势<b>目前是经验性的、没有理论解释</b>——两者优化行为的差异尚待刻画。NBA 的分析也有待推广到其他引导机制（如把 CFG 内化进单预测的 DanceOPD 式学生）和其他师生条件不对称的情形
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 §6</a>。此外参考条件蒸馏的案例是定性的（12 条 held-out 提示词），作者明确不把它当作性能的聚合估计
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 附录 7.1.2</a>。</p>
+  </div>
+
+  <div class="card">
+    <h3>🌍 为什么这件事重要</h3>
+    <p>CFG 是几乎所有现代扩散系统的默认组件，OPD 正在成为扩散模型后训练的热门范式——两者的组合方式是「顺手为之」的：把速度匹配扩展到合成预测上，看起来天经地义。这篇论文证明这个顺手的选择在数学上欠约束，并且精确指出了它何时 benign、何时咬人：<b>只要教师负支握有学生拿不到的特权信息</b>（参考图、稠密控制……这在实际知识迁移里非常常见），朴素匹配就会把负支越练越烂，而且在训练用的 γ 下完全看不出来。</p>
+    <p>给实践者的行动清单也很直接：做 branch-retaining 的 OPD 时，先检查师生负支条件是否一致；不一致就换分支感知目标（PDM 或 IBM）；部署时若需要在多个 γ 下工作，务必做跨 γ 评测——训练 γ 下的好成绩可能是一场「主场幻觉」
+      <a class="src" href="https://arxiv.org/pdf/2607.24731" target="_blank" rel="noopener">论文 §1, §4.2.3</a>。</p>
+    <div class="keyfact">一句话总结：对账要在合成之前。正支预测 + CFG 方向分别对齐（PDM），损失为零当且仅当两个分支都对——补偿自由度归零，γ 随便换 <a class="src" href="https://arxiv.org/abs/2607.24731" target="_blank" rel="noopener">arXiv 摘要</a> <a class="src" href="https://rethinking-cfg-opd.github.io" target="_blank" rel="noopener">项目主页</a>。</div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    本页基于 arXiv 论文《Rethinking Classifier-Free Guidance in On-Policy Diffusion Distillation》（arXiv:2607.24731v1，2026-07-27，阿里 Qwen Business Unit）整理制作 · 2026-07<br>
+    通俗类比与演示动画仅用于帮助理解，动画 ①②③④ 中的向量与曲线为教学示意；所有实验数字均直接摘自论文表 1–5，技术细节以
+    <a class="src-inline" href="https://arxiv.org/abs/2607.24731" target="_blank" rel="noopener">原文</a> 为准 · 文中所有标注 ↗ 的链接均指向原始出处
+  </div>
+</footer>
+
+<script>
+/* ============ 入场动画 ============ */
+const io = new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting)e.target.classList.add('show');
+}),{threshold:.15});
+document.querySelectorAll('.fade-up').forEach(el=>io.observe(el));
+
+/* ============ 工具：高清 canvas + 箭头 ============ */
+function setupCanvas(id){
+  const cv=document.getElementById(id);
+  const dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx:ctx,W:W,H:H};
+}
+function arrow(ctx,x1,y1,x2,y2,color,lw,dash){
+  const ang=Math.atan2(y2-y1,x2-x1),hl=9+lw;
+  ctx.save();
+  if(dash)ctx.setLineDash([6,5]);
+  ctx.strokeStyle=color;ctx.lineWidth=lw;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle=color;
+  ctx.beginPath();
+  ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-hl*Math.cos(ang-0.42),y2-hl*Math.sin(ang-0.42));
+  ctx.lineTo(x2-hl*Math.cos(ang+0.42),y2-hl*Math.sin(ang+0.42));
+  ctx.closePath();ctx.fill();
+  ctx.restore();
+}
+function vlabel(ctx,x,y,text,color){
+  ctx.fillStyle=color;ctx.font='bold 13px sans-serif';ctx.textAlign='center';
+  ctx.fillText(text,x,y);
+}
+
+/* ============ 动画 ①：CFG 合成速度 ============ */
+const CFG_VP=[1.0,0.45],CFG_VM=[0.25,-0.30];
+function cfgDemo(){
+  const g=parseFloat(document.getElementById('cfg-gamma').value);
+  document.getElementById('cfg-gammav').textContent=g.toFixed(1);
+  const o=setupCanvas('cfg-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const ox=80,oy=H-56,sc=40;
+  const X=v=>ox+v[0]*sc,Y=v=>oy-v[1]*sc;
+  // 坐标轴
+  ctx.strokeStyle='#2a3c60';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(30,oy);ctx.lineTo(W-20,oy);ctx.moveTo(ox,20);ctx.lineTo(ox,H-20);ctx.stroke();
+  const d=[CFG_VP[0]-CFG_VM[0],CFG_VP[1]-CFG_VM[1]];
+  const comp=[CFG_VM[0]+g*d[0],CFG_VM[1]+g*d[1]];
+  // 从 v- 尖端出发沿 d 的延长虚线
+  const ext=[CFG_VM[0]+6.3*d[0],CFG_VM[1]+6.3*d[1]];
+  ctx.setLineDash([4,5]);ctx.strokeStyle='#3a5078';ctx.lineWidth=1.2;
+  ctx.beginPath();ctx.moveTo(X(CFG_VM),Y(CFG_VM));ctx.lineTo(X(ext),Y(ext));ctx.stroke();ctx.setLineDash([]);
+  // 分支与合成
+  arrow(ctx,ox,oy,X(CFG_VM),Y(CFG_VM),'#8d9bb5',2.5,false);
+  arrow(ctx,ox,oy,X(CFG_VP),Y(CFG_VP),'#4d9fff',3,false);
+  if(g>0.01)arrow(ctx,ox,oy,X(comp),Y(comp),'#ffd97a',3.5,false);
+  vlabel(ctx,X(CFG_VP)+16,Y(CFG_VP)-8,'v₊','#4d9fff');
+  vlabel(ctx,X(CFG_VM)+18,Y(CFG_VM)+16,'v₋','#8d9bb5');
+  if(g>0.01)vlabel(ctx,X(comp)+18,Y(comp)-8,'ṽ','#ffd97a');
+  // 说明
+  let msg;
+  if(g===0)msg='γ = 0：合成速度完全等于<b style="color:#8d9bb5">负分支 v₋</b>（退化情形，一般用不到）。';
+  else if(g===1)msg='γ = 1：ṽ <b style="color:#ffd97a">恰好落在 v₊ 上</b>——公式退化为 ṽ = v₊，CFG 等于只用正分支。';
+  else if(g<1)msg='γ &lt; 1：ṽ 落在 v₋ 与 v₊ <b>之间</b>，是保守的内插。';
+  else msg='γ = '+g.toFixed(1)+' &gt; 1：ṽ 从 v₋ 出发、沿「v₊ − v₋」方向<b style="color:#ffd97a">过冲 '+g.toFixed(1)+' 倍</b>——越贴题，也越逼近崩坏边缘。';
+  document.getElementById('cfg-readout').innerHTML=msg+
+    '<br><span style="font-size:13px;color:#7f92b8">关键：网络只输出 v₊ 与 v₋，ṽ 是推理时现配的。蒸馏若只匹配 ṽ，两支各自的误差就被藏进了这个配方里。</span>';
+}
+document.getElementById('cfg-gamma').addEventListener('input',cfgDemo);
+cfgDemo();
+
+/* ============ 动画 ②：欠约束直线 ============ */
+const G_TRAIN=4.5;
+function underDemo(){
+  const t=parseFloat(document.getElementById('under-t').value)/100;
+  const gtest=parseFloat(document.getElementById('under-gtest').value);
+  document.getElementById('under-tv').textContent=t.toFixed(2);
+  document.getElementById('under-gtestv').textContent=gtest.toFixed(1);
+  const o=setupCanvas('under-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=70,padR=30,padT=26,padB=44;
+  const px=v=>padL+v/0.9*(W-padL-padR);
+  const py=v=>(H-padB)-v/1.1*(H-padT-padB);
+  // 轴
+  ctx.strokeStyle='#2a3c60';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(padL,padT);ctx.lineTo(padL,H-padB);ctx.lineTo(W-padR,H-padB);ctx.stroke();
+  ctx.fillStyle='#7f92b8';ctx.font='12px sans-serif';ctx.textAlign='center';
+  ctx.fillText('正支误差 |e₊| →',(padL+W-padR)/2,H-12);
+  ctx.save();ctx.translate(18,(padT+H-padB)/2);ctx.rotate(-Math.PI/2);
+  ctx.fillText('负支误差 |e₋| →',0,0);ctx.restore();
+  // 约束线 e+ = (γ-1)/γ · e-
+  const ratio=(G_TRAIN-1)/G_TRAIN;
+  const sMax=1.1;
+  ctx.strokeStyle='#ffd97a';ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.moveTo(px(0),py(0));ctx.lineTo(px(ratio*sMax*0.95),py(sMax*0.95));ctx.stroke();
+  ctx.fillStyle='#ffd97a';ctx.font='bold 12.5px sans-serif';ctx.textAlign='right';
+  ctx.fillText('朴素零损失线：γe₊+(1−γ)e₋=0',W-padR,padT-6);
+  // 原点：PDM 的唯一解
+  ctx.beginPath();ctx.arc(px(0),py(0),7,0,7);ctx.fillStyle='#2bc48a';ctx.fill();
+  ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+  vlabel(ctx,px(0)+4,py(0)+24,'PDM 唯一零解 (0,0)','#2bc48a');
+  // 当前点
+  const s=t*sMax*0.95,ep=ratio*s;
+  ctx.beginPath();ctx.arc(px(ep),py(s),8,0,7);ctx.fillStyle='#ff6b6b';ctx.fill();
+  ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+  vlabel(ctx,px(ep),py(s)-14,'当前学生 ('+ep.toFixed(2)+', '+s.toFixed(2)+')','#ff6b6b');
+  // 读出
+  const naiveRes=Math.abs(G_TRAIN*ep+(1-G_TRAIN)*s);
+  const testRes=Math.abs(gtest*ep+(1-gtest)*s);
+  document.getElementById('under-readout').innerHTML=
+    '训练视角（γ='+G_TRAIN+'）：残余 ‖γe₊+(1−γ)e₋‖ = <b style="color:#2bc48a">'+naiveRes.toFixed(3)+'</b>（恒为 0，损失完全满意）'+
+    '<br>推理视角（γ='+gtest.toFixed(1)+'）：同一学生的残余 = <b style="color:'+(testRes<0.01?'#2bc48a':'#ff6b6b')+'">'+testRes.toFixed(3)+'</b>'+
+    (testRes<0.01?' —— 推理 γ 恰好等于训练 γ，补偿仍然成立，问题隐形。':' —— 换了 γ 重新配比，互相补偿的戏法穿帮。线上离原点越远、γ 差得越多，爆得越狠。');
+}
+document.getElementById('under-t').addEventListener('input',underDemo);
+document.getElementById('under-gtest').addEventListener('input',underDemo);
+underDemo();
+
+/* ============ 动画 ③：分支误差动力学 ============ */
+const DYN_CURVES={
+  shared:{
+    naive:{ep:[2.6,0.5],em:[0.6,0.35]},
+    pdm:{ep:[2.6,0.4],em:[0.6,0.3]},
+    text:'共享负支：连朴素匹配都是良性的——正支更新顺带惠及负支，两条误差<b style="color:#2bc48a">联合下降</b>（对应论文图 2 上排：文字渲染蒸馏）。'
+  },
+  priv:{
+    naive:{ep:[2.6,0.7],em:[0.5,2.1]},
+    pdm:{ep:[2.6,0.5],em:[0.5,0.55]},
+    text:'特权负支：朴素匹配正支误差在降、<b style="color:#ff6b6b">负支误差一路上涨</b>——这就是 NBA 的拮抗动力学（论文图 2 下排）。PDM 掐断补偿通道，负支误差被按住。'
+  }
+};
+let dynMode='shared',dynProg=1,dynAnim=null;
+function drawDyn(prog){
+  const o=setupCanvas('dyn-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const c=DYN_CURVES[dynMode];
+  const panels=[{x:40,title:'朴素匹配',cur:c.naive},{x:W/2+20,title:'PDM',cur:c.pdm}];
+  const pw=W/2-60,padT=34,padB=34,vMax=2.8;
+  panels.forEach(p=>{
+    ctx.strokeStyle='#2a3c60';ctx.lineWidth=1;
+    ctx.strokeRect(p.x,padT,pw,H-padT-padB);
+    ctx.fillStyle='#8fb8ff';ctx.font='bold 13px sans-serif';ctx.textAlign='left';
+    ctx.fillText(p.title,p.x,padT-10);
+    ctx.fillStyle='#7f92b8';ctx.font='10.5px sans-serif';
+    ctx.fillText('训练步 →',p.x+pw-54,H-10);
+    const N=40,n=Math.max(2,Math.round(N*prog));
+    ['ep','em'].forEach(k=>{
+      const a=p.cur[k][0],b=p.cur[k][1];
+      ctx.strokeStyle=k==='ep'?'#4d9fff':'#ff6b6b';ctx.lineWidth=2.5;ctx.beginPath();
+      for(let i=0;i<n;i++){
+        const f=i/(N-1);
+        // 平滑趋向终值 + 一点点过程抖动（确定性）
+        const v=a+(b-a)*(1-Math.pow(1-f,2.2))+Math.sin(i*1.7)*0.05*(1-f);
+        const xx=p.x+4+f*(pw-8);
+        const yy=padT+(1-v/vMax)*(H-padT-padB)-4;
+        if(i===0)ctx.moveTo(xx,yy);else ctx.lineTo(xx,yy);
+      }
+      ctx.stroke();
+    });
+  });
+  // 图例
+  ctx.font='12px sans-serif';ctx.textAlign='left';
+  ctx.fillStyle='#4d9fff';ctx.fillText('— 正支误差 ‖e₊‖',40,H-8);
+  ctx.fillStyle='#ff6b6b';ctx.fillText('— 负支误差 ‖e₋‖',170,H-8);
+  if(prog>=1)document.getElementById('dyn-readout').innerHTML=c.text;
+  else document.getElementById('dyn-readout').innerHTML='训练中……（进度 '+Math.round(prog*100)+'%）';
+}
+function dynPlay(){
+  if(dynAnim)cancelAnimationFrame(dynAnim);
+  const t0=performance.now(),dur=2200;
+  function step(t){
+    dynProg=Math.min(1,(t-t0)/dur);
+    drawDyn(1-Math.pow(1-dynProg,2));
+    if(dynProg<1)dynAnim=requestAnimationFrame(step);
+  }
+  dynAnim=requestAnimationFrame(step);
+}
+document.getElementById('dyn-play').addEventListener('click',dynPlay);
+document.getElementById('dyn-shared').addEventListener('click',function(){
+  dynMode='shared';
+  this.classList.add('active');document.getElementById('dyn-priv').classList.remove('active');
+  drawDyn(1);
+});
+document.getElementById('dyn-priv').addEventListener('click',function(){
+  dynMode='priv';
+  this.classList.add('active');document.getElementById('dyn-shared').classList.remove('active');
+  drawDyn(1);
+});
+drawDyn(1);
+
+/* ============ 动画 ④：PDM 矢量对齐 ============ */
+const VT={vp:[1.0,0.5],vm:[0.2,-0.4]};
+const V_INIT={vp:[0.55,0.15],vm:[0.35,-0.15]};
+const V_NAIVE={vp:[0.78,0.41],vm:[-0.083,-0.516]};
+const V_PDM={vp:[0.98,0.51],vm:[0.21,-0.39]};
+const V_GAMMA=4.5;
+let vecMode='naive',vecAnim=null;
+function composeV(vp,vm,g){return [g*vp[0]+(1-g)*vm[0],g*vp[1]+(1-g)*vm[1]];}
+function drawVec(prog){
+  const o=setupCanvas('vec-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const ox=80,oy=H-56,sc=45;
+  const X=v=>ox+v[0]*sc,Y=v=>oy-v[1]*sc;
+  ctx.strokeStyle='#2a3c60';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(30,oy);ctx.lineTo(W-20,oy);ctx.moveTo(ox,20);ctx.lineTo(ox,H-20);ctx.stroke();
+  const target=vecMode==='naive'?V_NAIVE:V_PDM;
+  const vs={vp:[V_INIT.vp[0]+(target.vp[0]-V_INIT.vp[0])*prog,
+                V_INIT.vp[1]+(target.vp[1]-V_INIT.vp[1])*prog],
+            vm:[V_INIT.vm[0]+(target.vm[0]-V_INIT.vm[0])*prog,
+                V_INIT.vm[1]+(target.vm[1]-V_INIT.vm[1])*prog]};
+  // 教师（细箭头）
+  arrow(ctx,ox,oy,X(VT.vp),Y(VT.vp),'#4d9fff',1.8,false);
+  arrow(ctx,ox,oy,X(VT.vm),Y(VT.vm),'#8d9bb5',1.8,false);
+  // 教师方向 d（虚线，从 v- 尖端到 v+ 尖端）
+  ctx.setLineDash([5,5]);ctx.strokeStyle='#a55eea';ctx.lineWidth=1.8;
+  ctx.beginPath();ctx.moveTo(X(VT.vm),Y(VT.vm));ctx.lineTo(X(VT.vp),Y(VT.vp));ctx.stroke();ctx.setLineDash([]);
+  const compT=composeV(VT.vp,VT.vm,V_GAMMA);
+  arrow(ctx,ox,oy,X(compT),Y(compT),'rgba(255,255,255,.55)',1.8,true);
+  vlabel(ctx,X(compT)+14,Y(compT)-8,'ṽT','#dfe8ff');
+  // 学生（粗箭头）
+  arrow(ctx,ox,oy,X(vs.vp),Y(vs.vp),'#2bc48a',3.2,false);
+  arrow(ctx,ox,oy,X(vs.vm),Y(vs.vm),'#ffb3b3',3.2,false);
+  ctx.setLineDash([5,5]);ctx.strokeStyle='#ffd97a';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(X(vs.vm),Y(vs.vm));ctx.lineTo(X(vs.vp),Y(vs.vp));ctx.stroke();ctx.setLineDash([]);
+  const compS=composeV(vs.vp,vs.vm,V_GAMMA);
+  arrow(ctx,ox,oy,X(compS),Y(compS),'#f7b731',2.6,true);
+  // 图例（流式换行，窄屏不溢出）
+  ctx.font='12px sans-serif';ctx.textAlign='left';
+  const legend=[['#4d9fff','细蓝 v⁺T（教师正支）'],['#2bc48a','粗绿 v⁺S（学生正支）'],
+    ['#ffb3b3','粗红 v⁻S（学生负支）'],['#ffd97a','黄虚线 = 学生方向 dS']];
+  let lx=40,ly=22;
+  legend.forEach(it=>{
+    const tw=ctx.measureText(it[1]).width;
+    if(lx+tw>W-16){lx=40;ly+=18;}
+    ctx.fillStyle=it[0];ctx.fillText(it[1],lx,ly);
+    lx+=tw+22;
+  });
+  if(prog>=1){
+    const e=vecMode==='naive'?
+      '朴素训练后：学生的 ṽS（橙色虚箭头）与教师 ṽT 几乎重合，训练损失≈0 ✓——但看分支：绿、红粗箭头各自偏离教师，<b style="color:#ff6b6b">误差互相补偿</b>，黄虚线方向 dS 也已跑偏。换 γ 重组立刻露馅。':
+      'PDM 训练后：学生正支与教师正支<b style="color:#2bc48a">逐一对齐</b>，黄虚线方向 dS 与教师紫色虚线 dT 平行等长——分支误差无处可藏，任何 γ 下重组都对。';
+    document.getElementById('vec-readout').innerHTML=e;
+  }else{
+    document.getElementById('vec-readout').innerHTML='对齐中……（'+Math.round(prog*100)+'%）';
+  }
+}
+function vecPlay(){
+  if(vecAnim)cancelAnimationFrame(vecAnim);
+  const t0=performance.now(),dur=1600;
+  function step(t){
+    const f=Math.min(1,(t-t0)/dur);
+    drawVec(1-Math.pow(1-f,3));
+    if(f<1)vecAnim=requestAnimationFrame(step);
+  }
+  vecAnim=requestAnimationFrame(step);
+}
+document.getElementById('vec-play').addEventListener('click',vecPlay);
+document.getElementById('vec-naive').addEventListener('click',function(){
+  vecMode='naive';
+  this.classList.add('active');document.getElementById('vec-pdm').classList.remove('active');
+  drawVec(1);
+});
+document.getElementById('vec-pdm').addEventListener('click',function(){
+  vecMode='pdm';
+  this.classList.add('active');document.getElementById('vec-naive').classList.remove('active');
+  drawVec(1);
+});
+document.getElementById('vec-naive').classList.add('active');
+drawVec(1);
+
+/* ============ 动画 ⑤：γ 敏感性（论文表 3 真实数据） ============ */
+const SENS_G=[1,3,5];
+const SENS={
+  mpjpe:{naive:[8.98,4.94,4.62],ibm:[4.91,4.42,4.28],pdm:[4.48,4.17,4.27]},
+  fvd:{naive:[507.70,134.09,67.44],ibm:[71.17,56.85,53.83],pdm:[60.97,55.85,58.65]}
+};
+const SENS_METHODS=[['naive','朴素 OPD','#ff6b6b'],['ibm','IBM','#a55eea'],['pdm','PDM','#2bc48a']];
+function sensDemo(){
+  const gi=parseInt(document.getElementById('sens-gamma').value);
+  const g=SENS_G[gi];
+  document.getElementById('sens-gammav').textContent=g;
+  const cvEl=document.getElementById('sens-canvas');
+  const narrow=cvEl.clientWidth<680;
+  cvEl.style.height=narrow?'470px':'260px';
+  const o=setupCanvas('sens-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padT=36,padB=52;
+  const panels=narrow?[
+    {x:56,y:0,w:W-100,h:(H-3*padT)/2,title:'MPJPE ↓（越低越好）',data:SENS.mpjpe,max:9.5,fmt:v=>v.toFixed(2)},
+    {x:56,y:(H-3*padT)/2+padT,w:W-100,h:(H-3*padT)/2,title:'FVD ↓（越低越好）',data:SENS.fvd,max:530,fmt:v=>v.toFixed(1)}
+  ]:[
+    {x:56,y:0,w:W/2-80,h:H-padT-padB,title:'MPJPE ↓（越低越好）',data:SENS.mpjpe,max:9.5,fmt:v=>v.toFixed(2)},
+    {x:W/2+36,y:0,w:W/2-80,h:H-padT-padB,title:'FVD ↓（越低越好）',data:SENS.fvd,max:530,fmt:v=>v.toFixed(1)}
+  ];
+  panels.forEach(p=>{
+    const top=p.y+padT,bh=p.h;
+    ctx.fillStyle='#8fb8ff';ctx.font='bold 13px sans-serif';ctx.textAlign='left';
+    ctx.fillText(p.title,p.x,top-12);
+    const bw=Math.max(14,Math.min(46,(p.w-60)/3-14));
+    SENS_METHODS.forEach((m,i)=>{
+      const v=p.data[m[0]][gi];
+      const h=Math.max(3,v/p.max*bh);
+      const bx=p.x+30+i*((p.w-60)/3);
+      const by=top+bh-h;
+      ctx.fillStyle=m[2];ctx.fillRect(bx,by,bw,h);
+      ctx.fillStyle='#fff';ctx.font='bold 12px sans-serif';ctx.textAlign='center';
+      ctx.fillText(p.fmt(v),bx+bw/2,by-6);
+      ctx.fillStyle='#9db4dd';ctx.font='12px sans-serif';
+      ctx.fillText(m[1],bx+bw/2,top+bh+18);
+    });
+    ctx.strokeStyle='#2a3c60';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(p.x,top+bh);ctx.lineTo(p.x+p.w,top+bh);ctx.stroke();
+  });
+  let msg;
+  if(g===5)msg='γ = 5（训练值）：三家都还体面，朴素 OPD 的「主场幻觉」——补偿把戏在自己的主场完全隐形。';
+  else if(g===3)msg='γ = 3：朴素 OPD 开始露馅（FVD 134.09，约为 PDM 的 2.4 倍），PDM 甚至略优于自己在 γ=5 的表现。';
+  else msg='γ = 1（CFG 退化为正分支）：朴素 OPD 崩盘——MPJPE 8.98、FVD <b style="color:#ff6b6b">507.70</b>；PDM 稳在 4.48 / 60.97。负支被练烂的代价一次性清算。';
+  document.getElementById('sens-readout').innerHTML=msg;
+}
+document.getElementById('sens-gamma').addEventListener('input',sensDemo);
+sensDemo();
+</script>
+</body>
+</html>

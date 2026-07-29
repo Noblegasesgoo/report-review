@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>看懂 SpecBox · 让沙箱「未卜先知」，给 LLM 智能体的工具调用提速 2.9 倍</title>
+<style>
+  :root{
+    --blue:#1783ff; --blue-d:#0b5cc4; --red:#ff6b6b; --amber:#f7b731;
+    --purple:#a55eea; --green:#2bc48a; --ink:#1b2430; --ink-soft:#48566a;
+    --bg:#f6f8fc; --card:#ffffff; --line:#e4eaf3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.8}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+
+  /* ===== Hero ===== */
+  .hero{background:linear-gradient(160deg,#0a1a3f 0%,#103a8c 55%,#1783ff 100%);
+    color:#fff;padding:72px 0 56px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+    padding:4px 14px;border-radius:99px;font-size:13px;letter-spacing:1px;margin-bottom:18px}
+  .hero h1{font-size:clamp(26px,4.6vw,44px);line-height:1.3;margin-bottom:14px}
+  .hero p.sub{font-size:clamp(14px,1.8vw,18px);opacity:.88;max-width:860px}
+  .hero .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);
+    border-radius:16px;padding:14px 22px;min-width:150px}
+  .stat b{display:block;font-size:26px;font-weight:800}
+  .stat span{font-size:13px;opacity:.85}
+
+  /* ===== Nav ===== */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  nav.toc .inner{display:flex;gap:6px;overflow-x:auto;padding:10px 22px;max-width:1060px;margin:0 auto}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--ink-soft);text-decoration:none;
+    padding:6px 12px;border-radius:99px;transition:.2s}
+  nav.toc a:hover{background:#eaf2ff;color:var(--blue-d)}
+
+  /* ===== Sections ===== */
+  section.chapter{padding:56px 0 8px}
+  .chap-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  .chap-num{font-size:14px;font-weight:800;color:#fff;background:var(--blue);
+    border-radius:10px;padding:3px 12px;letter-spacing:1px}
+  .chap-head h2{font-size:clamp(21px,3vw,30px)}
+  .oneline{color:var(--blue-d);font-weight:600;margin:4px 0 22px;font-size:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:0 2px 14px rgba(20,50,110,.05)}
+  .card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card p{margin-bottom:12px;color:#2c3a4e}
+  .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
+    border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
+  .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
+  .keyfact{position:relative;background:#eef5ff;border-left:4px solid var(--blue);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";position:absolute;left:16px;top:12px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .demo-box{background:#0e1830;border-radius:18px;padding:22px;margin:16px 0;color:#dfe8ff;
+    position:relative;overflow:hidden}
+  .demo-title{color:#8fb8ff;font-size:13px;letter-spacing:2px;font-weight:700;margin-bottom:14px;text-transform:uppercase}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:99px;padding:9px 22px;font-size:14px;
+    cursor:pointer;font-weight:600;transition:.2s;box-shadow:0 4px 14px rgba(23,131,255,.35)}
+  .btn:hover{background:var(--blue-d);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);box-shadow:none;color:#dfe8ff}
+  .btn.ghost.active{background:rgba(23,131,255,.22);border-color:#6db4ff;color:#fff}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border-radius:12px;overflow:hidden}
+  table.tbl th{background:#103a8c;color:#fff;padding:10px 12px;text-align:left;font-weight:600}
+  table.tbl td{padding:10px 12px;border-bottom:1px solid var(--line)}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl tr:nth-child(even) td{background:#f7faff}
+  .hl{color:var(--blue-d);font-weight:700}
+
+  /* ===== 公式（纯 HTML/CSS，无 MathJax）===== */
+  .formula{background:#0e1830;border-radius:14px;padding:20px 22px;margin:14px 0;color:#eaf1ff;
+    font-size:clamp(15px,2.2vw,19px);text-align:center;overflow-x:auto;line-height:2;
+    font-family:"STIX Two Math","Cambria Math",Georgia,serif}
+  .formula .op{color:#8fb8ff}
+  .formula .cond{font-size:.82em;color:#9db4dd}
+  .frac{display:inline-flex;flex-direction:column;vertical-align:middle;margin:0 2px;line-height:1.4}
+  .frac .num{border-bottom:1.5px solid currentColor;padding:0 7px}
+  .frac .den{padding:0 7px}
+  .fnote{font-size:13px;color:#7f92b8;margin-top:10px;text-align:center;line-height:1.7;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  .formula var{font-style:italic}
+
+  /* ===== 结果条形图 ===== */
+  .scorebar{height:10px;border-radius:99px;background:#e7edf6;overflow:hidden;margin:4px 0 12px}
+  .scorebar i{display:block;height:100%;border-radius:99px;width:0;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+  .bar-row{display:grid;grid-template-columns:200px 1fr 90px;gap:12px;align-items:center;margin-bottom:10px;font-size:14px}
+  @media(max-width:640px){.bar-row{grid-template-columns:120px 1fr 70px}}
+  .bar-row b{text-align:right;font-variant-numeric:tabular-nums}
+
+  /* ===== 步骤时间分解条 ===== */
+  .stepbar{display:flex;height:44px;border-radius:12px;overflow:hidden;margin:8px 0 4px;font-size:12px;color:#fff}
+  .stepbar div{display:flex;align-items:center;justify-content:center;font-weight:600;white-space:nowrap;overflow:hidden}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--ink-soft);margin:6px 0 14px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+
+  /* ===== 滑杆 ===== */
+  .slider-row{display:flex;align-items:center;gap:14px;margin:14px 0 6px;flex-wrap:wrap}
+  .slider-row label{font-size:14px;color:#9db4dd;white-space:nowrap}
+  .slider-row input[type=range]{flex:1;min-width:180px;accent-color:var(--amber)}
+  .slider-row output{color:#ffd97a;font-weight:700;min-width:76px;text-align:right;font-variant-numeric:tabular-nums}
+  canvas.chart{width:100%;height:260px;display:block;border-radius:10px;background:#0a1326}
+  .demo-readout{margin-top:14px;font-size:14.5px;line-height:1.8}
+  .caption{font-size:12.5px;color:#7f92b8;margin-top:8px;line-height:1.6}
+
+  /* ===== 来源标注 ===== */
+  .src{color:var(--blue-d);text-decoration:none;font-size:.8em;font-weight:600;
+    border-bottom:1px dashed #9db8e8;padding:0 1px;white-space:nowrap}
+  .src:hover{color:var(--blue);border-bottom-style:solid;background:#eaf2ff;border-radius:4px}
+  .src::after{content:"↗";font-size:.85em;margin-left:1px}
+  .demo-box .src, .formula .src{color:#8fb8ff;border-bottom-color:#3a5078}
+  .demo-box .src:hover{color:#cfe2ff;background:rgba(23,131,255,.15)}
+  .src-inline{color:inherit;border-bottom:1px dashed #9db8e8;text-decoration:none}
+  .src-inline:hover{color:var(--blue)}
+
+  footer{margin-top:64px;padding:34px 0 46px;color:#7f8ca3;font-size:13px;text-align:center;
+    border-top:1px solid var(--line);line-height:2}
+  .fade-up{opacity:0;transform:translateY(26px);transition:all .7s cubic-bezier(.3,.7,.3,1)}
+  .fade-up.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">arXiv 论文交互解读 · LLM 智能体系统</span>
+    <h1>看懂 SpecBox：让沙箱「未卜先知」，给 LLM 智能体的工具调用提速 2.9 倍</h1>
+    <p class="sub">北航等团队提出的智能体服务运行时：大模型还在「边说边想」的时候，就从流式 token 里猜出它接下来要调用哪个工具沙箱，提前把沙箱热好——既不当「包年包间」的冤大头（常驻部署），也不吃「现找场地」的冷启动苦头（按需部署）。</p>
+    <div class="stats">
+      <div class="stat"><b>2.9×</b><span>QPS=20 时 P99 端到端延迟相对按需基线的降幅</span></div>
+      <div class="stat"><b>−45.9%</b><span>相对常驻部署的峰值内存削减</span></div>
+      <div class="stat"><b>4.53×</b><span>多轮会话累计沙箱供应延迟的降幅</span></div>
+      <div class="stat"><b>313.55×</b><span>1 GB 载荷下带外传输 vs JSON-RPC 的延迟降幅</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="toc"><div class="inner">
+  <a href="#ch0">🎒 热身：智能体与沙箱</a>
+  <a href="#ch1">⏱️ 概念基础：一步有多慢</a>
+  <a href="#ch2">🎯 核心方法：三板斧</a>
+  <a href="#ch3">📊 实验结果</a>
+  <a href="#ch4">⚖️ 局限与意义</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ============ CH0 热身 ============ -->
+<section class="chapter" id="ch0">
+  <div class="chap-head"><span class="chap-num">第 0 章</span><h2>热身：智能体、MCP 与「沙箱」</h2></div>
+  <p class="oneline">LLM 智能体不再只是聊天，而是边推理边调用外部工具干活；这些工具住在隔离的「沙箱」里，而沙箱的开门速度成了新的瓶颈。</p>
+
+  <div class="card fade-up">
+    <h3>🤖 智能体在干什么？一个「推理—行动」循环</h3>
+    <p>传统 LLM 服务只要优化「吐字」速度就够了；而智能体是一个<b>有状态的运行循环</b>：LLM 控制器反复推理、规划，然后调用外部工具——代码执行、网页自动化、数据处理等。出于安全隔离和可复现性，这些工具越来越多地部署为<b>独立沙箱环境</b>，通过 Anthropic 提出的 <a class="src" href="https://modelcontextprotocol.io" target="_blank" rel="noopener">Model Context Protocol（MCP）</a> 这类标准协议访问，工具调用变成了一组松散耦合的微服务（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §1、§2.1</a>）。</p>
+    <p>于是智能体的端到端延迟不再只由模型推理决定，还取决于<b>协调这些异构外部执行环境的效率</b>——一次会话就是一串 LLM 推理核心与多个环境服务之间的 RPC 式交互（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §2.1</a>）。</p>
+    <div class="analogy">把 LLM 想成一位<b>主厨</b>，沙箱就是后厨外一排<b>专用操作间</b>：烘焙间、刺身间、雕花果蔬间……主厨（推理）每想到一道工序，就得走进对应操作间（调用工具）干活。问题是：这些操作间<b>平时都锁着门</b>，开门、通电、预热设备要花时间。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔥 根本矛盾：「包年包间」还是「现找场地」？</h3>
+    <p>论文把这个矛盾讲得很清楚（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §2.2</a>）：</p>
+    <table class="tbl">
+      <tr><th>部署方式</th><th>做法</th><th>代价</th></tr>
+      <tr><td><b>常驻（Reserved）</b></td><td>为每个租户的所有沙箱保持「常热」容器</td><td>面对成百上千种细粒度工具，空闲容器吃掉大量内存与 CPU，大规模多租户下经济上不可持续</td></tr>
+      <tr><td><b>按需（On-demand）</b></td><td>收到调用才「冷启动」沙箱</td><td>镜像下载解压、网络命名空间、虚拟文件系统挂载、应用级握手一串串行开销，秒级冷启动沿关键路径累积，P99 尾延迟爆炸</td></tr>
+    </table>
+    <p style="margin-top:14px">冷启动到底有多慢？论文实测了 32 个沙箱环境（含 MCPBench 全部沙箱）：<b>大多数沙箱初始化要 2~4 秒，重量级沙箱（如 PaperSearch、Neo4j）可接近 20 秒</b>（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §2.3 图 2b</a>）。</p>
+    <div class="analogy">常驻 = 餐厅把所有包间<b>全年留灯留座</b>，随来随用但租金惊人；按需 = 客人到了才<b>现找场地、现装修</b>，省钱但客人等到崩溃。SpecBox 想干的是第三件事：<b>看客人点菜的动作，提前猜出他要哪个包间，趁他还在看菜单时先把房间开好</b>。</div>
+    <div class="keyfact">核心思想一句话：<b>在最可能的沙箱被正式请求之前就把它预启动</b>，让环境准备与正在进行的 LLM 生成重叠（overlap），打破「推理完才开始准备环境」的串行依赖（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §1</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🎬 直观对比：串行等待 vs 投机重叠</h3>
+    <p>点击播放，看同一个执行步骤在两种运行时下的时间轴差异——绿色部分就是被「藏起来」的沙箱启动时间：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 反应式 vs SpecBox 的单步时间轴（时长为示意）</div>
+      <canvas class="chart" id="tl-canvas" style="height:230px"></canvas>
+      <div class="btn-row">
+        <button class="btn" id="tl-play">▶ 播放对比</button>
+        <button class="btn ghost" id="tl-reset">↺ 重置</button>
+      </div>
+      <div class="demo-readout" id="tl-result">两种模式摆在一起：上面是「推理完才开沙箱」的反应式，下面是 SpecBox——沙箱准备（绿色）与 token 生成（蓝色）同时进行。</div>
+      <div class="caption">各段时长为教学示意；真实占比见第 1 章图 2a 的实测分解。重叠机制对应 <a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §2.3 观察 #1</a>。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH1 概念基础 ============ -->
+<section class="chapter" id="ch1">
+  <div class="chap-head"><span class="chap-num">第 1 章</span><h2>概念基础：一步到底慢在哪</h2></div>
+  <p class="oneline">把一个执行步骤拆成五段，你会发现：将近一半的时间根本不在「想」和「做」，而在「准备场地」和「搬运材料」。</p>
+
+  <div class="card fade-up">
+    <h3>⏱️ 一步的延迟解剖：五段时间</h3>
+    <p>主流智能体框架采用<b>反应式执行</b>：LLM 完成一整步推理后，才发起工具调用，模型推理与环境交互之间是严格的串行依赖链。单步端到端延迟可拆为（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §2.3 式 (1)</a>）：</p>
+    <div class="formula">
+      <var>T</var><sub>step</sub><sup>(<var>N</var>)</sup> <span class="op">=</span>
+      <var>T</var><sub>context</sub><sup>(<var>N</var>)</sup> <span class="op">+</span>
+      <var>T</var><sub>generation</sub><sup>(<var>N</var>)</sup> <span class="op">+</span>
+      <var>T</var><sub>env_prep</sub><sup>(<var>N</var>)</sup> <span class="op">+</span>
+      <var>T</var><sub>data_io</sub><sup>(<var>N</var>)</sup> <span class="op">+</span>
+      <var>T</var><sub>sandbox_exec</sub><sup>(<var>N</var>)</sup>
+      <div class="fnote">前两项是 LLM 推理（读上下文 + 吐 token）；后三项是智能体运行时的优化边界：<b>环境准备</b>、<b>数据搬运</b>、<b>沙箱执行</b>。SpecBox 不动推理栈，专门压缩后三项（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §2.3</a>）。</div>
+    </div>
+    <p>论文实测的单步时间占比（图 2a），注意高并发下「环境准备」占比不降反升：</p>
+    <div class="legend">
+      <span><i style="background:#4d9fff"></i>context 上下文处理</span>
+      <span><i style="background:#1783ff"></i>generation 生成</span>
+      <span><i style="background:#2bc48a"></i>env_prep 环境准备</span>
+      <span><i style="background:#f7b731"></i>data_io 数据搬运</span>
+      <span><i style="background:#a55eea"></i>sandbox_exec 沙箱执行</span>
+    </div>
+    <p style="font-size:13.5px;color:var(--ink-soft);margin-bottom:2px">QPS=1（低并发）</p>
+    <div class="stepbar">
+      <div style="width:15.4%;background:#4d9fff">15.4%</div>
+      <div style="width:18.8%;background:#1783ff">18.8%</div>
+      <div style="width:22.3%;background:#2bc48a">22.3%</div>
+      <div style="width:11.1%;background:#f7b731">11.1%</div>
+      <div style="width:32.4%;background:#a55eea">32.4%</div>
+    </div>
+    <p style="font-size:13.5px;color:var(--ink-soft);margin:10px 0 2px">QPS=20（高并发）</p>
+    <div class="stepbar">
+      <div style="width:12.3%;background:#4d9fff">12.3%</div>
+      <div style="width:14.4%;background:#1783ff">14.4%</div>
+      <div style="width:28.1%;background:#2bc48a">28.1%</div>
+      <div style="width:8.0%;background:#f7b731">8.0%</div>
+      <div style="width:37.3%;background:#a55eea">37.3%</div>
+    </div>
+    <div class="keyfact">QPS=20 时 env_prep 占 28.1%、sandbox_exec 占 37.3%——<b>超过 65% 的时间花在模型推理之外</b>。这就是 SpecBox 的靶子（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §2.3 图 2a</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔭 三个观察：论文的全部灵感来源</h3>
+    <p>SpecBox 的三个技术件，分别对应论文 §2.3 的三条观察：</p>
+    <table class="tbl">
+      <tr><th>观察</th><th>发现了什么</th><th>对应技术</th></tr>
+      <tr><td><b>#1 步内可重叠</b></td><td>提示词、计划和已生成的部分 token 流往往已经泄露了要调用的沙箱，不必等到调用语句写完</td><td>意图感知沙箱预热（§3.1）</td></tr>
+      <tr><td><b>#2 跨步有规律</b></td><td>连续步骤有很强的时间局部性：论文检索之后常跟着文档阅读，数据分析之后常跟着图表生成</td><td>随机沙箱预取（§3.2）</td></tr>
+      <tr><td><b>#3 重复与冗余</b></td><td>多轮工作流常重复访问相同文档、重跑确定性分析；大体积产物与控制消息耦合传输，data_io 随载荷膨胀</td><td>复用感知数据传输（§3.3）</td></tr>
+    </table>
+    <div class="analogy">像一位熟练的<b>行政总助</b>：听到老板说「帮我查一下……」（观察 #1）就去预会议室；知道老板开完选题会通常要数据间（观察 #2）就提前把数据间也开了；上次打印过的文件绝不重印、大件走货运电梯不走前台（观察 #3）。</div>
+  </div>
+</section>
+
+<!-- ============ CH2 核心方法 ============ -->
+<section class="chapter" id="ch2">
+  <div class="chap-head"><span class="chap-num">第 2 章</span><h2>核心方法：SpecBox 的三板斧</h2></div>
+  <p class="oneline">板斧一：边吐字边猜意图，步内预热；板斧二：用马尔可夫链跨步预取；板斧三：语义缓存 + 带外零拷贝传输。</p>
+
+  <!-- 2.1 意图感知预热 -->
+  <div class="card fade-up">
+    <h3>① 意图感知预热：两个「侦察兵」抢时间</h3>
+    <p>难点在于一个两难（Challenge #1）：<b>猜得越早，重叠窗口越大，但误判越多</b>——早期 token 语义极其模糊（read、get 这类通用动词出现在无数工具的描述里），误触发会浪费沙箱容量，多租户下甚至可能把宿主机内存打爆（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §2.4</a>）。SpecBox 的解法是派两个性格互补的侦察兵并行盯 token 流（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §3.1</a>）：</p>
+    <table class="tbl">
+      <tr><th>路由器</th><th>性格</th><th>机制</th></tr>
+      <tr><td><b>关键词路由器</b></td><td>快但毛躁：微秒级出结果</td><td>扫描流式 token，命中某工具专属关键词数达到阈值 γ 就报候选；实现取 <b>γ=2</b></td></tr>
+      <tr><td><b>语义路由器</b></td><td>准但慢性子</td><td>把当前上下文与工具意图表示做语义比对，能接住措辞与关键词几乎不重叠的隐式意图，但需要更长前缀才可靠</td></tr>
+    </table>
+    <p style="margin-top:14px">两路候选怎么合并？取交集要等慢的那个、且任一路漏检都会丢工具；SpecBox 选择<b>并集</b>——谁先有可信信号谁先开工（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §3.1 式 (2)</a>）：</p>
+    <div class="formula">
+      <var>S</var><sub>trigger</sub><sup>(<var>N</var>)</sup> <span class="op">=</span>
+      <var>S</var><sub>key</sub><sup>(<var>N</var>)</sup> <span class="op">∪</span> <var>S</var><sub>semantic</sub><sup>(<var>N</var>)</sup>
+      <div class="fnote">每个路由器各自管控自己的误报；并集让「第一个可信信号」立即启动准备。显式意图吃关键词路由器的早鸟红利，隐式意图由语义路由器兜底。</div>
+    </div>
+    <div class="analogy">两位侦察兵蹲点：一个<b>只看制服</b>（关键词），人一过岗哨就按铃，偶尔认错；一个<b>看脸认人</b>（语义），要等走近才确定。「并集」策略就是<b>谁按铃都算数</b>，先按先开门——宁可偶尔白开一间房，也不让客人干等。</div>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 流式生成中的双路由器触发（时长为示意）</div>
+      <canvas class="chart" id="rt-canvas" style="height:240px"></canvas>
+      <div class="btn-row">
+        <button class="btn" id="rt-play">▶ 播放一步生成</button>
+        <button class="btn ghost" id="rt-reset">↺ 重置</button>
+      </div>
+      <div class="demo-readout" id="rt-result">token 逐个生成。注意：关键词路由器（黄）在第 8 个 token 就触发了预热，绿色预热条在剩余解码期间悄悄跑完——等调用正式发出时，沙箱已经热好了。</div>
+      <div class="caption">触发时机为示意；γ=2 是论文 §5.3.1 选出的工作点（表 1：平均等待 323.0 ms、匹配率 95.0%）。</div>
+    </div>
+  </div>
+
+  <!-- 2.2 随机预取 -->
+  <div class="card fade-up">
+    <h3>② 随机沙箱预取：马尔可夫链猜「下一步」</h3>
+    <p>步内预热只能用<b>当前步剩余的解码时间</b>，碰上启动比吐字还慢的重量级沙箱就不够用（Challenge #2：跨步预测天然不可靠，预热所有可能后继又退化成常驻部署）。SpecBox 的办法：在<b>当前沙箱执行期间</b>（T<sub>sandbox_exec</sub>），用历史轨迹学出的概率模型提前热好下一步最可能的沙箱（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §3.2</a>）。</p>
+    <p>把执行轨迹记进一张<b>沙箱依赖图（SDG）</b>，统计步与步之间的转移次数，再用<b>一阶马尔可夫模型 + 拉普拉斯平滑</b>估计下一步概率（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §3.2 式 (3)(4)</a>）：</p>
+    <div class="formula">
+      <var>P</var><sub><var>i</var>,<var>j</var></sub> <span class="op">=</span> <var>P</var>( <var>S</var><sup>(<var>n</var>+1)</sup> = <var>v</var><sub><var>j</var></sub> | <var>S</var><sup>(<var>n</var>)</sup> = <var>v</var><sub><var>i</var></sub> ) <span class="op">=</span>
+      <span class="frac"><span class="num"><var>C</var><sub><var>i</var>,<var>j</var></sub> + α</span><span class="den">∑<sub><var>k</var>∈<var>V</var></sub> ( <var>C</var><sub><var>i</var>,<var>k</var></sub> + α )</span></span>
+      <div class="fnote">C<sub>i,j</sub> 是「从沙箱 i 走到沙箱 j」的历史次数；α=1 的拉普拉斯平滑避免冷门转移被估成零概率。白话：<b>历史上从 i 出发，有多大比例下一步去了 j</b>。</div>
+    </div>
+    <p>有了概率还不能乱开——SpecBox 过三道筛子（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §3.2 式 (5)(6)(7)</a>）：</p>
+    <table class="tbl">
+      <tr><th>筛子</th><th>规则</th><th>实现取值</th><th>白话</th></tr>
+      <tr><td>成本筛 K<sub>i</sub></td><td>冷启动代价 L<sub>j</sub> ≥ λ 才值得预取</td><td>λ = 5</td><td>开门本来就快的房间不用提前开</td></tr>
+      <tr><td>置信筛 C<sub>i</sub></td><td>转移概率 P<sub>i,j</sub> ≥ τ 才保留</td><td>τ = 0.6</td><td>不够可能的别浪费内存</td></tr>
+      <tr><td>预算筛 A<sub>i</sub></td><td>对 C<sub>i</sub> 按概率取 top-B</td><td>B = 1</td><td>每步最多预开 B 间</td></tr>
+    </table>
+    <div class="analogy">像一位<b>老出租车司机</b>：在机场排队时心里有本账——「这个点从写字楼走的人，七成去高铁站」。他只对「大概率 + 路程远（冷启动贵）」的目的地提前热车，而且一次只押一个（B=1）。猜错了也没关系：没用完的预热沙箱直接丢弃，不在 agent 正式提交前执行任何有副作用的操作（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §4</a>）。</div>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · SDG 上的马尔可夫预取（转移概率为示意）</div>
+      <canvas class="chart" id="mk-canvas" style="height:300px"></canvas>
+      <div class="slider-row">
+        <label>当前所在沙箱</label>
+        <div class="btn-row" style="margin-top:0" id="mk-nodes"></div>
+      </div>
+      <div class="slider-row">
+        <label>置信阈值 τ（论文取 0.6）</label>
+        <input type="range" id="mk-tau" min="0.1" max="0.9" step="0.05" value="0.6">
+        <output id="mk-tauv">0.60</output>
+      </div>
+      <div class="demo-readout" id="mk-result"></div>
+      <div class="caption">箭头粗细 ∝ 转移概率 P<sub>i,j</sub>。虚线节点被置信筛滤掉；高亮节点是通过成本筛（λ=5）、置信筛后被预算筛（B=1）选中的预取目标。概率矩阵为教学示意，筛选规则对应 <a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §3.2 式 (5)-(7)</a>。</div>
+    </div>
+  </div>
+
+  <!-- 2.3 复用感知传输 -->
+  <div class="card fade-up">
+    <h3>③ 复用感知传输：不重复做，大件走专线</h3>
+    <p>预热再充分，还有两个成本留在关键路径上：<b>重复执行</b>（同一篇文档换种问法又查一遍）和<b>大产物搬运</b>（文件、图像随 RPC 消息序列化）。SpecBox 分别用语义缓存和带外传输解决（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §3.3</a>）。</p>
+    <p><b>语义缓存</b>：精确匹配参数太死板，放开的语义匹配又可能误合并。SpecBox 走保守路线——先按工具身份过滤，再比对归一化调用表示的语义相似度（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §3.3 式 (8)</a>）：</p>
+    <div class="formula">
+      hit(<var>x</var>) <span class="op">=</span> ∃<var>i</var> <span class="cond">s.t.</span>
+      tool(<var>x</var>) <span class="op">=</span> tool(<var>x</var><sub><var>i</var></sub>) <span class="op">∧</span>
+      sim( φ(<var>x</var>), φ(<var>x</var><sub><var>i</var></sub>) ) <span class="op">≥</span> τ<sub><var>c</var></sub>
+      <div class="fnote">同一工具 + 语义足够像，才允许复用旧结果；否则走正常执行兜底。语义匹配只是<b>精确复用的保守扩展</b>，不是无约束的近似。实验中 τ<sub>c</sub>=0.8（§4）。</div>
+    </div>
+    <p><b>带外数据传输</b>：控制面照旧走标准 MCP/RPC 消息（指令、完成通知、错误、元数据），大产物只留一个 <b>64 位 token_id</b> 引用，实体通过宿主机内存映射的<b>共享内存区域零拷贝</b>直达 Agent Engine——缓存命中时连沙箱都不用起，直接复用已发布的产物（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §3.3、§4</a>）。</p>
+    <div class="analogy">语义缓存像<b>外卖平台认出「这单和上次一模一样」</b>：换个说法点同一家的同一道菜，直接把上一单的结果给你，不重新开火。带外传输则像<b>大件快递不走前台</b>：前台（控制面）只递一张取件码（64 位引用），冰箱洗衣机从货运电梯（共享内存）直接上楼。</div>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 载荷大小 vs 传输延迟（端点为论文实测）</div>
+      <canvas class="chart" id="ob-canvas"></canvas>
+      <div class="slider-row">
+        <label>产物载荷大小（对数刻度）</label>
+        <input type="range" id="ob-size" min="0" max="3" step="0.01" value="0">
+        <output id="ob-sizev">1 MB</output>
+      </div>
+      <div class="demo-readout" id="ob-result"></div>
+      <div class="caption">端点数据：1 MB 时 1.95 ms vs 2.28 ms；1 GB 时 5.97 ms vs 1873.16 ms（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §5.3.4 图 12</a>），中间为对数插值示意。注意带外传输近乎 O(1)：延迟对载荷大小不敏感。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH3 实验结果 ============ -->
+<section class="chapter" id="ch3">
+  <div class="chap-head"><span class="chap-num">第 3 章</span><h2>实验结果：又快又省，还有解剖报告</h2></div>
+  <p class="oneline">200 条多轮轨迹、32 个真实 MCP 工具服务器上重放：P99 降 2.9×，峰值内存省 45.9%，而且每个技术件都做了单独的「归因实验」。</p>
+
+  <div class="card fade-up">
+    <h3>🧪 实验怎么搭的</h3>
+    <p>评测基于 <b>MCPBench</b> 派生的轨迹级基准：32 个开源 MCP 兼容工具服务器（Playwright、Jupyter、Neo4j 等），先为每个工具生成 20 个单轮原子交互模板（共 640 个），再由 LLM 规划器增量构造 1–10 步的多轮会话，<b>最终 200 条轨迹、平均每会话 6.4 步、每步 2.96 个工具</b>。运行时基于开源 <a class="src" href="https://github.com/modelscope/agentscope" target="_blank" rel="noopener">AgentScope</a> 框架实现，沙箱用 Docker 容器，推理模型为 Qwen3.5-Max（DashScope 云端 API），宿主机为 16 核 CPU / 256 GiB 内存（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §4、§5.1</a>）。</p>
+    <p>对照组是两个极端（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §5.2</a>）：<b>常驻运行时</b>（所有沙箱常热，性能天花板、成本不可行）与<b>按需运行时</b>（调用即冷启动，生产现状）。SpecBox 要回答的问题是：<b>能不能用「按需」的成本，跑出「常驻」的体验？</b></p>
+    <div class="caption" style="color:#8a97ad">小注：论文 §5 的行文与图表中 SpecBox 有时写作「Laplace」，是同一系统的遗留命名（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §5.2.2 起</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🏁 端到端：逼近常驻的体验，只要按需的成本</h3>
+    <p><b>累计沙箱供应延迟</b>（会话内每次工具调用的初始化延迟之和）：SpecBox 比按需基线降低 <b>4.53×</b>，且与常驻基线的差距在 10.6% 以内（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §5.2.1 图 9</a>）：</p>
+    <div class="bar-row"><span>按需 On-demand</span><div class="scorebar"><i data-w="100" style="background:#ff6b6b"></i></div><b>4.53×</b></div>
+    <div class="bar-row"><span>SpecBox</span><div class="scorebar"><i data-w="22" style="background:#2bc48a"></i></div><b>1.00×</b></div>
+    <p style="margin-top:18px"><b>P99 端到端延迟（QPS=20 高并发）</b>：按需基线长尾爆炸到 257.2 s，SpecBox 压到 88.7 s，<b>提速 2.9×</b>（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §5.2.2 图 10a</a>）：</p>
+    <div class="bar-row"><span>按需 On-demand</span><div class="scorebar"><i data-w="100" style="background:#ff6b6b"></i></div><b>257.2 s</b></div>
+    <div class="bar-row"><span>SpecBox</span><div class="scorebar"><i data-w="34" style="background:#2bc48a"></i></div><b>88.7 s</b></div>
+    <p style="margin-top:18px"><b>峰值内存</b>：常驻部署从 24.6 GiB 一路涨到 80.6 GiB 峰值；SpecBox 最高 49.4 GiB，比常驻<b>省 45.9%</b>，轨迹与按需（24.3–40.4 GiB）几乎重合（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §5.2.3 图 10d</a>）：</p>
+    <div class="bar-row"><span>常驻 Reserved</span><div class="scorebar"><i data-w="100" style="background:#ff6b6b"></i></div><b>80.6 GiB</b></div>
+    <div class="bar-row"><span>SpecBox</span><div class="scorebar"><i data-w="61" style="background:#2bc48a"></i></div><b>49.4 GiB</b></div>
+    <div class="bar-row"><span>按需 On-demand</span><div class="scorebar"><i data-w="50" style="background:#4d9fff"></i></div><b>≤40.4 GiB</b></div>
+    <p style="margin-top:18px"><b>峰值 CPU</b>：高并发区（QPS≥8）两个基线在 14–16 核的高位波动（约 15.8–15.9 核），SpecBox 稳定在 11–12 核、封顶约 12.2 核，峰值压力降低 <b>22.8%–23.3%</b>（峰值负载下最多省 25% CPU）（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §5.2.3 图 10c</a>）：</p>
+    <div class="bar-row"><span>两个基线（约）</span><div class="scorebar"><i data-w="100" style="background:#ff6b6b"></i></div><b>15.8–15.9 核</b></div>
+    <div class="bar-row"><span>SpecBox</span><div class="scorebar"><i data-w="77" style="background:#2bc48a"></i></div><b>≈12.2 核</b></div>
+    <div class="keyfact">一句话结论：SpecBox 的延迟曲线贴着常驻走，资源曲线贴着按需走——「serverful 的性能，serverless 的成本」这个设想基本兑现（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §5.2</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔬 微基准①：关键词阈值 γ 的「金发姑娘」区间</h3>
+    <p>γ 太小过敏（误报多），太大迟钝（错过重叠窗口）。每个配置独立跑 100 次（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §5.3.1 表 1</a>）：</p>
+    <table class="tbl">
+      <tr><th>γ</th><th>平均等待 (ms)</th><th>匹配率</th><th>100 次中误配次数</th><th>评价</th></tr>
+      <tr><td>1</td><td>786.619</td><td>80.0%</td><td>20</td><td>过敏：误报引发冷启动回退，拖出长尾</td></tr>
+      <tr><td><b>2</b></td><td><b>323.021</b></td><td><b>95.0%</b></td><td><b>5</b></td><td><b>最优：比 γ=1 快 2.43×</b></td></tr>
+      <tr><td>3</td><td>621.812</td><td>97.0%</td><td>3</td><td>更准但更晚，预热提前量被侵蚀</td></tr>
+    </table>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔬 微基准②：语义路由器选谁？稀疏检索赢麻了</h3>
+    <p>三种语义路由模型在各自最优点对比（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §5.3.1 表 2</a>）：</p>
+    <table class="tbl">
+      <tr><th>模型</th><th>Micro-F1</th><th>命中率 (Top-3)</th><th>精确率</th><th>平均延迟 (ms)</th></tr>
+      <tr><td><b>Retrieval（TF-IDF 稀疏检索）</b></td><td><b>0.970</b></td><td><b>0.992</b></td><td><b>0.942</b></td><td><b>2.116</b></td></tr>
+      <tr><td>Encoder（微调 all-MiniLM-L6-v2）</td><td>0.776</td><td>0.968</td><td>0.634</td><td>7.822</td></tr>
+      <tr><td>FastText</td><td>0.124</td><td>0.124</td><td>0.124</td><td>0.171</td></tr>
+    </table>
+    <div class="keyfact">非神经的稀疏检索在质量与成本上双赢：比神经 Encoder 精确得多（0.942 vs 0.634），推理还快 <b>3.70×</b>——生产实例选了 Retrieval。FastText 虽快但完全不可判别（F1 仅 0.124）（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §5.3.1</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔬 微基准③：并集 / 交集 / 加权，谁合并得好？</h3>
+    <table class="tbl">
+      <tr><th>合并策略</th><th>平均等待 (ms)</th><th>目标匹配率</th><th>冷启动率</th><th>结论</th></tr>
+      <tr><td><b>并集 ∪（SpecBox 采用）</b></td><td><b>124.446</b></td><td><b>95.0%</b></td><td><b>5.0%</b></td><td>最快，谁先有信号谁触发</td></tr>
+      <tr><td>交集 ∩</td><td>393.523</td><td>100.0%</td><td>0.0%</td><td>零冷启动但阻塞关键路径，比并集慢 3.16×</td></tr>
+      <tr><td>加权打分</td><td>1308.378</td><td>55.0%</td><td>45.0%</td><td>关键词与语义分数结构性错位，阈值频频过不了线</td></tr>
+    </table>
+    <div class="analogy">交集 = 两位侦察兵都确认才开门——从不开错，但客人常在门口干等；并集 = 任一确认即开——偶尔白开（5%），但几乎从不让客人等。延迟敏感场景里，「偶尔白开」远比「经常干等」划算（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §5.3.1 表 3</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔬 微基准④⑤：跨步预取与语义缓存各贡献多少</h3>
+    <p><b>随机预取</b>（10 轮会话剖面，<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §5.3.2 图 11</a>）：第 1 轮两者几乎相同（512.06 ms vs 540.06 ms，马尔可夫还没有历史信号）；从第 2 轮起分叉——完整版（Proactive）第 2 轮降到 138.14 ms、第 10 轮 97.14 ms，而只做步内路由的 Reactive 版第 10 轮涨到 583.26 ms，<b>终点差距 6.0×</b>。冷启动次数同样印证：Reactive 峰值 2.90 次/轮（第 9 轮），Proactive 全程压在 0.24–0.83 之间。</p>
+    <p><b>语义缓存</b>（100 次重复请求工作负载，<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §5.3.3 表 4</a>）：</p>
+    <table class="tbl">
+      <tr><th>设置</th><th>平均等待 (ms)</th><th>命中率</th><th>旁路率</th></tr>
+      <tr><td>无缓存</td><td>412.78</td><td>0.0%</td><td>0.0%</td></tr>
+      <tr><td>精确匹配缓存</td><td>233.64</td><td>33.6%</td><td>100.0%</td></tr>
+      <tr><td><b>语义缓存（τ=0.6）</b></td><td><b>141.93</b></td><td><b>37.4%</b></td><td><b>84.8%</b></td></tr>
+    </table>
+    <div class="keyfact">语义缓存比无缓存快 <b>2.91×</b>，比精确匹配多接住 3.8 个百分点的近重复请求；旁路率 84.8% &lt; 100% 正是保守设计的体现——少数语义命中不够可靠，校验后回退正常执行，正确性优先（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §5.3.3</a>）。</div>
+    <p><b>带外传输</b>（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §5.3.4 图 12</a>）：1 MB 时两者都在 3 ms 内（1.95 vs 2.28 ms）；100 MB 时 JSON-RPC 涨到 132.45 ms；1 GB 时 JSON-RPC 高达 1873.16 ms，而带外传输只漂移到 5.97 ms——<b>313.55× 的差距，近乎 O(1) 的 scaling</b>。交互动画见第 2 章③。</p>
+  </div>
+</section>
+
+<!-- ============ CH4 局限与意义 ============ -->
+<section class="chapter" id="ch4">
+  <div class="chap-head"><span class="chap-num">第 4 章</span><h2>局限与意义</h2></div>
+  <p class="oneline">一阶马尔可夫猜不远、共享内存出不了单机——论文自己把边界划得很清楚；但「运行时中间件」这个位置选得很准。</p>
+
+  <div class="card fade-up">
+    <h3>⚠️ 论文自述的局限</h3>
+    <table class="tbl">
+      <tr><th>边界</th><th>具体含义</th><th>缓解 / 未来方向</th></tr>
+      <tr><td>一阶马尔可夫假设</td><td>预取器只看「上一步在哪」，开放式长程工作流中预测精度会下降</td><td>两级兜底：跨步预取落空时，步内意图预热仍在解码期内接住，最坏情况延迟被 bounded；未来考虑在线 GNN 捕捉非线性转移（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §6</a>）</td></tr>
+      <tr><td>共享内存需同机</td><td>mmap 传输要求 Agent Engine 与沙箱在同一主机边界内，限制单会话跨节点扩展</td><td>契合主流多租户拓扑（K8s Pod IPC、Sidecar）；未来引入 RDMA 零拷贝扩展到解耦集群（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §6</a>）</td></tr>
+      <tr><td>威胁模型</td><td>沙箱逃逸、恶意智能体、基础设施被攻破不在范围内</td><td>预测性准备不执行副作用操作、未用预热直接丢弃；缓存复用仅限确定性兼容调用（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §4</a>）</td></tr>
+    </table>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🌍 为什么这篇值得读</h3>
+    <p><b>位置选得好</b>：SpecBox 是夹在「上游推理框架」与「下游执行环境」之间的<b>运行时中间件</b>，只需要两个现代生态里现成的东西——流式 token 输出和 MCP 标准工具接口——不引入额外系统约束（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §6</a>）。</p>
+    <p><b>与底层优化正交</b>：Firecracker、RunD 这类 microVM/快照技术把物理启动压到毫秒级，但 MCP 发现钩子、环境附着这类<b>应用层握手</b>仍留在关键路径上；SpecBox 在更高的「应用感知编排层」工作，用「重叠」而非「压缩」来消除就绪延迟，两者可以叠加（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §7</a>）。</p>
+    <p><b>可迁移到训练侧</b>：VERL、Slime 这类 Agentic RL 框架的 rollout 生成与环境交互是同构循环，预热与预取机制可以直接搬过去掩蔽训练 rollout 的环境开销（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §6</a>）。</p>
+    <div class="keyfact">更大的图景：经典 serverless 预热（Mitosis、IceBreaker 等）假设请求独立同分布，这个假设在多轮自主智能体负载下彻底失效——工具调用由 LLM 的流动上下文轨迹动态决定。SpecBox 的价值在于<b>把服务基础设施与智能体行为特征显式协同设计</b>（<a class="src" href="https://arxiv.org/pdf/2607.23933" target="_blank" rel="noopener">论文 §7</a>）。</div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    本页基于 arXiv 论文《SpecBox: Speculative Sandbox Scheduling for Efficient LLM Agent Serving》（<a class="src-inline" href="https://arxiv.org/abs/2607.23933" target="_blank" rel="noopener">arXiv:2607.23933</a>）整理制作 · 2026-07<br>
+    通俗类比与演示动画仅用于帮助理解，演示中的时长、触发时机与转移概率为教学示意；所有实验数字均直接摘自论文 §5（表 1–4、图 9–12），技术细节以
+    <a class="src-inline" href="https://arxiv.org/abs/2607.23933" target="_blank" rel="noopener">原文</a> 为准 · 文中所有标注 ↗ 的链接均指向原始出处
+  </div>
+</footer>
+
+<script>
+/* ============ 入场动画 ============ */
+const io = new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('show');
+    e.target.querySelectorAll('.scorebar i').forEach(b=>b.style.width=b.dataset.w+'%');
+  }
+}),{threshold:.12});
+document.querySelectorAll('.fade-up').forEach(el=>io.observe(el));
+
+/* ============ 工具：高清 canvas ============ */
+function setupCanvas(id){
+  const cv=document.getElementById(id);
+  const dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx,W,H};
+}
+function rr(ctx,x,y,w,h,r){
+  ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
+}
+
+/* ============ 演示 1：反应式 vs SpecBox 时间轴（时长示意） ============ */
+const TL_ROWS=[
+  {label:'反应式：推理完才开沙箱',y:52,segs:[
+    {n:'context',d:0.8,c:'#4d9fff'},{n:'generation',d:1.4,c:'#1783ff'},
+    {n:'env_prep',d:2.0,c:'#2bc48a'},{n:'data_io',d:0.7,c:'#f7b731'},
+    {n:'sandbox_exec',d:1.4,c:'#a55eea'}]},
+  {label:'SpecBox：预热与生成重叠',y:142,segs:[
+    {n:'context',d:0.8,c:'#4d9fff'},{n:'generation',d:1.4,c:'#1783ff'},
+    {n:'data_io',d:0.7,c:'#f7b731'},{n:'sandbox_exec',d:1.4,c:'#a55eea'}],
+   warm:{after:1.0,d:2.0}}
+];
+const TL_TOTAL=6.3;
+let tlRaf=null;
+function tlDraw(prog){
+  const o=setupCanvas('tl-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=150,padR=70,barH=26,x0=padL,xw=W-padL-padR;
+  const sx=v=>x0+v/TL_TOTAL*xw;
+  // 时间轴
+  ctx.strokeStyle='#24344f';ctx.fillStyle='#7f92b8';ctx.font='11px sans-serif';ctx.textAlign='center';
+  for(let s=0;s<=6;s++){const gx=sx(s);
+    ctx.beginPath();ctx.moveTo(gx,30);ctx.lineTo(gx,H-26);ctx.stroke();
+    ctx.fillText(s+'s',gx,H-10);}
+  TL_ROWS.forEach(row=>{
+    ctx.fillStyle='#9db4dd';ctx.font='12.5px sans-serif';ctx.textAlign='right';
+    ctx.fillText(row.label,padL-12,row.y+barH/2+4);
+    let acc=0,total=0;row.segs.forEach(s=>total+=s.d);
+    row.segs.forEach(s=>{
+      const done=Math.max(0,Math.min(s.d,prog*TL_TOTAL-acc));
+      if(done>0){ctx.fillStyle=s.c;rr(ctx,sx(acc),row.y,done/TL_TOTAL*xw,barH,6);ctx.fill();
+        if(done/TL_TOTAL*xw>54){ctx.fillStyle='rgba(255,255,255,.92)';ctx.font='11px sans-serif';ctx.textAlign='center';
+          ctx.fillText(s.n,sx(acc)+done/TL_TOTAL*xw/2,row.y+barH/2+4);}}
+      acc+=s.d;
+    });
+    // 预热条（藏在 generation 下方）
+    if(row.warm){
+      const wStart=row.warm.after,wDone=Math.max(0,Math.min(row.warm.d,prog*TL_TOTAL-wStart));
+      if(wDone>0){ctx.fillStyle='rgba(43,196,138,.85)';rr(ctx,sx(wStart),row.y+barH+5,wDone/TL_TOTAL*xw,9,4);ctx.fill();
+        ctx.fillStyle='#2bc48a';ctx.font='10.5px sans-serif';ctx.textAlign='left';
+        ctx.fillText('沙箱预热（重叠）',sx(wStart)+4,row.y+barH+32);}
+    }
+    if(prog*TL_TOTAL>=total){
+      ctx.fillStyle='#ffd97a';ctx.font='bold 13px sans-serif';ctx.textAlign='left';
+      ctx.fillText('共 '+total.toFixed(1)+'s',sx(total)+8,row.y+barH/2+4);
+    }
+  });
+}
+function tlPlay(){
+  if(tlRaf)cancelAnimationFrame(tlRaf);
+  const t0=performance.now(),dur=3800;
+  const step=t=>{const f=Math.min(1,(t-t0)/dur);tlDraw(f);
+    if(f<1){tlRaf=requestAnimationFrame(step);}else{
+      document.getElementById('tl-result').innerHTML=
+        '反应式全程 <b style="color:#ff6b6b">6.3s</b>；SpecBox 把 2.0s 的沙箱准备藏进生成期，全程 <b style="color:#2bc48a">4.3s</b>——省下的正是 env_prep 被移出关键路径的部分（示意口径）。';}};
+  tlRaf=requestAnimationFrame(step);
+}
+document.getElementById('tl-play').addEventListener('click',tlPlay);
+document.getElementById('tl-reset').addEventListener('click',()=>{
+  if(tlRaf)cancelAnimationFrame(tlRaf);tlDraw(0);
+  document.getElementById('tl-result').textContent='两种模式摆在一起：上面是「推理完才开沙箱」的反应式，下面是 SpecBox——沙箱准备（绿色）与 token 生成（蓝色）同时进行。';});
+tlDraw(0);
+
+/* ============ 演示 2：双路由器流式触发（时机示意） ============ */
+const RT_TOKENS=['请','帮','我','检','索','最','近','关','于','稀疏','注意','力','的','论','文','并','阅','读','第','一','篇'];
+const RT_KW=7,RT_SEM=13,RT_N=RT_TOKENS.length,RT_WARM_LEN=10;
+let rtRaf=null;
+function rtDraw(prog){
+  const o=setupCanvas('rt-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=64,padR=26,x0=padL,xw=W-padL-padR;
+  const tx=i=>x0+(i+0.5)/RT_N*xw;
+  const shown=Math.floor(prog*RT_N);
+  // token 流
+  ctx.font='12px sans-serif';ctx.textAlign='center';
+  for(let i=0;i<shown;i++){
+    ctx.fillStyle=i>=RT_N-3?'rgba(43,196,138,.25)':'rgba(77,159,255,.18)';
+    rr(ctx,tx(i)-14,26,28,24,6);ctx.fill();
+    ctx.fillStyle='#dfe8ff';ctx.fillText(RT_TOKENS[i],tx(i),43);
+  }
+  // 路由器行
+  const rows=[{n:'关键词路由器',y:82,at:RT_KW,c:'#f7b731'},{n:'语义路由器',y:122,at:RT_SEM,c:'#a55eea'}];
+  rows.forEach(r=>{
+    ctx.fillStyle='#9db4dd';ctx.font='12px sans-serif';ctx.textAlign='right';
+    ctx.fillText(r.n,padL-10,r.y+4);
+    ctx.strokeStyle='#24344f';ctx.beginPath();ctx.moveTo(x0,r.y);ctx.lineTo(x0+xw,r.y);ctx.stroke();
+    if(shown>r.at){
+      ctx.fillStyle=r.c;ctx.beginPath();ctx.arc(tx(r.at),r.y,6,0,7);ctx.fill();
+      ctx.font='11px sans-serif';ctx.textAlign='left';
+      ctx.fillText('触发！',tx(r.at)+10,r.y+4);
+    }
+  });
+  // 预热进度条
+  const wy=166;
+  ctx.fillStyle='#9db4dd';ctx.font='12px sans-serif';ctx.textAlign='right';
+  ctx.fillText('沙箱预热',padL-10,wy+4);
+  ctx.strokeStyle='#24344f';ctx.beginPath();ctx.moveTo(x0,wy);ctx.lineTo(x0+xw,wy);ctx.stroke();
+  if(shown>RT_KW){
+    const wProg=Math.min(1,(shown-RT_KW)/RT_WARM_LEN);
+    ctx.strokeStyle='#2bc48a';ctx.lineWidth=7;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(tx(RT_KW),wy);ctx.lineTo(tx(RT_KW)+wProg*(xw*(RT_WARM_LEN/RT_N)),wy);ctx.stroke();
+    ctx.lineWidth=1;
+    if(wProg>=1){ctx.fillStyle='#2bc48a';ctx.font='11.5px sans-serif';ctx.textAlign='left';
+      ctx.fillText('✓ 预热完成',tx(RT_KW)+xw*(RT_WARM_LEN/RT_N)+8,wy+4);}
+  }
+  // 调用正式发出
+  if(shown>=RT_N){
+    ctx.strokeStyle='#ffd97a';ctx.setLineDash([5,4]);ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(tx(RT_N-1)+16,14);ctx.lineTo(tx(RT_N-1)+16,wy+22);ctx.stroke();
+    ctx.setLineDash([]);ctx.lineWidth=1;
+    ctx.fillStyle='#ffd97a';ctx.font='12px sans-serif';ctx.textAlign='right';
+    ctx.fillText('工具调用正式发出 →',tx(RT_N-1)+8,wy+38);
+  }
+}
+function rtPlay(){
+  if(rtRaf)cancelAnimationFrame(rtRaf);
+  const t0=performance.now(),dur=5200;
+  const step=t=>{const f=Math.min(1,(t-t0)/dur);rtDraw(f);
+    if(f<1){rtRaf=requestAnimationFrame(step);}else{
+      document.getElementById('rt-result').innerHTML=
+        '并集策略下，<b style="color:#f7b731">关键词路由器</b>先在第 8 个 token 触发，预热在剩余解码期内跑完；<b style="color:#a55eea">语义路由器</b>第 14 个 token 才确认——它负责接住关键词漏掉的隐式意图。调用发出时沙箱已就绪，<b style="color:#2bc48a">关键路径上的等待 ≈ 0</b>（时机为示意）。';}};
+  rtRaf=requestAnimationFrame(step);
+}
+document.getElementById('rt-play').addEventListener('click',rtPlay);
+document.getElementById('rt-reset').addEventListener('click',()=>{
+  if(rtRaf)cancelAnimationFrame(rtRaf);rtDraw(0);
+  document.getElementById('rt-result').textContent='token 逐个生成。注意：关键词路由器（黄）在第 8 个 token 就触发了预热，绿色预热条在剩余解码期间悄悄跑完——等调用正式发出时，沙箱已经热好了。';});
+rtDraw(0);
+
+/* ============ 演示 3：SDG 马尔可夫预取（概率示意） ============ */
+const MK_NODES=[
+  {n:'PaperSearch',L:12,x:.20,y:.26},{n:'DocReader',L:3,x:.50,y:.13},
+  {n:'DataAnalysis',L:6,x:.80,y:.26},{n:'FigureGen',L:8,x:.80,y:.72},
+  {n:'WebBrowse',L:2,x:.50,y:.84},{n:'Jupyter',L:5,x:.20,y:.72}
+];
+const MK_P=[
+  [0,.70,.10,.10,.05,.05],
+  [.15,0,.35,.30,.10,.10],
+  [.10,.10,0,.55,.05,.20],
+  [.25,.20,.15,0,.30,.10],
+  [.40,.25,.15,.10,0,.10],
+  [.10,.10,.50,.25,.05,0]
+];
+const MK_LAM=5,MK_B=1;
+let mkCur=0;
+function mkDraw(){
+  const tau=parseFloat(document.getElementById('mk-tau').value);
+  document.getElementById('mk-tauv').textContent=tau.toFixed(2);
+  const o=setupCanvas('mk-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const px=i=>MK_NODES[i].x*W,py=i=>MK_NODES[i].y*H;
+  const cand=[];
+  for(let j=0;j<MK_NODES.length;j++){
+    if(j===mkCur)continue;
+    if(MK_NODES[j].L>=MK_LAM&&MK_P[mkCur][j]>=tau)cand.push(j);
+  }
+  cand.sort((a,b)=>MK_P[mkCur][b]-MK_P[mkCur][a]);
+  const pick=cand.slice(0,MK_B);
+  // 边
+  for(let j=0;j<MK_NODES.length;j++){
+    if(j===mkCur)continue;
+    const p=MK_P[mkCur][j];
+    const ok=pick.includes(j);
+    ctx.strokeStyle=ok?'#2bc48a':(MK_NODES[j].L<MK_LAM?'#2a3a56':'#5a6f95');
+    ctx.lineWidth=ok?1.5+p*9:1+p*5;
+    if(MK_NODES[j].L<MK_LAM)ctx.setLineDash([4,5]);
+    ctx.beginPath();ctx.moveTo(px(mkCur),py(mkCur));ctx.lineTo(px(j),py(j));ctx.stroke();
+    ctx.setLineDash([]);ctx.lineWidth=1;
+    const mx=(px(mkCur)+px(j))/2,my=(py(mkCur)+py(j))/2;
+    ctx.fillStyle=ok?'#7fe6bd':'#7f92b8';ctx.font=(ok?'bold ':'')+'12px sans-serif';ctx.textAlign='center';
+    ctx.fillText(p.toFixed(2),mx,my-6);
+  }
+  // 节点
+  MK_NODES.forEach((nd,j)=>{
+    const isCur=j===mkCur,isPick=pick.includes(j);
+    const r=isCur?30:(isPick?27:22);
+    ctx.fillStyle=isCur?'#1783ff':(isPick?'rgba(43,196,138,.30)':'#16223d');
+    ctx.beginPath();ctx.arc(px(j),py(j),r,0,7);ctx.fill();
+    ctx.strokeStyle=isCur?'#8fb8ff':(isPick?'#2bc48a':'#3a5078');ctx.lineWidth=2;ctx.stroke();ctx.lineWidth=1;
+    ctx.fillStyle=isCur?'#fff':(isPick?'#bff3de':'#9db4dd');
+    ctx.font=(isCur||isPick?'bold ':'')+'12.5px sans-serif';ctx.textAlign='center';
+    ctx.fillText(nd.n,px(j),py(j)+4);
+    ctx.fillStyle='#63769a';ctx.font='10px sans-serif';
+    ctx.fillText('冷启动 L='+nd.L+'s',px(j),py(j)+r+14);
+    if(isPick){ctx.fillStyle='#2bc48a';ctx.font='bold 11.5px sans-serif';
+      ctx.fillText('预取 ✓',px(j),py(j)-r-8);}
+  });
+  // 读出
+  const eligible=MK_NODES.map((nd,j)=>j).filter(j=>j!==mkCur&&nd.L>=MK_LAM);
+  const passed=eligible.filter(j=>MK_P[mkCur][j]>=tau);
+  let html='当前在 <b style="color:#8fb8ff">'+MK_NODES[mkCur].n+'</b>。'+
+    '成本筛（L≥λ='+MK_LAM+'）剩 '+eligible.length+' 个；'+
+    '置信筛（P≥τ='+tau.toFixed(2)+'）剩 <b style="color:#ffd97a">'+passed.length+'</b> 个；'+
+    '预算筛（top-B='+MK_B+'）最终预取：';
+  html+=pick.length?('<b style="color:#2bc48a">'+pick.map(j=>MK_NODES[j].n).join('、')+'</b>（趁当前沙箱执行期间提前热好）'):'<b style="color:#ff6b6b">无（τ 太高，宁可不预取也不浪费内存）</b>';
+  document.getElementById('mk-result').innerHTML=html;
+}
+const mkBtnBox=document.getElementById('mk-nodes');
+MK_NODES.forEach((nd,j)=>{
+  const b=document.createElement('button');
+  b.className='btn ghost'+(j===0?' active':'');b.textContent=nd.n;b.style.padding='5px 14px';b.style.fontSize='13px';
+  b.addEventListener('click',()=>{mkCur=j;
+    mkBtnBox.querySelectorAll('.btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');mkDraw();});
+  mkBtnBox.appendChild(b);
+});
+document.getElementById('mk-tau').addEventListener('input',mkDraw);
+mkDraw();
+
+/* ============ 演示 4：载荷 vs 传输延迟（端点实测，中间插值示意） ============ */
+const OB_RPC=[[1,2.28],[100,132.45],[1000,1873.16]];
+const OB_OOB=[[1,1.95],[1000,5.97]];
+function obInterp(pts,mb){
+  const lx=Math.log10(mb);
+  for(let k=0;k<pts.length-1;k++){
+    const a=pts[k],b=pts[k+1];
+    if(mb>=a[0]&&mb<=b[0]){
+      const f=(lx-Math.log10(a[0]))/(Math.log10(b[0])-Math.log10(a[0]));
+      return Math.pow(10,Math.log10(a[1])+f*(Math.log10(b[1])-Math.log10(a[1])));
+    }
+  }
+  return pts[pts.length-1][1];
+}
+function obFmt(v){return v>=1000?(v/1000).toFixed(2)+' s':v.toFixed(2)+' ms';}
+function obDraw(){
+  const f=parseFloat(document.getElementById('ob-size').value);
+  const mb=Math.pow(10,f);
+  document.getElementById('ob-sizev').textContent=mb>=1000?'1000 MB':(mb>=100?Math.round(mb)+' MB':(mb>=10?mb.toFixed(1)+' MB':mb.toFixed(2)+' MB'));
+  const o=setupCanvas('ob-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=54,padR=20,padT=18,padB=34;
+  const xmin=0,xmax=3,ymin=Math.log10(1),ymax=Math.log10(2500);
+  const X=v=>padL+(Math.log10(v)-xmin)/(xmax-xmin)*(W-padL-padR);
+  const Y=v=>padT+(ymax-Math.log10(v))/(ymax-ymin)*(H-padT-padB);
+  // 网格
+  ctx.fillStyle='#7f92b8';ctx.font='11px sans-serif';ctx.textAlign='center';
+  [1,10,100,1000].forEach(v=>{ctx.strokeStyle='#1c2b47';ctx.beginPath();ctx.moveTo(X(v),padT);ctx.lineTo(X(v),H-padB);ctx.stroke();
+    ctx.fillText(v+' MB',X(v),H-14);});
+  [1,10,100,1000].forEach(v=>{ctx.strokeStyle='#1c2b47';ctx.beginPath();ctx.moveTo(padL,Y(v));ctx.lineTo(W-padR,Y(v));ctx.stroke();
+    ctx.textAlign='right';ctx.fillText(v+' ms',padL-8,Y(v)+4);ctx.textAlign='center';});
+  // 曲线
+  function curve(pts,color){
+    ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.beginPath();
+    for(let i=0;i<=120;i++){const v=Math.pow(10,i/120*3);
+      const y=Y(obInterp(pts,v));
+      if(i===0)ctx.moveTo(X(v),y);else ctx.lineTo(X(v),y);}
+    ctx.stroke();ctx.lineWidth=1;
+    pts.forEach(p=>{ctx.fillStyle=color;ctx.beginPath();ctx.arc(X(p[0]),Y(p[1]),4,0,7);ctx.fill();});
+  }
+  curve(OB_RPC,'#ff6b6b');curve(OB_OOB,'#2bc48a');
+  ctx.font='12px sans-serif';ctx.textAlign='left';
+  ctx.fillStyle='#ff6b6b';ctx.fillText('JSON-RPC',X(300),Y(obInterp(OB_RPC,300))-10);
+  ctx.fillStyle='#2bc48a';ctx.fillText('带外传输',X(300),Y(obInterp(OB_OOB,300))+18);
+  // 滑杆竖线
+  ctx.strokeStyle='#ffd97a';ctx.setLineDash([5,4]);ctx.beginPath();
+  ctx.moveTo(X(mb),padT);ctx.lineTo(X(mb),H-padB);ctx.stroke();ctx.setLineDash([]);
+  const rpc=obInterp(OB_RPC,mb),oob=obInterp(OB_OOB,mb);
+  document.getElementById('ob-result').innerHTML=
+    '载荷 <b style="color:#ffd97a">'+document.getElementById('ob-sizev').textContent+'</b>：'+
+    'JSON-RPC ≈ <b style="color:#ff6b6b">'+obFmt(rpc)+'</b>，带外传输 ≈ <b style="color:#2bc48a">'+obFmt(oob)+'</b>'+
+    '，相差 <b style="color:#ffd97a">'+Math.round(rpc/oob)+'×</b>。'+
+    (mb>=900?'论文实测端点：1873.16 ms vs 5.97 ms = <b style="color:#ffd97a">313.55×</b> ✓':
+     mb<=1.01?'论文实测端点：2.28 ms vs 1.95 ms，两者都在 3 ms 内 ✓':
+     '中间值为对数插值示意；圆点是论文实测点。');
+}
+document.getElementById('ob-size').addEventListener('input',obDraw);
+obDraw();
+</script>
+</body>
+</html>
