@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>看懂 Zero-Mem · 不动用一个 token，给 LLM 智能体装上「零生成」记忆</title>
+<style>
+  :root{
+    --blue:#1783ff; --blue-d:#0b5cc4; --red:#ff6b6b; --amber:#f7b731;
+    --purple:#a55eea; --green:#2bc48a; --ink:#1b2430; --ink-soft:#48566a;
+    --bg:#f6f8fc; --card:#ffffff; --line:#e4eaf3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.8}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+
+  /* ===== Hero ===== */
+  .hero{background:linear-gradient(160deg,#0a1a3f 0%,#103a8c 55%,#1783ff 100%);
+    color:#fff;padding:72px 0 56px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+    padding:4px 14px;border-radius:99px;font-size:13px;letter-spacing:1px;margin-bottom:18px}
+  .hero h1{font-size:clamp(26px,4.6vw,44px);line-height:1.3;margin-bottom:14px}
+  .hero p.sub{font-size:clamp(14px,1.8vw,18px);opacity:.88;max-width:860px}
+  .hero .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);
+    border-radius:16px;padding:14px 22px;min-width:150px}
+  .stat b{display:block;font-size:26px;font-weight:800}
+  .stat span{font-size:13px;opacity:.85}
+
+  /* ===== Nav ===== */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  nav.toc .inner{display:flex;gap:6px;overflow-x:auto;padding:10px 22px;max-width:1060px;margin:0 auto}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--ink-soft);text-decoration:none;
+    padding:6px 12px;border-radius:99px;transition:.2s}
+  nav.toc a:hover{background:#eaf2ff;color:var(--blue-d)}
+
+  /* ===== Sections ===== */
+  section.chapter{padding:56px 0 8px}
+  .chap-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  .chap-num{font-size:14px;font-weight:800;color:#fff;background:var(--blue);
+    border-radius:10px;padding:3px 12px;letter-spacing:1px}
+  .chap-head h2{font-size:clamp(21px,3vw,30px)}
+  .oneline{color:var(--blue-d);font-weight:600;margin:4px 0 22px;font-size:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:0 2px 14px rgba(20,50,110,.05)}
+  .card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card p{margin-bottom:12px;color:#2c3a4e}
+  .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
+    border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
+  .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
+  .keyfact{position:relative;background:#eef5ff;border-left:4px solid var(--blue);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";position:absolute;left:16px;top:12px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .demo-box{background:#0e1830;border-radius:18px;padding:22px;margin:16px 0;color:#dfe8ff;
+    position:relative;overflow:hidden}
+  .demo-title{color:#8fb8ff;font-size:13px;letter-spacing:2px;font-weight:700;margin-bottom:14px;text-transform:uppercase}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:99px;padding:9px 22px;font-size:14px;
+    cursor:pointer;font-weight:600;transition:.2s;box-shadow:0 4px 14px rgba(23,131,255,.35)}
+  .btn:hover{background:var(--blue-d);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);box-shadow:none;color:#dfe8ff}
+  .btn.ghost.active{background:rgba(23,131,255,.22);border-color:#6db4ff;color:#fff}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border-radius:12px;overflow:hidden}
+  table.tbl th{background:#103a8c;color:#fff;padding:10px 12px;text-align:left;font-weight:600}
+  table.tbl td{padding:10px 12px;border-bottom:1px solid var(--line)}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl tr:nth-child(even) td{background:#f7faff}
+  .hl{color:var(--blue-d);font-weight:700}
+  .tbl-wrap{overflow-x:auto}
+
+  /* ===== 公式（纯 HTML/CSS，无 MathJax）===== */
+  .formula{background:#0e1830;border-radius:14px;padding:20px 22px;margin:14px 0;color:#eaf1ff;
+    font-size:clamp(15px,2.2vw,19px);text-align:center;overflow-x:auto;line-height:2;
+    font-family:"STIX Two Math","Cambria Math",Georgia,serif}
+  .formula .op{color:#8fb8ff}
+  .formula .cond{font-size:.82em;color:#9db4dd}
+  .frac{display:inline-flex;flex-direction:column;vertical-align:middle;margin:0 2px;line-height:1.4}
+  .frac .num{border-bottom:1.5px solid currentColor;padding:0 7px}
+  .frac .den{padding:0 7px}
+  .fnote{font-size:13px;color:#7f92b8;margin-top:10px;text-align:center;line-height:1.7;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  .formula var{font-style:italic}
+
+  /* ===== 结果条形图 ===== */
+  .scorebar{height:10px;border-radius:99px;background:#e7edf6;overflow:hidden;margin:4px 0 12px}
+  .scorebar i{display:block;height:100%;border-radius:99px;width:0;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+  .bar-row{display:grid;grid-template-columns:170px 1fr 64px;gap:12px;align-items:center;margin-bottom:10px;font-size:14px}
+  @media(max-width:640px){.bar-row{grid-template-columns:110px 1fr 56px}}
+  .bar-row b{text-align:right;font-variant-numeric:tabular-nums}
+
+  /* ===== 滑杆 ===== */
+  .slider-row{display:flex;align-items:center;gap:14px;margin:14px 0 6px;flex-wrap:wrap}
+  .slider-row label{font-size:14px;color:#9db4dd;white-space:nowrap}
+  .slider-row input[type=range]{flex:1;min-width:180px;accent-color:var(--amber)}
+  .slider-row output{color:#ffd97a;font-weight:700;min-width:56px;text-align:right;font-variant-numeric:tabular-nums}
+  canvas.chart{width:100%;height:260px;display:block;border-radius:10px;background:#0a1326}
+  .demo-readout{margin-top:14px;font-size:14.5px;line-height:1.8}
+  .caption{font-size:12.5px;color:#7f92b8;margin-top:8px;line-height:1.6}
+
+  /* ===== 范式对比动画 ===== */
+  .pipes{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:6px}
+  @media(max-width:760px){.pipes{grid-template-columns:1fr}}
+  .pipe{background:#0a1326;border:1px solid #1e2c4d;border-radius:14px;padding:14px}
+  .pipe h4{font-size:14.5px;color:#cfe2ff;margin-bottom:4px;text-align:center}
+  .pipe .pp-cost{text-align:center;font-size:13px;color:#9db4dd;margin-bottom:10px}
+  .pipe .pp-cost b{color:#ffd97a;font-size:18px;font-variant-numeric:tabular-nums}
+  .pipe.zm .pp-cost b{color:#2bc48a}
+  .pp-step{background:#101c3a;border:1px solid #22345e;border-radius:10px;padding:8px 46px 8px 10px;
+    font-size:12.5px;color:#8ea3cf;margin:8px 0;opacity:.45;transition:all .45s;position:relative}
+  .pp-step.on{opacity:1;border-color:var(--blue);color:#eaf1ff;background:#142a58;
+    box-shadow:0 0 0 1px var(--blue),0 4px 18px rgba(23,131,255,.25)}
+  .pp-step.bad.on{border-color:var(--red);box-shadow:0 0 0 1px var(--red),0 4px 18px rgba(255,107,107,.22)}
+  .pp-step.good.on{border-color:var(--green);box-shadow:0 0 0 1px var(--green),0 4px 18px rgba(43,196,138,.22)}
+  .pp-step .tk{position:absolute;right:8px;top:8px;font-size:11px;color:#ffd97a;font-weight:700}
+  .pp-arrow{text-align:center;color:#3a5078;font-size:12px;line-height:1;margin:0}
+
+  /* ===== 路由动画条形 ===== */
+  .rt-row{display:grid;grid-template-columns:150px 1fr 56px;gap:12px;align-items:center;margin:10px 0;font-size:13.5px}
+  @media(max-width:640px){.rt-row{grid-template-columns:96px 1fr 48px}}
+  .rt-bar{height:16px;border-radius:99px;background:#101c3a;overflow:hidden}
+  .rt-bar i{display:block;height:100%;border-radius:99px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+  .rt-row b{text-align:right;font-variant-numeric:tabular-nums;color:#cfe2ff}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:#9db4dd;margin-top:10px}
+  .legend span::before{content:"●";margin-right:5px}
+
+  /* ===== 来源标注 ===== */
+  .src{color:var(--blue-d);text-decoration:none;font-size:.8em;font-weight:600;
+    border-bottom:1px dashed #9db8e8;padding:0 1px;white-space:nowrap}
+  .src:hover{color:var(--blue);border-bottom-style:solid;background:#eaf2ff;border-radius:4px}
+  .src::after{content:"↗";font-size:.85em;margin-left:1px}
+  .demo-box .src, .formula .src{color:#8fb8ff;border-bottom-color:#3a5078}
+  .demo-box .src:hover{color:#cfe2ff;background:rgba(23,131,255,.15)}
+  .src-inline{color:inherit;border-bottom:1px dashed #9db8e8;text-decoration:none}
+  .src-inline:hover{color:var(--blue)}
+
+  footer{margin-top:64px;padding:34px 0 46px;color:#7f8ca3;font-size:13px;text-align:center;
+    border-top:1px solid var(--line);line-height:2}
+  .fade-up{opacity:0;transform:translateY(26px);transition:all .7s cubic-bezier(.3,.7,.3,1)}
+  .fade-up.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">arXiv 论文交互解读 · 智能体记忆</span>
+    <h1>看懂 Zero-Mem：不动用一个 token，给 LLM 智能体装上「零生成」记忆</h1>
+    <p class="sub">香港理工大学等团队提出的智能体记忆框架：记忆系统的构建、组织、路由、检索、证据闭环与校准全程不调用 LLM、不消耗任何 LLM token——只有最后答题那一步才请大模型出场。原始交互记录一个字不改，照样在长对话记忆与长文本多跳问答基准上拿下最高分。</p>
+    <div class="stats">
+      <div class="stat"><b>0</b><span>记忆操作的 LLM 调用次数与 token 消耗</span></div>
+      <div class="stat"><b>57.6%↓</b><span>记忆操作耗时（相对最快基线 LightMem）</span></div>
+      <div class="stat"><b>59.15</b><span>LoCoMo 平均 F1（GPT-4o-mini，全场最高）</span></div>
+      <div class="stat"><b>72.07</b><span>HotpotQA 56K F1（GPT-4o-mini，全场最高）</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="toc"><div class="inner">
+  <a href="#ch0">🧠 热身：智能体的记忆难题</a>
+  <a href="#ch1">🧰 概念基础</a>
+  <a href="#ch2">🎯 核心方法：四件套</a>
+  <a href="#ch3">📊 实验结果</a>
+  <a href="#ch4">⚖️ 局限与意义</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ============ CH0 热身 ============ -->
+<section class="chapter" id="ch0">
+  <div class="chap-head"><span class="chap-num">第 0 章</span><h2>热身：智能体的记忆难题</h2></div>
+  <p class="oneline">让智能体「记住过去」这件事，此前的主流做法是再请大模型当记忆的「秘书」——而这位秘书既贵，又会悄悄改口供。</p>
+
+  <div class="card fade-up">
+    <h3>🗂️ 记忆系统的两难：「写摘要」还是「翻仓库」</h3>
+    <p>LLM 智能体在长程交互中不断累积对话、动作、工具观察与任务结果。它靠不靠谱，不只取决于当下的推理，更取决于能否从不断膨胀的历史里<b>找回正确的证据</b>——而且要对应到正确的实体、正确的会话、正确的时间状态（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文 §1</a>）。</p>
+    <p>在此之前的记忆系统大致走两条路，各有硬伤（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文 §1，图 1</a>）：</p>
+    <table class="tbl">
+      <tr><th>路线</th><th>做法</th><th>硬伤</th></tr>
+      <tr><td><b>生成式记忆</b><br><span style="font-size:12.5px;color:#7f8ca3">Zep / Mem0 / A-Mem / MemoryOS 等</span></td><td>让 LLM 把历史压缩成摘要、记忆卡片、结构化笔记，检索时先查这些「二手材料」</td><td>记忆管理变成<b>持续的生成开销</b>（token 与时间）；摘要里<b>被省略的细节、被合并的主体、被模糊的时间</b>会削弱对原始交互的可追溯性</td></tr>
+      <tr><td><b>原始检索</b><br><span style="font-size:12.5px;color:#7f8ca3">RAG / GAM 等直接检索原始块</span></td><td>一个字不改，直接对原始记录做词面或向量相似度检索</td><td>平面检索会<b>混淆不同用户、不同会话、不同时间状态</b>的相似记录；证据分散在多次交互中时容易漏检</td></tr>
+    </table>
+    <div class="analogy">生成式记忆像雇一位秘书整理档案：他写的摘要确实好查，但摘要经过他的转述——原件里的关键细节可能被顺手省略或张冠李戴，而且这位秘书按字收费、随叫随计费。原始检索则像不雇秘书、自己去仓库翻箱子：东西都在，但没有编目，想找「去年三月张三说的那句话」得碰运气。Zero-Mem 的想法是第三条路：<b>原件一份不动，但给档案室做两套详尽的索引编目</b>——编目工作全由「不要钱的工具」完成。</div>
+    <div class="keyfact">论文由此提出核心问题：<b>结构化的记忆访问，真的需要「生成」吗？</b>（Can an agent memory system eliminate LLM calls from every operation outside final question answering?）（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文 §2</a>）</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>⚖️ 「零 token 记忆操作」到底是什么意思</h3>
+    <p>论文把这套运行方式正式定义为 <b>zero-token memory operations</b>：记忆的<b>构建、组织、路由、检索、证据闭环，以及答题前的证据校准与答题后的答案校准</b>，全部不调用 LLM、不消耗 LLM 输入或输出 token。只有两类计算被单独记账：编码器（embedding 模型）的计算，以及最终问答（final-QA reader）那一次 LLM 推理（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文 §2</a>）。</p>
+    <p>点击播放，直观对比三种范式下「记忆操作」各自消耗多少 LLM token：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 三种记忆范式的 token 账本（示意）</div>
+      <div class="pipes">
+        <div class="pipe">
+          <h4>① 生成式记忆</h4>
+          <div class="pp-cost">记忆操作 token：<b id="pp-tok-gen">0</b></div>
+          <div class="pp-step" data-col="gen" data-step="0">📥 交互历史不断涌入</div>
+          <div class="pp-arrow">↓</div>
+          <div class="pp-step bad" data-col="gen" data-step="1">✍️ LLM 写摘要 / 抽取记忆卡片<span class="tk">+token</span></div>
+          <div class="pp-arrow">↓</div>
+          <div class="pp-step bad" data-col="gen" data-step="2">🔍 检索二手摘要，细节已被转述<span class="tk">+token</span></div>
+          <div class="pp-arrow">↓</div>
+          <div class="pp-step" data-col="gen" data-step="3">💬 最终问答（唯一必要的 LLM 调用）</div>
+        </div>
+        <div class="pipe">
+          <h4>② 原始检索</h4>
+          <div class="pp-cost">记忆操作 token：<b id="pp-tok-raw">0</b></div>
+          <div class="pp-step" data-col="raw" data-step="0">📥 交互历史原样切块</div>
+          <div class="pp-arrow">↓</div>
+          <div class="pp-step" data-col="raw" data-step="1">🧮 向量 / 词面索引（编码器，无 LLM）</div>
+          <div class="pp-arrow">↓</div>
+          <div class="pp-step bad" data-col="raw" data-step="2">🔍 平面相似度检索：混淆会话、漏掉跨交互证据</div>
+          <div class="pp-arrow">↓</div>
+          <div class="pp-step" data-col="raw" data-step="3">💬 最终问答（可能基于残缺证据）</div>
+        </div>
+        <div class="pipe zm">
+          <h4>③ Zero-Mem</h4>
+          <div class="pp-cost">记忆操作 token：<b id="pp-tok-zm">0</b></div>
+          <div class="pp-step" data-col="zm" data-step="0">📥 原始记录即权威档案，一字不改</div>
+          <div class="pp-arrow">↓</div>
+          <div class="pp-step good" data-col="zm" data-step="1">🧮 NER + 图 / 时间层级双编目（零 LLM）</div>
+          <div class="pp-arrow">↓</div>
+          <div class="pp-step good" data-col="zm" data-step="2">🔍 双视角检索 + 确定性校准（零 LLM）</div>
+          <div class="pp-arrow">↓</div>
+          <div class="pp-step" data-col="zm" data-step="3">💬 最终问答（唯一一次 LLM 调用）</div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="pp-play">▶ 播放对比</button>
+        <button class="btn ghost" id="pp-reset">↺ 重置</button>
+      </div>
+      <div class="demo-readout" id="pp-readout"></div>
+      <div class="caption">token 数字为演示用示意值，用于表达「每一步都可能烧钱」的相对关系；真实开销对比见第 3 章表 2 的实测数据（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文表 2</a>）。</div>
+    </div>
+    <div class="keyfact">Zero-Mem 的承诺：<b>原始记录与呈现给答题器的证据之间，不存在任何「生成出来的中间记忆」</b>——证据永远可追溯到真实发生过的交互（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文 §2</a>）。</div>
+  </div>
+</section>
+<!-- ============ CH1 概念基础 ============ -->
+<section class="chapter" id="ch1">
+  <div class="chap-head"><span class="chap-num">第 1 章</span><h2>概念基础：不花 token 的工具箱</h2></div>
+  <p class="oneline">要理解 Zero-Mem 为什么敢「不用 LLM」，先认识四件便宜又好用的老工具——它们只做计算，不做生成。</p>
+
+  <div class="card fade-up">
+    <h3>① 「记忆操作」的钱原来花在哪</h3>
+    <p>先统一记账口径。一个记忆系统的完整生命周期可以拆成：<b>构建</b>（把历史存进来）、<b>组织</b>（建索引/结构）、<b>路由与检索</b>（按问题找证据）、<b>校准</b>（筛证据、查答案）。在生成式系统里，这几步里的每一步都可能是一次 LLM 调用——写摘要要 token、抽取三元组要 token、改写查询也要 token，历史越长、调用越频繁，<b>token 与时间开销就成了「经常性支出」</b>（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文 §1</a>）。</p>
+    <p>Zero-Mem 的账本非常干净：上面每一步的 LLM 开销都是 <b>0</b>。但论文也很诚实地补了一句——<b>零 token 不等于零计算</b>：编码器推理、记忆组织、检索和确定性校准仍然要花算力，只是它们不调 LLM、不烧 LLM token（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文 §Efficiency Comparison</a>）。</p>
+    <div class="analogy">LLM 像一位按小时收费的资深顾问：口才好、会综合，但请他整理档案太贵，而且他转述过的东西不算「原件」。Zero-Mem 的思路是：整理档案这种<b>有章可循的活</b>，交给不要钱的编目员（NER）、检索员（BM25/向量）和公证员（确定性校验）去做，资深顾问只在最后出庭陈述时出场一次。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>② 四件工具：NER、BM25、向量、PageRank</h3>
+    <p>Zero-Mem 用来看懂和组织历史的全部「智力」，来自四个成熟的非生成式工具（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文 §Method</a>）：</p>
+    <table class="tbl">
+      <tr><th>工具</th><th>干什么</th><th>白话理解</th></tr>
+      <tr><td><b>NER 命名实体识别</b>（如 spaCy）</td><td>从文本里圈出人名、地点、组织等实体</td><td>编目员拿荧光笔把每张卡片上的「主角」圈出来</td></tr>
+      <tr><td><b>BM25 词面检索</b></td><td>按词的重合与稀有度给文档打分</td><td>按「关键词字面命中」查索引卡：人名、日期、数字、标题一查一个准</td></tr>
+      <tr><td><b>稠密向量</b>（BGE-M3）</td><td>把文本编码成向量，按语义相近程度匹配</td><td>字面不同但意思相近也能找到——「换工作」和「跳槽」指向同一段记录</td></tr>
+      <tr><td><b>Personalized PageRank</b></td><td>在图上从指定节点出发做带重启的随机游走，算出每个节点的得分</td><td>从「与问题相关的实体」出发沿关系网扩散涟漪，看能量最终汇聚到哪些记录上</td></tr>
+    </table>
+    <p>向量之间的「语义相近程度」用<b>余弦相似度</b>度量——Zero-Mem 用它把问题里的实体对齐到图里真实出现过的实体（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文式 (8)</a>）：</p>
+    <div class="formula">
+      cos(<var>e</var>, <var>ê</var>) = <span class="frac"><span class="num"><var>e</var> · <var>ê</var></span><span class="den">‖<var>e</var>‖ · ‖<var>ê</var>‖</span></span>
+      <div class="fnote">两个向量夹角越小，值越接近 1，说明问题里提到的实体 <var>ê</var> 和档案里记录的实体 <var>e</var> 越像同一个「主角」。全程只是向量点乘——没有任何生成。</div>
+    </div>
+    <div class="keyfact">论文特别强调：这些表示<b>只用于索引、播种和打分，不生成、不改写任何记忆内容</b>（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文 §Method / Memory Substrate</a>）。这是「可溯源」承诺的技术底线。</div>
+  </div>
+</section>
+
+<!-- ============ CH2 核心方法 ============ -->
+<section class="chapter" id="ch2">
+  <div class="chap-head"><span class="chap-num">第 2 章</span><h2>核心方法：Zero-Mem 的四件套</h2></div>
+  <p class="oneline">一份不动的原始档案 + 两套互补的编目 + 一个按问题分配权重的分诊台 + 一位铁面无私的核对员。</p>
+
+  <!-- 组件一 -->
+  <div class="card fade-up">
+    <h3>🗃️ 组件一：可溯源的记忆底座——一份档案，两套编目</h3>
+    <p>Zero-Mem 不用生成的摘要替换原始历史。每个派生单元都完整保留<b>原文、来源标识、会话时间、边界标识</b>等元数据——检出来的每条证据都能回溯到真实交互，而不是某句「模型生成的记忆陈述」（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文 §Memory Substrate</a>）。在此之上建两套互补结构：</p>
+    <p><b>编目 A：实体–上下文图（关系视角）。</b>用 NER 圈出每段记录里的实体，连两类边：实体与它出现的记录之间的「共现边」，以及相邻记录之间的「邻接边」（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文式 (3)(4)</a>）：</p>
+    <div class="formula">
+      <var>G</var> = ( <var>V</var><sub><var>d</var></sub> ∪ <var>V</var><sub><var>e</var></sub>, <var>E</var><sub><var>de</var></sub> ∪ <var>E</var><sub><var>dd</var></sub> )，&nbsp;&nbsp;
+      <var>w</var>(<var>d</var><sub><var>i</var></sub>, <var>e</var>) = <span class="frac"><span class="num"><var>c</var>(<var>e</var>, <var>d</var><sub><var>i</var></sub>)</span><span class="den">∑<sub><var>e</var>′∈<var>E</var>(<var>d</var><sub><var>i</var></sub>)</sub> <var>c</var>(<var>e</var>′, <var>d</var><sub><var>i</var></sub>)</span></span>
+      <div class="fnote">白话翻译：<var>c</var>(<var>e</var>, <var>d</var><sub><var>i</var></sub>) 是实体 <var>e</var> 在记录 <var>d</var><sub><var>i</var></sub> 里出现的次数；一段记录里某实体被提到的占比越高，这条「共现边」越粗。图只记录<b>观察到的</b>共现与邻接，不生成任何推断出来的关系。</div>
+    </div>
+    <p><b>编目 B：时间层级（时序视角）。</b>图本身保不住对话的先后顺序与会话状态，所以再把历史按粒度叠成四层（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文式 (5)</a>）：</p>
+    <div class="formula">
+      <var>T</var>(<var>H</var>) = <var>U</var><sub>turn</sub> ∪ <var>U</var><sub>window</sub> ∪ <var>U</var><sub>episode</sub> ∪ <var>U</var><sub>local</sub>
+      <div class="fnote"><b>轮次</b>（turn）保存原子发言；<b>窗口</b>（window）保留短程上下文；<b>篇章</b>（episode）按语义连续性和会话边界把相邻窗口聚成连贯的「事件区」；<b>局部片段</b>（local span）在证据需要上下文时补上前后文。所有单元都继承原始记录的溯源信息。</div>
+    </div>
+    <div class="analogy">像图书馆的双套编目：<b>主题索引卡</b>（图）告诉你「哪些书都提到了爱丽丝」，适合查关系；<b>按上架时间排列的书架</b>（时间层级）告诉你「那段时间先后发生了什么」，适合查来龙去脉。关键是——<b>书本身一本没动</b>，动的只是索引。</div>
+  </div>
+
+  <!-- 组件二 -->
+  <div class="card fade-up">
+    <h3>🚦 组件二：查询画像与路由——按问题分配两套编目的权重</h3>
+    <p>不同问题要的证据形状不一样：「A 和 B 是什么关系？」该走图；「那天之后发生了什么？」该走时间线。Zero-Mem 为每个问题提取一份轻量<b>画像</b>，全程不借助标准答案（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文式 (6)(7)</a>）：</p>
+    <div class="formula">
+      φ(<var>q</var>) = { subject, keywords, answer-type, temporal-cues, boundary }，&nbsp;&nbsp; Route(<var>q</var>) ∈ { relational, local }
+      <div class="fnote">主体和关键词提供内容锚点；答案类型与时间线索刻画「需要什么结构的证据」；boundary 限定可查的交互范围。路由信号全是确定性的（问法、是否有时间/聚合要求、有无主体锚点），不调用 LLM。</div>
+    </div>
+    <p>路由不「二选一」，而是决定两套编目在融合时的<b>权重</b>：关系型问题给图视角权重 ρ、层级视角权重 1−ρ；局部型问题反过来（实验中 ρ = 0.6，<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文 §Implementation Details</a>）。拖动滑杆感受权重如何改变最终排名（演示候选分数为示意）：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 路由权重如何改写证据排名（示意）</div>
+      <div class="btn-row" style="margin-top:0">
+        <button class="btn ghost active" id="rt-rel">关系型问题「谁和谁在同一个项目组？」</button>
+        <button class="btn ghost" id="rt-loc">局部型问题「上周五会议后决定了什么？」</button>
+      </div>
+      <div class="slider-row">
+        <label>主视角权重 ρ</label>
+        <input type="range" id="rt-rho" min="0.1" max="0.9" step="0.05" value="0.6">
+        <output id="rt-rhov">0.60</output>
+      </div>
+      <div id="rt-bars"></div>
+      <div class="legend">
+        <span style="color:#4d9fff">图视角得分</span>
+        <span style="color:#a55eea">层级视角得分</span>
+        <span style="color:#ffd97a">融合得分 = ρ·主视角 + (1−ρ)·次视角</span>
+      </div>
+      <div class="demo-readout" id="rt-readout"></div>
+      <div class="caption">三位候选的图/层级单项得分为教学示意值；融合规则与论文式 (13) 一致：S<sub>fuse</sub>(d) = ρ·Ŝ<sub>primary</sub>(d) + (1−ρ)·Ŝ<sub>secondary</sub>(d)。完整模型中两个视角都会执行，路由只控制相对权重（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文 §Query-Conditioned Evidence Routing</a>）。</div>
+    </div>
+    <div class="analogy">前台分诊：病人说「我和家人的关系」（关系型），优先转给查「主题索引卡」的科室；病人说「我上周三之后怎么了」（局部型），优先转给查「时间线」的科室。但两个科室都会出诊，只是意见权重不同。</div>
+  </div>
+
+  <!-- 组件三 -->
+  <div class="card fade-up">
+    <h3>🔍 组件三：双视角检索与证据闭环——涟漪扩散 + 从章到句</h3>
+    <p><b>图视角：激活扩散 + Personalized PageRank。</b>先用余弦相似度把问题实体对齐到图中实体，作为「火种」；然后让激活沿共现句子向外扩散——一个实体若与已激活实体在「和问题相关的句子」里共同出现，就得分（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文式 (8)(9)</a>）。扩散结果与上下文先验合成重置向量 <var>r</var><sub><var>q</var></sub>，最后用 Personalized PageRank 在整张图上摊分能量（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文式 (10)</a>）：</p>
+    <div class="formula">
+      π<sub><var>q</var></sub> = (1 − γ)<var>r</var><sub><var>q</var></sub> + γ<var>P</var><sup>⊤</sup>π<sub><var>q</var></sub>
+      <div class="fnote">γ 是阻尼系数（实验取 0.6）：每次游走以 1−γ 的概率「跳回」与问题相关的种子，以 γ 的概率沿边继续走。迭代收敛后，上下文节点上的 PageRank 值就是图视角的排名——能量最终汇聚的记录，就是「关系网里离问题最近」的证据。</div>
+    </div>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 图视角的能量扩散（示意）</div>
+      <canvas class="chart" id="ppr-canvas" style="height:300px"></canvas>
+      <div class="btn-row">
+        <button class="btn" id="ppr-play">▶ 播放扩散过程</button>
+        <button class="btn ghost" id="ppr-reset">↺ 重置</button>
+      </div>
+      <div class="demo-readout" id="ppr-readout"></div>
+      <div class="caption">示意网络：● 圆形 = 实体节点，■ 方形 = 上下文（记录）节点。播放顺序对应论文流程：对齐问题实体 → 沿共现句子扩散激活 → PageRank 收敛后得分最高的记录被取走。网络结构与数值为教学示意。</div>
+    </div>
+    <p><b>层级视角：粗到细的钻取。</b>每个单元同时按「语义相关性」和「与查询画像的结构兼容性」（主体一致、时间有效、边界一致、答案类型匹配、词面支持）打分，然后从粗到细逐层下钻（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文式 (11)</a>）：</p>
+    <div class="formula">
+      <var>U</var><sub>episode</sub> → <var>U</var><sub>window</sub> → <var>U</var><sub>turn</sub> → <var>U</var><sub>local</sub>
+      <div class="fnote">篇章先圈出相关的「事件区」，窗口把范围收窄，轮次亮出原始证据；若证据依赖前后文，再补上局部片段。与图视角不同，这一路显式保住了顺序、时间局部性与会话级上下文。</div>
+    </div>
+    <p><b>融合与闭环。</b>两路排名先做按查询的 min-max 归一化，再按路由权重 ρ 融合成主证据 M(q)；然后<b>证据闭环</b>从图视角补充「关系桥接」记录、从层级视角补回相邻轮次或局部片段，按来源标识去重，得到紧凑的闭环证据集 C(q)（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文式 (12)(13)(14)</a>）。</p>
+    <div class="analogy">两位侦查员分头查案：一位沿「人物关系网」摸排（图），一位按「案发时间线」梳理（层级）。汇总时先按案件类型决定谁的意见权重高，再互相补充——关系网发现的线索要配上前后时间线，时间线上的关键节点要补上关系背景，最后把重复笔录合并，形成一份完整卷宗。</div>
+  </div>
+
+  <!-- 组件四 -->
+  <div class="card fade-up">
+    <h3>✅ 组件四：确定性校准——答题前后各设一道「安检」</h3>
+    <p><b>答题前：证据校准。</b>先做硬过滤——丢掉违反溯源或查询边界约束的候选；再按主体、时间、答案类型的兼容性排序，产出最终证据集 R(q)。过滤只执行规则、排序不改写内容（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文式 (15)</a>）：</p>
+    <div class="formula">
+      <var>R</var>(<var>q</var>) = Rank<sub>φ(<var>q</var>)</sub> ( Filter ( <var>C</var>(<var>q</var>), φ(<var>q</var>) ) )
+      <div class="fnote">到这一步为止，整条流水线没有调用过一次 LLM。接下来，唯一一次 LLM 调用发生：reader 基于 R(q) 产出初始答案 a₀。</div>
+    </div>
+    <p><b>答题后：答案校准。</b>对可确定性检查的题型，从证据本地抽取候选集 A(q)，再做三类检查：证据支持度、答案类型、格式。规则非常克制——a₀ 有证据支持且格式合规就<b>原样保留</b>；标量答案只在 A(q) 中存在<b>唯一</b>类型兼容候选时才替换；列表类答案做逐条修剪与规范化；若没有可用的确定性修正，一律保留 a₀（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文式 (16)</a>）。</p>
+    <div class="analogy">法庭的「证据核对员」：开庭前剔除来路不明的证物（边界/溯源过滤）；宣判后核对判决书——答案必须能在卷宗里找到出处、类型格式必须合规。核对员<b>只查不改口供</b>：没有铁证就维持原判，绝不自由发挥。</div>
+    <div class="keyfact">至此，记忆的构建、组织、路由、检索、闭环、双端校准全部完成，LLM 调用次数：<b>记忆操作 0 次 / 最终问答 1 次</b>（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文图 2、§Deterministic Evidence Calibration</a>）。</div>
+  </div>
+</section>
+<!-- ============ CH3 实验结果 ============ -->
+<section class="chapter" id="ch3">
+  <div class="chap-head"><span class="chap-num">第 3 章</span><h2>实验结果：不花钱，还更能打？</h2></div>
+  <p class="oneline">两个基准、两种底座模型、十个对手——先看准不准，再看贵不贵，最后拆开看每个零件的贡献。</p>
+
+  <div class="card fade-up">
+    <h3>🧪 实验设置：把「记忆管线」单独拎出来比</h3>
+    <p>两个互补基准（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文 §Experimental Setup</a>）：<b>LoCoMo</b>（<a class="src" href="https://arxiv.org/abs/2402.17753" target="_blank" rel="noopener">arXiv:2402.17753</a>）考察多会话长程对话记忆，含单跳、多跳、时间推理、开放域四类问题；<b>HotpotQA</b>（<a class="src" href="https://arxiv.org/abs/1809.09600" target="_blank" rel="noopener">arXiv:1809.09600</a>）的记忆评测变体把金标准文档混入干扰段落，构造 56K / 224K / 448K token 三档上下文，考察长文本多跳检索。底座模型用 GPT-4o-mini（闭源）与 Qwen2.5-14B（开源）各跑一遍；<b>所有方法共用同一个最终答题器与同等上下文预算</b>，因此差异全部来自记忆管线本身。对手包括无记忆的 LONG-LLM、RAG（2048 token 切块取 top-5），以及记忆系统 <a class="src" href="https://arxiv.org/abs/2502.12110" target="_blank" rel="noopener">A-Mem</a>、<a class="src" href="https://arxiv.org/abs/2504.19413" target="_blank" rel="noopener">Mem0</a>、MemoryOS、<a class="src" href="https://arxiv.org/abs/2510.18866" target="_blank" rel="noopener">LightMem</a>、<a class="src" href="https://arxiv.org/abs/2601.02553" target="_blank" rel="noopener">SimpleMem</a>、CompassMem、<a class="src" href="https://arxiv.org/abs/2511.18423" target="_blank" rel="noopener">GAM</a>（LoCoMo 上另有 <a class="src" href="https://arxiv.org/abs/2405.14831" target="_blank" rel="noopener">HippoRAG</a>）。阻尼系数 γ 与路由权重 ρ 均设 0.6，检索预算统一 top-5，硬件 RTX 4090、四线程并发。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🏆 LoCoMo：平均 F1 双底座全场第一</h3>
+    <p>GPT-4o-mini 底座下，各方法四类问题的<b>平均 F1</b>（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文表 1</a>）：</p>
+    <div class="bar-row"><span>LONG-LLM</span><div class="scorebar"><i data-w="37.31" style="background:#c9d6ec"></i></div><b>37.31</b></div>
+    <div class="bar-row"><span>RAG</span><div class="scorebar"><i data-w="44.73" style="background:#c9d6ec"></i></div><b>44.73</b></div>
+    <div class="bar-row"><span>A-Mem</span><div class="scorebar"><i data-w="39.65" style="background:#c9d6ec"></i></div><b>39.65</b></div>
+    <div class="bar-row"><span>Mem0</span><div class="scorebar"><i data-w="45.10" style="background:#c9d6ec"></i></div><b>45.10</b></div>
+    <div class="bar-row"><span>MemoryOS</span><div class="scorebar"><i data-w="42.84" style="background:#c9d6ec"></i></div><b>42.84</b></div>
+    <div class="bar-row"><span>LightMem</span><div class="scorebar"><i data-w="38.44" style="background:#c9d6ec"></i></div><b>38.44</b></div>
+    <div class="bar-row"><span>HippoRAG</span><div class="scorebar"><i data-w="47.92" style="background:#9db4dd"></i></div><b>47.92</b></div>
+    <div class="bar-row"><span>SimpleMem</span><div class="scorebar"><i data-w="48.02" style="background:#9db4dd"></i></div><b>48.02</b></div>
+    <div class="bar-row"><span>CompassMem</span><div class="scorebar"><i data-w="52.18" style="background:#5a7bb5"></i></div><b>52.18</b></div>
+    <div class="bar-row"><span>GAM</span><div class="scorebar"><i data-w="53.75" style="background:#5a7bb5"></i></div><b>53.75</b></div>
+    <div class="bar-row"><span class="hl">Zero-Mem</span><div class="scorebar"><i data-w="59.15" style="background:linear-gradient(90deg,#1783ff,#2bc48a)"></i></div><b class="hl">59.15</b></div>
+    <div class="tbl-wrap" style="margin-top:16px">
+    <table class="tbl">
+      <tr><th>底座</th><th>指标</th><th>最强基线（GAM）</th><th>Zero-Mem</th><th>提升</th></tr>
+      <tr><td rowspan="2">GPT-4o-mini</td><td>平均 F1</td><td>53.75</td><td class="hl">59.15</td><td class="hl">+5.40</td></tr>
+      <tr><td>平均 BLEU-1</td><td>47.51</td><td class="hl">52.96</td><td class="hl">+5.45</td></tr>
+      <tr><td rowspan="2">Qwen2.5-14B</td><td>平均 F1</td><td>52.70</td><td class="hl">57.57</td><td class="hl">+4.87</td></tr>
+      <tr><td>平均 BLEU-1</td><td>46.55</td><td class="hl">51.41</td><td class="hl">+4.86</td></tr>
+    </table>
+    </div>
+    <div class="keyfact">GPT-4o-mini 下 Zero-Mem 在单跳（66.65）、时间推理（61.97）、开放域（35.52）三类第一，多跳（41.61）以 0.68 分之差略低于 GAM（42.29）；Qwen2.5-14B 下则在<b>全部四类问题、两项指标上均列第一</b>（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文表 1、§Main Results</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📚 HotpotQA：448K token 上下文中仍然第一</h3>
+    <p>上下文从 56K 加到 448K token（干扰段落越来越多），考察能否在长文本中定位并串联分布式证据。F1 成绩（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文表 3</a>）：</p>
+    <div class="tbl-wrap">
+    <table class="tbl">
+      <tr><th rowspan="2">方法</th><th colspan="3">GPT-4o-mini</th><th colspan="3">Qwen2.5-14B</th></tr>
+      <tr><th>56K</th><th>224K</th><th>448K</th><th>56K</th><th>224K</th><th>448K</th></tr>
+      <tr><td>LONG-LLM</td><td>56.56</td><td>54.29</td><td>53.92</td><td>49.75</td><td>46.82</td><td>43.17</td></tr>
+      <tr><td>RAG</td><td>52.71</td><td>51.84</td><td>54.01</td><td>51.81</td><td>46.72</td><td>48.36</td></tr>
+      <tr><td>MemoryOS</td><td>26.47</td><td>23.10</td><td>24.16</td><td>24.58</td><td>30.25</td><td>23.13</td></tr>
+      <tr><td>LightMem</td><td>40.93</td><td>35.28</td><td>30.02</td><td>37.30</td><td>27.72</td><td>28.25</td></tr>
+      <tr><td>GAM（最强基线）</td><td>63.22</td><td>64.56</td><td>59.81</td><td>64.07</td><td>55.99</td><td>57.87</td></tr>
+      <tr><td class="hl">Zero-Mem</td><td class="hl">72.07</td><td class="hl">66.43</td><td class="hl">65.04</td><td class="hl">68.58</td><td class="hl">65.47</td><td class="hl">61.02</td></tr>
+    </table>
+    </div>
+    <div class="keyfact">Zero-Mem 在全部 2×3 个设置下均为最高 F1，相对最强基线平均领先 <b>5.52 分</b>；尤其在最难的 448K 设置（GPT-4o-mini）仍保持 65.04，比 GAM 高 5.23 分（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文表 3、§Main Results</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>⚡ 效率：0 token，每问 0.22 秒</h3>
+    <p>同一硬件、同一并发（4 线程）、同一答题器（GPT-4o-mini）下，记忆操作（不含共享的最终问答阶段）的开销实测（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文表 2</a>）：</p>
+    <div class="tbl-wrap">
+    <table class="tbl">
+      <tr><th>方法</th><th>F1</th><th>BLEU-1</th><th>记忆操作总 token</th><th>token / 问</th><th>总耗时 (s)</th><th>耗时 / 问 (s)</th></tr>
+      <tr><td>SimpleMem</td><td>48.02</td><td>41.68</td><td>14,096,246</td><td>9,153.41</td><td>8,365.38</td><td>5.43</td></tr>
+      <tr><td>LightMem</td><td>38.44</td><td>34.36</td><td>877,086</td><td>569.54</td><td>788.76</td><td>0.51</td></tr>
+      <tr><td>GAM</td><td>53.75</td><td>47.51</td><td>28,570,674</td><td>18,552.39</td><td>9,237.25</td><td>6.00</td></tr>
+      <tr><td class="hl">Zero-Mem</td><td class="hl">59.15</td><td class="hl">52.96</td><td class="hl">0</td><td class="hl">0</td><td class="hl">334.77</td><td class="hl">0.22</td></tr>
+    </table>
+    </div>
+    <div class="keyfact">与最强基线 GAM 相比，Zero-Mem 的 F1 与 BLEU-1 分别相对提升 <b>10.0% 和 11.5%</b>；与最快基线 LightMem 相比，记忆操作延迟降低 <b>57.6%</b>（0.51 → 0.22 s/问）。注意：「零 token」并非「零计算」——编码器与确定性流程仍有处理成本，但实测表明去掉生成式调用并没有把成本转嫁成更慢的非生成管线（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文表 2、§Efficiency Comparison</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔬 消融与检索预算：每个零件都有用，且很快饱和</h3>
+    <p>HotpotQA 56K + GPT-4o-mini 上的消融（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文图 3</a>）：完整模型 72.07 F1 / 69.66 BLEU-1；只留图视角降到 62.50 / 59.90，只留层级视角降到 54.88 / 51.40，都明显低于完整模型；去掉证据闭环（67.90 / 65.43）或证据校准（70.13 / 66.45）也会掉分——双视角互补，闭环与校准各有贡献：</p>
+    <div class="bar-row"><span>完整模型</span><div class="scorebar"><i data-w="72.07" style="background:linear-gradient(90deg,#1783ff,#2bc48a)"></i></div><b class="hl">72.07</b></div>
+    <div class="bar-row"><span>仅图视角</span><div class="scorebar"><i data-w="62.50" style="background:#5a7bb5"></i></div><b>62.50</b></div>
+    <div class="bar-row"><span>仅层级视角</span><div class="scorebar"><i data-w="54.88" style="background:#9db4dd"></i></div><b>54.88</b></div>
+    <div class="bar-row"><span>去掉证据闭环</span><div class="scorebar"><i data-w="67.90" style="background:#5a7bb5"></i></div><b>67.90</b></div>
+    <div class="bar-row"><span>去掉证据校准</span><div class="scorebar"><i data-w="70.13" style="background:#5a7bb5"></i></div><b>70.13</b></div>
+    <p style="margin-top:16px">检索预算（Top-K 主候选数）的影响（LoCoMo，GPT-4o-mini，<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文图 4</a>）——拖动滑杆，查看不同预算下的平均成绩（<b>以下为论文真实数据</b>）：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · Top-K 检索预算 vs 平均成绩（论文图 4 数据）</div>
+      <canvas class="chart" id="tk-canvas"></canvas>
+      <div class="slider-row">
+        <label>Top-K</label>
+        <input type="range" id="tk-k" min="0" max="5" step="1" value="2">
+        <output id="tk-kv">5</output>
+      </div>
+      <div class="demo-readout" id="tk-readout"></div>
+      <div class="caption">数据来源：论文图 4（LoCoMo，GPT-4o-mini）。主实验为对齐所有基线的检索设置统一用 Top-5，它比最优的 Top-10 仅低 0.65 F1 / 0.83 BLEU-1，而主候选数量减半。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH4 局限与意义 ============ -->
+<section class="chapter" id="ch4">
+  <div class="chap-head"><span class="chap-num">第 4 章</span><h2>局限与意义</h2></div>
+  <p class="oneline">它赢下的是「记忆操作不必生成」这场论证，但不是每一场局部战斗。</p>
+
+  <div class="card fade-up">
+    <h3>⚠️ 冷静看待的几点</h3>
+    <table class="tbl">
+      <tr><th>观察</th><th>依据</th></tr>
+      <tr><td><b>并非全面碾压</b>：LoCoMo 多跳问题（GPT-4o-mini）上 Zero-Mem（41.61）略低于 GAM（42.29）；开放域问题的绝对分数（35.52 F1）整体仍不高</td><td><a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文表 1</a>（论文自述「remaining competitive with GAM on multi-hop」）</td></tr>
+      <tr><td><b>工具链误差会传染</b>：实体–上下文图依赖 NER 与向量模型的质量——实体圈错、对齐错位，后面的扩散与排序都会受影响（解读补充，非论文原述）</td><td>方法链路见 <a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文式 (3)(8)</a></td></tr>
+      <tr><td><b>零 token ≠ 零计算</b>：编码器推理、图构建与 PageRank 迭代仍是真实算力开销，论文单独记账且未与基线对比这部分成本</td><td><a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文 §Efficiency Comparison</a></td></tr>
+      <tr><td><b>超参为全局手工设定</b>：γ 与 ρ 均固定为 0.6，未按任务自适应；路由只做「关系 / 局部」二分类</td><td><a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文 §Implementation Details、式 (7)</a></td></tr>
+      <tr><td><b>代码尚未开源</b>：论文声明「同行评审后」公布代码与实现细节，当前结果尚无法独立复现</td><td><a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文摘要</a> · <a class="src" href="https://github.com/TheMoon0815/Zero-mem" target="_blank" rel="noopener">GitHub 仓库</a></td></tr>
+    </table>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🌟 为什么这篇论文值得记住</h3>
+    <p>此前的高效记忆系统（如 <a class="src" href="https://arxiv.org/abs/2601.02553" target="_blank" rel="noopener">SimpleMem</a>、<a class="src" href="https://arxiv.org/abs/2510.18866" target="_blank" rel="noopener">LightMem</a>）的思路是<b>减少</b>生成式开销——压缩 token、把小模型换进记忆管线。Zero-Mem 则直接把问题推到极限：<b>记忆操作的生成开销能否归零？</b>它用「保留原始记录 + 双视图结构化检索 + 确定性校准」给出了肯定答案，并且在两个基准上以零记忆 token 的代价拿到了有竞争力甚至第一的成绩（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文 §Conclusion</a>）。</p>
+    <div class="analogy">大家一直在比赛「怎么把秘书的工资压低」，Zero-Mem 直接问：整理档案这件事，为什么需要一位会写作的秘书？给它两套好编目和一位铁面核对员就够了——作家只需要在最后写结案陈词时出场。</div>
+    <div class="keyfact">一句话总结：<b>有效的智能体记忆，不需要对过去生成中间表示</b>——可溯源的证据选择，是生成式记忆管线之外一条切实可行的路（<a class="src" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">论文 §Conclusion</a>）。</div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    本页面为 arXiv 论文 <a class="src-inline" href="https://arxiv.org/abs/2607.29377" target="_blank" rel="noopener">《Zero-Mem: Zero-Token Memory Operations for LLM Agents》(arXiv:2607.29377)</a> 的中文交互解读，
+    数据与结论以 <a class="src-inline" href="https://arxiv.org/pdf/2607.29377" target="_blank" rel="noopener">原文</a> 为准 · 文中所有标注 ↗ 的链接均指向原始出处<br>
+    交互演示中未注明「论文数据」的数值均为教学示意，非论文实验结果
+  </div>
+</footer>
+<script>
+/* ============ 入场动画 ============ */
+const io = new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('show');
+    e.target.querySelectorAll('.scorebar i').forEach(b=>b.style.width=b.dataset.w+'%');
+  }
+}),{threshold:.15});
+document.querySelectorAll('.fade-up').forEach(el=>io.observe(el));
+
+/* ============ 工具：高清 canvas ============ */
+function setupCanvas(id){
+  const cv=document.getElementById(id);
+  const dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx:ctx,W:W,H:H};
+}
+
+/* ============ 第0章: 三种范式 token 账本 ============ */
+const PP_MSG=[
+  '第 1 步：历史不断涌入。三种范式在这一步都没有区别——都还没花钱。',
+  '第 2 步：生成式记忆请 LLM 把历史写成摘要/记忆卡片——记忆操作开始产生 token 开销；另外两路只用编码器和规则工具，token 仍为 0。',
+  '第 3 步：检索。生成式在二手摘要里检索（继续烧 token，且细节已被转述）；原始检索可能混淆会话、漏掉跨交互证据；Zero-Mem 沿图与时间层级双路找证据，token 仍为 0。',
+  '第 4 步：最终问答——三种范式都必须调一次 LLM（这一步不计入「记忆操作」）。差别在于：Zero-Mem 呈上的是可追溯的原始证据，且此前一分 token 没花。'
+];
+const PP_TOK=[0,4000,5200,5200];
+let ppTimer=null;
+function ppReset(){
+  if(ppTimer){clearTimeout(ppTimer);ppTimer=null;}
+  document.querySelectorAll('.pp-step').forEach(s=>s.classList.remove('on'));
+  document.getElementById('pp-tok-gen').textContent='0';
+  document.getElementById('pp-tok-raw').textContent='0';
+  document.getElementById('pp-tok-zm').textContent='0';
+  document.getElementById('pp-readout').innerHTML='';
+}
+function ppStep(i){
+  document.querySelectorAll('.pp-step[data-step="'+i+'"]').forEach(s=>s.classList.add('on'));
+  document.getElementById('pp-tok-gen').textContent=PP_TOK[i].toLocaleString('en-US');
+  document.getElementById('pp-readout').innerHTML=PP_MSG[i];
+  if(i<3){ppTimer=setTimeout(()=>ppStep(i+1),1800);}
+  else{ppTimer=null;}
+}
+document.getElementById('pp-play').addEventListener('click',()=>{ppReset();ppStep(0);});
+document.getElementById('pp-reset').addEventListener('click',ppReset);
+
+/* ============ 第2章: 路由权重滑杆（示意） ============ */
+const RT_CAND=[
+  {name:'候选 A ·「张伟↔星桥项目」共现记录',g:0.92,h:0.35},
+  {name:'候选 B · 上周五会议前后邻接记录',g:0.30,h:0.88},
+  {name:'候选 C · 弱相关旧记录',g:0.55,h:0.50}
+];
+let rtMode='rel';
+function rtDemo(){
+  const rho=parseFloat(document.getElementById('rt-rho').value);
+  document.getElementById('rt-rhov').textContent=rho.toFixed(2);
+  const wG=rtMode==='rel'?rho:1-rho, wH=1-wG;
+  const rows=RT_CAND.map(c=>({name:c.name,g:c.g,h:c.h,f:wG*c.g+wH*c.h}));
+  rows.sort((a,b)=>b.f-a.f);
+  const box=document.getElementById('rt-bars');
+  box.innerHTML=rows.map((r,i)=>
+    '<div class="rt-row"><span>'+(i===0?'🥇 ':'')+r.name+'</span>'+
+    '<div class="rt-bar"><i style="width:'+(r.f*100).toFixed(1)+'%;background:'+(i===0?'linear-gradient(90deg,#1783ff,#2bc48a)':'#3a5078')+'"></i></div>'+
+    '<b>'+r.f.toFixed(2)+'</b></div>'
+  ).join('');
+  document.getElementById('rt-readout').innerHTML=
+    '当前为<b style="color:#ffd97a">'+(rtMode==='rel'?'关系型':'局部型')+'</b>问题：图视角权重 <b style="color:#4d9fff">'+wG.toFixed(2)+'</b>，层级视角权重 <b style="color:#a55eea">'+wH.toFixed(2)+'</b>。'+
+    (rtMode==='rel'?'擅长关系桥接的候选 A 排名靠前。':'贴近时间线的候选 B 排名靠前——同一个候选池，权重一变，卷宗顺序就变。');
+}
+document.getElementById('rt-rho').addEventListener('input',rtDemo);
+document.getElementById('rt-rel').addEventListener('click',()=>{
+  rtMode='rel';
+  document.getElementById('rt-rel').classList.add('active');
+  document.getElementById('rt-loc').classList.remove('active');
+  rtDemo();
+});
+document.getElementById('rt-loc').addEventListener('click',()=>{
+  rtMode='loc';
+  document.getElementById('rt-loc').classList.add('active');
+  document.getElementById('rt-rel').classList.remove('active');
+  rtDemo();
+});
+rtDemo();
+
+/* ============ 第2章: 图视角能量扩散（示意） ============ */
+/* 节点：实体(圆) e0..e4，上下文(方) c0..c5 */
+const PPR_ENT=[
+  {id:'e0',x:.16,y:.24,label:'张伟'},{id:'e1',x:.14,y:.62,label:'李娜'},
+  {id:'e2',x:.40,y:.14,label:'星桥项目'},{id:'e3',x:.44,y:.86,label:'周五会议'},
+  {id:'e4',x:.68,y:.30,label:'预算'}
+];
+const PPR_CTX=[
+  {id:'c0',x:.38,y:.44,label:'记录1'},{id:'c1',x:.60,y:.60,label:'记录2'},
+  {id:'c2',x:.82,y:.48,label:'记录3'},{id:'c3',x:.30,y:.70,label:'记录4'},
+  {id:'c4',x:.84,y:.78,label:'记录5'},{id:'c5',x:.58,y:.10,label:'记录6'}
+];
+const PPR_EDGES=[
+  ['e0','c0'],['e0','c3'],['e1','c3'],['e2','c0'],['e2','c5'],
+  ['e4','c5'],['e4','c2'],['e3','c1'],['e3','c4'],['c0','c1'],['c1','c2'],['c2','c4']
+];
+/* 时间线：各阶段激活目标值 */
+const PPR_STAGES=[
+  {act:{e0:1,e2:1},msg:'第 1 步：问题里的实体「张伟」「星桥项目」经余弦相似度对齐到图中实体，成为初始火种（式 8）。'},
+  {act:{e0:1,e2:1,c0:.85,c3:.6,c5:.5},msg:'第 2 步：激活沿「共现句子」向外扩散——与火种实体在相关句子里共同出现的记录被点亮（式 9）。'},
+  {act:{e0:1,e2:1,c0:1,c3:.7,c5:.65,c1:.8,e4:.6,e3:.5},msg:'第 3 步：扩散继续，涟漪穿过「记录→实体→记录」的桥，更多记录与实体获得能量。'},
+  {act:{e0:.9,e2:.9,c0:1,c1:.95,c3:.55,c5:.5,c2:.75,e4:.55,e3:.45,c4:.4},msg:'第 4 步：Personalized PageRank 收敛（式 10）——能量稳定汇聚到「记录 1」「记录 2」，它们进入图视角的候选排名。'}
+];
+let pprAnim=null,pprStage=-1;
+const pprAct={};
+function pprTargets(){
+  const t={};
+  PPR_ENT.concat(PPR_CTX).forEach(n=>{t[n.id]=0;});
+  if(pprStage>=0){const s=PPR_STAGES[pprStage].act;for(const k in s)t[k]=s[k];}
+  return t;
+}
+function pprDraw(){
+  const o=setupCanvas('ppr-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const pos={};
+  PPR_ENT.concat(PPR_CTX).forEach(n=>{pos[n.id]={x:n.x*W,y:n.y*H};});
+  // 边
+  PPR_EDGES.forEach(ed=>{
+    const a=pos[ed[0]],b=pos[ed[1]];
+    const glow=Math.min(pprAct[ed[0]]||0,pprAct[ed[1]]||0);
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+    ctx.strokeStyle=glow>0.05?'rgba(23,131,255,'+(0.25+0.65*glow)+')':'rgba(70,95,150,.35)';
+    ctx.lineWidth=1+glow*3.5;ctx.stroke();
+  });
+  // 上下文节点（方形）
+  PPR_CTX.forEach(n=>{
+    const p=pos[n.id],a=pprAct[n.id]||0,s=8+5*a;
+    ctx.beginPath();ctx.rect(p.x-s,p.y-s,s*2,s*2);
+    ctx.fillStyle=a>0.05?'rgba(43,196,138,'+(0.25+0.75*a)+')':'#1a2a50';
+    ctx.fill();
+    if(a>0.05){ctx.strokeStyle='#2bc48a';ctx.lineWidth=2;ctx.stroke();}
+    ctx.fillStyle=a>0.05?'#eaf1ff':'#7f92b8';ctx.font='11px sans-serif';ctx.textAlign='center';
+    ctx.fillText(n.label,p.x,p.y+s+13);
+  });
+  // 实体节点（圆形）
+  PPR_ENT.forEach(n=>{
+    const p=pos[n.id],a=pprAct[n.id]||0,r=9+6*a;
+    ctx.beginPath();ctx.arc(p.x,p.y,r,0,7);
+    ctx.fillStyle=a>0.05?'rgba(247,183,49,'+(0.3+0.7*a)+')':'#1a2a50';
+    ctx.fill();
+    if(a>0.05){ctx.strokeStyle='#ffd97a';ctx.lineWidth=2;ctx.stroke();}
+    ctx.fillStyle=a>0.05?'#ffe9b0':'#7f92b8';ctx.font='11px sans-serif';ctx.textAlign='center';
+    ctx.fillText(n.label,p.x,p.y-r-6);
+  });
+}
+function pprTick(){
+  const t=pprTargets();let done=true;
+  PPR_ENT.concat(PPR_CTX).forEach(n=>{
+    const cur=pprAct[n.id]||0,tg=t[n.id],d=tg-cur;
+    if(Math.abs(d)>0.01){pprAct[n.id]=cur+d*0.12;done=false;}
+    else{pprAct[n.id]=tg;}
+  });
+  pprDraw();
+  if(!done){pprAnim=requestAnimationFrame(pprTick);}else{pprAnim=null;}
+}
+function pprGo(stage){
+  pprStage=stage;
+  document.getElementById('ppr-readout').innerHTML=PPR_STAGES[stage].msg;
+  if(!pprAnim)pprAnim=requestAnimationFrame(pprTick);
+}
+document.getElementById('ppr-play').addEventListener('click',()=>{
+  let s=0;pprGo(s);
+  const step=()=>{s++;if(s<PPR_STAGES.length){pprGo(s);setTimeout(step,2100);}};
+  setTimeout(step,2100);
+});
+document.getElementById('ppr-reset').addEventListener('click',()=>{
+  pprStage=-1;
+  PPR_ENT.concat(PPR_CTX).forEach(n=>{pprAct[n.id]=0;});
+  if(!pprAnim)pprAnim=requestAnimationFrame(pprTick);
+  document.getElementById('ppr-readout').innerHTML='';
+});
+PPR_ENT.concat(PPR_CTX).forEach(n=>{pprAct[n.id]=0;});
+pprDraw();
+
+/* ============ 第3章: Top-K 滑杆（论文图4真实数据） ============ */
+const TK_K=[1,3,5,10,15,20];
+const TK_F1=[52.59,57.26,59.15,59.80,59.50,59.69];
+const TK_B1=[46.79,51.21,52.96,53.79,53.34,53.61];
+function tkDemo(){
+  const idx=parseInt(document.getElementById('tk-k').value);
+  document.getElementById('tk-kv').textContent=TK_K[idx];
+  const o=setupCanvas('tk-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=42,padR=16,padT=20,padB=34;
+  const lo=44,hi=62;
+  const px=i=>padL+i/(TK_K.length-1)*(W-padL-padR);
+  const py=v=>(H-padB)-(v-lo)/(hi-lo)*(H-padB-padT);
+  // 网格
+  ctx.strokeStyle='rgba(70,95,150,.25)';ctx.lineWidth=1;ctx.font='11px sans-serif';
+  for(let v=45;v<=60;v+=5){
+    ctx.beginPath();ctx.moveTo(padL,py(v));ctx.lineTo(W-padR,py(v));ctx.stroke();
+    ctx.fillStyle='#7f92b8';ctx.textAlign='right';ctx.fillText(v,padL-6,py(v)+4);
+  }
+  ctx.textAlign='center';
+  TK_K.forEach((k,i)=>{ctx.fillStyle='#7f92b8';ctx.fillText(k,px(i),H-padB+16);});
+  ctx.fillText('Top-K',W/2,H-4);
+  // 两条线
+  const series=[{d:TK_F1,c:'#4d9fff',n:'平均 F1'},{d:TK_B1,c:'#a55eea',n:'平均 BLEU-1'}];
+  series.forEach(s=>{
+    ctx.beginPath();
+    s.d.forEach((v,i)=>{const x=px(i),y=py(v);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});
+    ctx.strokeStyle=s.c;ctx.lineWidth=2.5;ctx.stroke();
+    s.d.forEach((v,i)=>{
+      ctx.beginPath();ctx.arc(px(i),py(v),i===idx?7:4,0,7);
+      ctx.fillStyle=s.c;ctx.fill();
+      if(i===idx){ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+        ctx.fillStyle='#eaf1ff';ctx.fillText(v.toFixed(2),px(i),py(v)-12);}
+    });
+  });
+  // 图例
+  ctx.textAlign='left';ctx.fillStyle='#4d9fff';ctx.fillText('● 平均 F1',padL+6,padT+2);
+  ctx.fillStyle='#a55eea';ctx.fillText('● 平均 BLEU-1',padL+86,padT+2);
+  document.getElementById('tk-readout').innerHTML=
+    'Top-'+TK_K[idx]+'：平均 F1 <b style="color:#4d9fff">'+TK_F1[idx].toFixed(2)+'</b>，平均 BLEU-1 <b style="color:#a55eea">'+TK_B1[idx].toFixed(2)+'</b>。'+
+    (idx===0?'只取 1 条候选明显不够——多跳、时间类问题需要更广的证据覆盖。':
+     idx===2?'👈 主实验采用 Top-5（与所有基线的检索设置对齐）。':
+     idx===3?'Top-10 是全场最优（59.80 / 53.79），但只比 Top-5 高 0.65 / 0.83，主候选却要翻倍。':
+     '继续加大预算只剩微小波动——证据收益已经饱和。');
+}
+document.getElementById('tk-k').addEventListener('input',tkDemo);
+tkDemo();
+</script>
+</body>
+</html>

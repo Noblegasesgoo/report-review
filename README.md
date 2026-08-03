@@ -24,6 +24,8 @@
 | 📄 论文（检索增强生成） | 看懂 DeCoRAG：VLM 建知识图谱前注意力总往左上角飘？先写段「看图说话」当锚，再按锚裁剪精读 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/decorag-documents/) |
 | 📄 论文（具身智能与机器人） | 看懂 τ：给 VLA 机器人装上「指尖触觉」，精细接触操作平均成功率从 30% 翻倍到 71.25% | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/touch-vla/) |
 | 📄 论文（AI 安全与对齐） | 看懂 CoT 不忠实的两个世界：为什么「读模型的推理过程」恰在它答错时失灵 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/cot-unfaithfulness/) |
+| 📄 论文（LLM 智能体） | 看懂 Zero-Mem：不动用一个 token，也能给智能体装上可查、可溯源的长程记忆 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/zero-mem/) |
+| 📄 论文（推理与思维链） | 看懂 Sample More, Reflect Less：自我批评、反思重写花的 token，不如直接拿去买「多试几次」 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/sample-more-reflect-less/) |
 
 ## 目录结构
 
@@ -66,8 +68,12 @@
 │   │   └── index.html           # DeCoRAG 文档理解论文交互解读（单文件，零依赖）
 │   ├── touch-vla/
 │   │   └── index.html           # τ 触觉 VLA 论文交互解读（单文件，零依赖）
-│   └── cot-unfaithfulness/
-│       └── index.html           # CoT 不忠实检测论文交互解读（单文件，零依赖）
+│   ├── cot-unfaithfulness/
+│   │   └── index.html           # CoT 不忠实检测论文交互解读（单文件，零依赖）
+│   ├── zero-mem/
+│   │   └── index.html           # Zero-Mem 智能体记忆论文交互解读（单文件，零依赖）
+│   └── sample-more-reflect-less/
+│       └── index.html           # 重复采样 vs 自我反思论文交互解读（单文件，零依赖）
 ├── README.md
 └── LICENSE                      # MIT
 ```
@@ -237,6 +243,24 @@
 - **两个 regime × 1 组切换动画**：答对的世界信号中等有效（0.63–0.67），答错的世界全面失明——而那里正是不忠实的主场
 - **指标反转 × 1 组 AUROC 刻度滑杆**：标准 step-removal 指标与人类标签反向（AUROC 0.349），实际测的是「答案-推理耦合度」
 - **构造 vs 标注 × 1 组流程动画**：「明示合理化」构造对真实标注零迁移，提示诱导构造意外迁向答错世界
+
+### Zero-Mem 智能体记忆论文解读（`papers/zero-mem/index.html`，LLM 智能体）
+
+基于 arXiv 论文《Zero-Mem: Zero-Token Memory Operations for LLM Agents》（arXiv:2607.29377）制作的单文件交互页面，内容包括：
+
+- **零 token 记忆操作 × 1 组范式对比动画**：除最终问答外，记忆构建/组织/路由/检索/校准全程零 LLM 调用、零 LLM token
+- **双视图非生成编目 × 2 组动画**：实体–上下文图（PPR 能量扩散流程动画）+ 时间层级，路由权重 ρ 滑杆实时翻转融合排名
+- **实验结果 × 1 组 Top-K 滑杆折线图**：LoCoMo 双底座第一（F1 59.15 / 57.57）、HotpotQA 56K~448K 全面领先；记忆操作 0 token、0.22 秒/问，比最快基线再快 57.6%
+- **局限与意义**：多跳未全胜、零 token≠零计算；结构化记忆访问并不需要对过去做生成式中间表示，所有关键结论均挂 ↗ 原文出处
+
+### Sample More, Reflect Less 论文解读（`papers/sample-more-reflect-less/index.html`，推理与思维链）
+
+基于 arXiv 论文《Sample More, Reflect Less: Self-Refine and Reflexion Lose to Repeated Sampling at Equal Token Cost, from 1.5B to 7B》（arXiv:2607.28576）制作的单文件交互页面，内容包括：
+
+- **公平的账 × 1 组对比动画**：Self-Refine 7 次调用 vs 7 次独立采样，等 token 预算下 72.0% vs 78.3%
+- **成本-准确率曲线 × 1 组滑杆动画**：6 个设置可选，各方法散点按论文实测落位，低于基线曲线者红圈警示——36 组对比 0 胜 10 负
+- **挑 vs 数 × 1 组模拟动画**：同样 8 份采样，「模型自己挑」比「数多数票」低 1.3~17.3pp，100 局滚动模拟精确收敛到论文实测值
+- **方法论警示**：Reflexion 在 1.5B 上 100% 自判正确、反思从未触发，高分只因悄悄退化成单次 CoT；建议所有测试时方法论文附重复采样成本-准确率曲线作对照
 
 ## 许可证
 

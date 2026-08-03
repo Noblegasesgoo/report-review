@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>看懂 Sample More, Reflect Less · 同样的 token，自我批评不如多试几次</title>
+<style>
+  :root{
+    --blue:#1783ff; --blue-d:#0b5cc4; --red:#ff6b6b; --amber:#f7b731;
+    --purple:#a55eea; --green:#2bc48a; --ink:#1b2430; --ink-soft:#48566a;
+    --bg:#f6f8fc; --card:#ffffff; --line:#e4eaf3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.8}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+
+  /* ===== Hero ===== */
+  .hero{background:linear-gradient(160deg,#0a1a3f 0%,#103a8c 55%,#1783ff 100%);
+    color:#fff;padding:72px 0 56px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+    padding:4px 14px;border-radius:99px;font-size:13px;letter-spacing:1px;margin-bottom:18px}
+  .hero h1{font-size:clamp(26px,4.6vw,44px);line-height:1.3;margin-bottom:14px}
+  .hero p.sub{font-size:clamp(14px,1.8vw,18px);opacity:.88;max-width:860px}
+  .hero .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);
+    border-radius:16px;padding:14px 22px;min-width:150px}
+  .stat b{display:block;font-size:26px;font-weight:800}
+  .stat span{font-size:13px;opacity:.85}
+
+  /* ===== Nav ===== */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  nav.toc .inner{display:flex;gap:6px;overflow-x:auto;padding:10px 22px;max-width:1060px;margin:0 auto}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--ink-soft);text-decoration:none;
+    padding:6px 12px;border-radius:99px;transition:.2s}
+  nav.toc a:hover{background:#eaf2ff;color:var(--blue-d)}
+
+  /* ===== Sections ===== */
+  section.chapter{padding:56px 0 8px}
+  .chap-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  .chap-num{font-size:14px;font-weight:800;color:#fff;background:var(--blue);
+    border-radius:10px;padding:3px 12px;letter-spacing:1px}
+  .chap-head h2{font-size:clamp(21px,3vw,30px)}
+  .oneline{color:var(--blue-d);font-weight:600;margin:4px 0 22px;font-size:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:0 2px 14px rgba(20,50,110,.05)}
+  .card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card p{margin-bottom:12px;color:#2c3a4e}
+  .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
+    border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
+  .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
+  .keyfact{position:relative;background:#eef5ff;border-left:4px solid var(--blue);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";position:absolute;left:16px;top:12px;line-height:1.8}
+  .warnfact{position:relative;background:#fff1f0;border-left:4px solid var(--red);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .warnfact::before{content:"⚠️";position:absolute;left:16px;top:12px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .demo-box{background:#0e1830;border-radius:18px;padding:22px;margin:16px 0;color:#dfe8ff;
+    position:relative;overflow:hidden}
+  .demo-title{color:#8fb8ff;font-size:13px;letter-spacing:2px;font-weight:700;margin-bottom:14px;text-transform:uppercase}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:99px;padding:9px 22px;font-size:14px;
+    cursor:pointer;font-weight:600;transition:.2s;box-shadow:0 4px 14px rgba(23,131,255,.35)}
+  .btn:hover{background:var(--blue-d);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);box-shadow:none;color:#dfe8ff}
+  .btn.ghost.active{background:rgba(23,131,255,.22);border-color:#6db4ff;color:#fff}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border-radius:12px;overflow:hidden}
+  table.tbl th{background:#103a8c;color:#fff;padding:10px 12px;text-align:left;font-weight:600}
+  table.tbl td{padding:10px 12px;border-bottom:1px solid var(--line)}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl tr:nth-child(even) td{background:#f7faff}
+  .hl{color:var(--blue-d);font-weight:700}
+  .neg{color:#d63031;font-weight:700}
+  .pos{color:#0a8f5b;font-weight:700}
+  .tbl-scroll{overflow-x:auto;border-radius:12px;border:1px solid var(--line)}
+
+  /* ===== 公式（纯 HTML/CSS，无 MathJax）===== */
+  .formula{background:#0e1830;border-radius:14px;padding:20px 22px;margin:14px 0;color:#eaf1ff;
+    font-size:clamp(15px,2.2vw,19px);text-align:center;overflow-x:auto;line-height:2;
+    font-family:"STIX Two Math","Cambria Math",Georgia,serif}
+  .formula .op{color:#8fb8ff}
+  .formula .cond{font-size:.82em;color:#9db4dd}
+  .frac{display:inline-flex;flex-direction:column;vertical-align:middle;margin:0 2px;line-height:1.4}
+  .frac .num{border-bottom:1.5px solid currentColor;padding:0 7px}
+  .frac .den{padding:0 7px}
+  .fnote{font-size:13px;color:#7f92b8;margin-top:10px;text-align:center;line-height:1.7;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  .formula var{font-style:italic}
+
+  /* ===== 动画1：7 次调用对比 ===== */
+  .vs-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:760px){.vs-grid{grid-template-columns:1fr}}
+  .vs-col h4{font-size:14px;color:#8fb8ff;margin-bottom:10px;text-align:center}
+  .step-list{list-style:none}
+  .step-list li{background:#16224a;border:1px solid #26386e;border-radius:10px;padding:8px 12px;
+    margin-bottom:7px;font-size:13.5px;color:#8ea3cf;transition:all .4s;display:flex;gap:9px;align-items:center}
+  .step-list li .ico{width:22px;height:22px;border-radius:50%;background:#26386e;display:inline-flex;
+    align-items:center;justify-content:center;font-size:12px;flex-shrink:0;transition:all .4s}
+  .step-list li.on{background:#1d3573;border-color:#3f6fd6;color:#eaf1ff;transform:translateX(4px)}
+  .step-list li.on .ico{background:var(--blue);color:#fff}
+  .tok-meter{margin-top:10px;font-size:13px;color:#9db4dd;text-align:center;font-variant-numeric:tabular-nums}
+  .tok-meter b{color:#ffd97a;font-size:16px}
+  .verdict{margin-top:16px;background:#16224a;border:1px solid #26386e;border-radius:12px;
+    padding:14px 18px;font-size:14.5px;line-height:1.8;opacity:0;transition:opacity .8s}
+  .verdict.show{opacity:1}
+
+  /* ===== 动画2：成本-准确率曲线 ===== */
+  .chart-controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .chart-controls select{background:#16224a;color:#eaf1ff;border:1px solid #3a5078;border-radius:10px;
+    padding:8px 12px;font-size:14px;font-family:inherit}
+  .slider-row{display:flex;align-items:center;gap:14px;margin:14px 0 6px;flex-wrap:wrap}
+  .slider-row label{font-size:14px;color:#9db4dd;white-space:nowrap}
+  .slider-row input[type=range]{flex:1;min-width:180px;accent-color:var(--amber)}
+  .slider-row output{color:#ffd97a;font-weight:700;min-width:70px;text-align:right;font-variant-numeric:tabular-nums}
+  canvas.chart{width:100%;height:340px;display:block;border-radius:10px;background:#0a1326}
+  .demo-readout{margin-top:14px;font-size:14.5px;line-height:1.8}
+  .caption{font-size:12.5px;color:#7f92b8;margin-top:8px;line-height:1.6}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .legend span{font-size:12px;background:#16224a;border:1px solid #26386e;border-radius:99px;
+    padding:3px 11px;color:#9db4dd}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+
+  /* ===== 动画3：挑 vs 数 ===== */
+  .sample-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:10px 0 4px}
+  .chip{width:56px;height:56px;border-radius:12px;background:#16224a;border:2px solid #26386e;
+    display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700;color:#dfe8ff;
+    transition:all .3s}
+  .chip.maj{border-color:var(--green);box-shadow:0 0 10px rgba(43,196,138,.35)}
+  .chip.pick{border-color:var(--red);box-shadow:0 0 10px rgba(255,107,107,.4)}
+  .sim-bars{display:grid;grid-template-columns:130px 1fr 72px;gap:12px;align-items:center;
+    margin:12px 0;font-size:14px}
+  .sim-bar{height:16px;border-radius:99px;background:#16224a;overflow:hidden}
+  .sim-bar i{display:block;height:100%;border-radius:99px;width:0;transition:width .5s}
+  .sim-bars b{text-align:right;font-variant-numeric:tabular-nums}
+
+  /* ===== Reflexion 触发率条 ===== */
+  .fire-row{display:grid;grid-template-columns:170px 1fr 120px;gap:12px;align-items:center;margin-bottom:12px;font-size:14px}
+  @media(max-width:640px){.fire-row{grid-template-columns:110px 1fr 90px}}
+  .fire-bar{height:14px;border-radius:99px;background:#e7edf6;overflow:hidden}
+  .fire-bar i{display:block;height:100%;border-radius:99px;width:0;transition:width 1.2s cubic-bezier(.4,0,.2,1)}
+  .fire-row b{text-align:right;font-variant-numeric:tabular-nums}
+
+  /* ===== 来源标注 ===== */
+  .src{color:var(--blue-d);text-decoration:none;font-size:.8em;font-weight:600;
+    border-bottom:1px dashed #9db8e8;padding:0 1px;white-space:nowrap}
+  .src:hover{color:var(--blue);border-bottom-style:solid;background:#eaf2ff;border-radius:4px}
+  .src::after{content:"↗";font-size:.85em;margin-left:1px}
+  .demo-box .src, .formula .src{color:#8fb8ff;border-bottom-color:#3a5078}
+  .demo-box .src:hover{color:#cfe2ff;background:rgba(23,131,255,.15)}
+
+  footer{margin-top:64px;padding:34px 0 46px;color:#7f8ca3;font-size:13px;text-align:center;
+    border-top:1px solid var(--line);line-height:2}
+  .fade-up{opacity:0;transform:translateY(26px);transition:all .7s cubic-bezier(.3,.7,.3,1)}
+  .fade-up.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">arXiv 论文交互解读 · 推理与思维链</span>
+    <h1>看懂 Sample More, Reflect Less：同样的 token，自我批评不如多试几次</h1>
+    <p class="sub">让模型先规划、自我批评、反思重写、多智能体辩论……这些「想得更久」的方法几乎都让模型「写得更多」，而写得多本身就能提分。石溪大学这篇论文把账算公平：每个方法花了多少 token，就让最简单的「重复采样 + 多数票」花同样多 token，再配对的逐题比。结果：36 组对比没有一组能赢，10 组显著更差——输的全是让模型自己评判自己答案的方法。</p>
+    <div class="stats">
+      <div class="stat"><b>0 / 36</b><span>等 token 成本下显著胜过重复采样的对比数</span></div>
+      <div class="stat"><b>10 组</b><span>显著更差，全部来自「自我审视」类方法</span></div>
+      <div class="stat"><b>−17.3 pp</b><span>最大单次差距（3B/MATH-500，挑 vs 数）</span></div>
+      <div class="stat"><b>100%</b><span>Reflexion 在 1.5B 上的「装死」率：一次都没反思</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="toc"><div class="inner">
+  <a href="#ch0">⚖️ 热身：这笔账公平吗</a>
+  <a href="#ch1">🗳️ 概念基础：多数票与成本</a>
+  <a href="#ch2">🔬 核心方法：把公平做成统计</a>
+  <a href="#ch3">📊 实验结果</a>
+  <a href="#ch4">🧭 局限与意义</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ============ CH0 热身 ============ -->
+<section class="chapter" id="ch0">
+  <div class="chap-head"><span class="chap-num">热身</span><h2>这笔账公平吗？</h2></div>
+  <p class="oneline">「想得更久」的方法几乎都「写得更多」——而写得多本身就能提分，所以赢过单次思维链什么也证明不了。</p>
+
+  <div class="card fade-up">
+    <h3>😤 一个容易被忽略的共同点</h3>
+    <p>有一大类方法号称不用重训模型就能让它推理更好：先写计划再解题、把问题拆小、批评并重写自己的答案、反思错误再试一次、让几个「分身」辩论到意见一致
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=2">论文 §1</a>。
+      这些方法有个容易忽略的共同点：<b>它们几乎都让模型生成了更多文本</b>。论文给出了一组直观的量级：单次思维链大约 300 个 token，三轮自我批评约 1,600 个，三个智能体两轮辩论约 2,500 个——算力预算悄悄放大了 5 到 10 倍
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=2">论文 §1</a>。</p>
+    <p>问题在于：花更多算力本身就会提分。所以「超过了单次思维链」只能说明<b>多花了钱</b>，不能说明<b>方法的思想</b>起了作用。公平的问题是：如果把同样多的 token 直接拿去做最朴素的事——同一道题多试几次、取出现次数最多的答案——会做得更好还是更差？这正是本文做的比较
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=3">论文 §2.1</a>。</p>
+    <div class="analogy">两位考生水平相同。一位交卷前把答案改了三遍；另一位把同样的时间用来重考了七次，然后选自己最常写出的那个答案。第二位多考的次数就是「多花的 token」。如果只宣布「改三遍的考生比只考一次的考生分高」，你并不知道该归功于「修改」这个策略，还是多用的那些时间。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🧾 前人已经指出过，但没做过统计检验</h3>
+    <p>Wang et al. (2024) 在 <i>Reasoning in Token Economies</i> 里提出过完全相同的论点，并报告：一旦预算可比，「思维链 + 自洽性」这种简单基线「频繁胜过文献中提出的推理策略」
+      <a class="src" href="https://arxiv.org/abs/2406.06461">Wang et al. 2024</a>。
+      但那份证据全是<b>点估计</b>：没有置信区间、没有误差棒、没有跨轮次方差、没有显著性检验，每个数据集只用 100 道题
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=2">论文 §1</a>。</p>
+    <p>本文作者把这笔账算得很具体：按他们自己测得的方差，100 道题下配对准确率差的 95% 区间大约 <b>±3 到 ±8 个百分点</b>宽；若不是配对设计还要再宽 √2 倍。而许多待分辨的差距比这个还窄——也就是说，「简单基线经常赢」这种结论，恰好是噪声加上多方法比较就能制造出来的那种
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=2">论文 §1</a>。</p>
+    <div class="keyfact">本文的定位：把 Wang et al. 的论断当作<b>待检验的假设</b>而不是自己的贡献，用设计过的实验重跑一次——7 种方法、Qwen2.5 的 1.5B / 3B / 7B 三档开源模型、GSM8K 与 MATH-500 两个数学基准、每个设置 150 道题，所有 36 组对比都带配对 bootstrap 置信区间和多重检验校正
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=2">论文 §1</a> <a class="src" href="https://arxiv.org/pdf/2607.28576#page=13">Table 2</a>。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🎬 动画：同样 7 次调用，两种花法</h3>
+    <p>以 Self-Refine 为例：写答案 → 自我批评 → 重写，三轮下来是 <b>7 次调用</b>而不是 1 次
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=7">Table 1</a>。
+      点「▶ 播放」，看同样 7 次调用的两种花法：左边在一条答案上反复打磨，右边干脆独立做 7 遍再数票。</p>
+    <div class="demo-box">
+      <div class="demo-title">Self-Refine（7 次调用） vs 重复采样 7 次 + 多数票 · Qwen2.5-1.5B / GSM8K 实测</div>
+      <div class="vs-grid">
+        <div class="vs-col">
+          <h4>🔁 Self-Refine：一条答案改三遍</h4>
+          <ul class="step-list" id="srSteps">
+            <li><span class="ico">1</span>写出第一版答案</li>
+            <li><span class="ico">2</span>批评自己的答案</li>
+            <li><span class="ico">3</span>按批评重写</li>
+            <li><span class="ico">4</span>再批评</li>
+            <li><span class="ico">5</span>再重写</li>
+            <li><span class="ico">6</span>第三次批评</li>
+            <li><span class="ico">7</span>第三次重写 → 定稿</li>
+          </ul>
+          <div class="tok-meter">已花 token ≈ <b id="srTok">0</b> / 1,784</div>
+        </div>
+        <div class="vs-col">
+          <h4>🗳️ 重复采样：7 份独立答卷数票</h4>
+          <ul class="step-list" id="scSteps">
+            <li><span class="ico">1</span>独立作答 ①</li>
+            <li><span class="ico">2</span>独立作答 ②</li>
+            <li><span class="ico">3</span>独立作答 ③</li>
+            <li><span class="ico">4</span>独立作答 ④</li>
+            <li><span class="ico">5</span>独立作答 ⑤</li>
+            <li><span class="ico">6</span>独立作答 ⑥</li>
+            <li><span class="ico">7</span>独立作答 ⑦ → 取众数答案</li>
+          </ul>
+          <div class="tok-meter">已花 token ≈ <b id="scTok">0</b> / 1,784</div>
+        </div>
+      </div>
+      <div class="btn-row"><button class="btn" id="vsPlay">▶ 播放</button><button class="btn ghost" id="vsReset">↺ 重置</button></div>
+      <div class="verdict" id="vsVerdict">两边花的 token 几乎一样。实测结果：Self-Refine 准确率 <b>72.0%</b>，同成本下多数票基线 <b>78.3%</b>，差距 <span style="color:#ff9d9d;font-weight:700">−6.3 个百分点</span>。token 不是问题的关键——<b>花在「反复打磨一条答案」上，不如花在「多来几条独立答案」上</b>（Qwen2.5-1.5B/GSM8K，<a class="src" href="https://arxiv.org/pdf/2607.28576#page=13">Table 2</a>）。</div>
+      <div class="caption">两边的 7 次调用、模型、题目、token 预算完全相同，唯一区别是 token 花在什么上面。准确率数字取自论文 Table 2（1.5B/GSM8K：Self-Refine 72.0% @ 1,784 token，同成本自洽性基线 78.3%）。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH1 概念基础 ============ -->
+<section class="chapter" id="ch1">
+  <div class="chap-head"><span class="chap-num">概念基础</span><h2>多数票基线，和「成本」这把尺子</h2></div>
+  <p class="oneline">基线不是某个固定分数，而是一条「花多少 token 换多少准确率」的曲线——方法只有落在曲线上方才算值回票价。</p>
+
+  <div class="card fade-up">
+    <h3>🗳️ 自洽性（self-consistency）：最朴素的提分方式</h3>
+    <p>基线用的是 Wang et al. 2023 的自洽性
+      <a class="src" href="https://arxiv.org/abs/2203.11171">Self-Consistency (ICLR 2023)</a>：
+      以非零温度（本文用 0.7）对同一道题独立采样 N 条思维链，读出每条的最终答案，<b>哪个答案出现次数最多就交哪个</b>。不批评、不规划、尝试之间不交流、不加任何提示词技巧
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=4">论文 §2.2</a>。</p>
+    <div class="formula">
+      <var>â</var> <span class="op">=</span> arg max<sub><var>a</var></sub>
+      <span style="display:inline-flex;flex-direction:column;vertical-align:middle;line-height:1.4;margin:0 4px">
+        <span style="border-bottom:1.5px solid currentColor;padding:0 6px">N</span>
+        <span style="padding:0 6px;font-size:.82em">Σ<br><span class="cond">i = 1</span></span>
+      </span>
+      𝟙(<var>a<sub>i</sub></var> <span class="op">=</span> <var>a</var>)
+      <div class="fnote">N 份独立答卷里，答案 a 出现了几次；出现次数最多的那个 a 就是最终答案 â。𝟙(·) 是示性函数：条件成立记 1，否则记 0。</div>
+    </div>
+    <div class="analogy">在陌生城市问路：只问一个路人，他指错你就走错；问 16 个路人，取最多人指的方向，个别人的口误就被「多数」淹没了。前提是大家的回答互相独立——如果 16 个人都是听同一个人说的，人数再多也没用，这就是为什么采样要用非零温度制造多样性。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>⛽ 成本怎么算：生成的每个 token 都记账</h3>
+    <p>本文的成本口径是<b>模型生成的 token 总数</b>，把一道题上所有调用加总——包括那些不出现在最终答案里的 token：批评稿、自我评估、反思记录、辩论中互发的消息、验证步骤。这些 token 被生成了，就是被付过费了
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=4">论文 §2.3</a>。</p>
+    <p>为什么不用墙钟时间？因为时间取决于硬件、批大小、并行度，那些是部署的属性，不是方法的属性
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=4">论文 §2.3</a>。
+      作者还强调：只数生成 token 恰恰是对被测方法<b>最有利</b>的口径——若把输入侧也算上（比如 Best-of-N 的验证环节要重读 8 份完整解答，输入是输出的 1.25~1.42 倍，而基线只有 0.22~0.37），对 Best-of-N 的判决只会更差：1.5B/GSM8K 上从 −7.7 扩大到 −9.1，3B/MATH-500 上从 −14.1 扩大到 −16.8
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=11">论文 §4 效度威胁</a>。</p>
+    <div class="keyfact">重复采样还有个工程优势：16 条链可以并行生成；Self-Refine 和 Reflexion 必须串行，上一轮不完下一轮不能开始。按延迟算，串行方法只会更难看——所以选生成 token 口径是「对对手最客气」的选择
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=21">论文 §6.4</a>。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📈 一条曲线，而不是一个数</h3>
+    <p>自洽性可以在任意 N 上运行，所以它给出的不是单个分数，而是一条<b>准确率-成本曲线</b>。比较规则因此非常干脆：<b>一个方法只有落在这条曲线上方，才证明它的机制比「同样 token 多采样」更值</b>
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=4">论文 §2.2</a>。</p>
+    <p>整条曲线怎么便宜地拿到？每道题只生成一个 <b>K = 16</b> 条的样本池，然后对任意 N ≤ 16，从池中无放回地抽 N 条做多数票，重复 200 次取平均；N 取 {1, 2, 3, 4, 6, 8, 12, 16}。数学上，从 K 条独立链的池子里抽 N 条，与直接跑 N 条自洽性<b>分布完全相同</b>——这不是近似，只是复用了样本
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=4">论文 §2.4</a>。</p>
+
+    <div class="demo-box">
+      <div class="demo-title">交互：成本-准确率全景图 · 数据全部取自论文 §5.2 与 Table 2</div>
+      <div class="chart-controls">
+        <label style="font-size:14px;color:#9db4dd">设置：</label>
+        <select id="settingSel"></select>
+      </div>
+      <canvas class="chart" id="costChart" width="960" height="340"></canvas>
+      <div class="slider-row">
+        <label>采样数 N（基线曲线上的点）</label>
+        <input type="range" id="nSlider" min="0" max="7" step="1" value="0">
+        <output id="nOut">N = 1</output>
+      </div>
+      <div class="demo-readout" id="curveReadout"></div>
+      <div class="legend" id="chartLegend"></div>
+      <div class="caption">蓝线：重复采样（自洽性）基线，横轴为每题平均生成 token（对数刻度），曲线在论文实测锚点间线性插值（与论文 §4.5 的插值口径一致）。圆点：各方法在自己实测成本下的实测准确率——<b style="color:#ff9d9d">落在蓝线下方 = 同样的 token 不如直接多采样</b>。黄色菱形：滑杆选中的 N。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH2 核心方法 ============ -->
+<section class="chapter" id="ch2">
+  <div class="chap-head"><span class="chap-num">核心方法</span><h2>把「公平」做成一门统计</h2></div>
+  <p class="oneline">不比「方法 vs 单次 CoT」，而是「方法 vs 同成本基线曲线」，逐题配对、给每个差值都配上置信区间。</p>
+
+  <div class="card fade-up">
+    <h3>🧪 实验矩阵：7 种方法 × 3 档模型 × 2 个基准</h3>
+    <p>参赛阵容如下，每种方法严格按其原论文实现，且<b>任何方法都永远看不到正确答案</b>
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=7">论文 §4.3 / Table 1</a>：</p>
+    <div class="tbl-scroll"><table class="tbl">
+      <tr><th>方法</th><th>一句话原理</th><th>每题调用次数</th></tr>
+      <tr><td>Chain-of-Thought <a class="src" href="https://arxiv.org/abs/2201.11903">Wei et al. 2022</a></td><td>逐步推理，贪心单样本</td><td>1</td></tr>
+      <tr><td>Plan-and-Solve</td><td>先写计划再解题，贪心单样本</td><td>1</td></tr>
+      <tr><td>Self-Refine <a class="src" href="https://arxiv.org/abs/2303.17651">Madaan et al. 2023</a></td><td>自我批评 + 重写，3 轮</td><td>7</td></tr>
+      <tr><td>Reflexion <a class="src" href="https://arxiv.org/abs/2303.11366">Shinn et al. 2023</a></td><td>自判对错，错了才反思重试，最多 3 轮</td><td>1 ~ 10</td></tr>
+      <tr><td>Reflexion（强制版）</td><td>跳过自判，固定跑满 3 轮反思（作者自加的变体）</td><td>7</td></tr>
+      <tr><td>Best-of-N + 自验证</td><td>采 8 份，让模型自己挑最好的一份</td><td>9</td></tr>
+      <tr><td>多智能体辩论 <a class="src" href="https://arxiv.org/abs/2305.14325">Du et al. 2024</a></td><td>3 个分身辩 2 轮再收敛</td><td>9</td></tr>
+      <tr><td><b>采样基线（自洽性）</b></td><td>K=16 样本池，子采样多数票</td><td>1 ~ 16</td></tr>
+    </table></div>
+    <p style="margin-top:12px">模型侧用 Qwen2.5-Instruct 系列的 <b>1.5B、3B、7B</b> 三档
+      <a class="src" href="https://arxiv.org/abs/2412.15115">Qwen2.5 技术报告</a>，
+      在一台无 GPU 的 CPU 机器（AMD EPYC 7452，32 核，125 GB 内存）上以 llama.cpp Q8_0 量化运行
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=6">论文 §4.1</a>。
+      基准是答案可自动精确判分的 <b>GSM8K</b>（小学应用题，整数答案）
+      <a class="src" href="https://arxiv.org/abs/2110.14168">Cobbe et al. 2021</a>
+      和 <b>MATH-500</b>（竞赛数学子集，答案是公式）
+      <a class="src" href="https://arxiv.org/abs/2305.20050">Lightman et al. 2023</a>，
+      各抽 150 题、固定种子、所有方法做同一套题
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=6">论文 §4.2</a>。</p>
+    <div class="keyfact">为什么要有两个 Reflexion？原版的「是否重试」由模型自己决定——结果在 1.5B 上它<b>每道题都判自己对</b>，反思一次都没发生，方法悄悄退化成单次思维链。只测原版就测不到「反思」这个机制，所以作者另跑一个强制跑满 3 轮的变体，并明确声明：对「Reflexion 方法」的结论以原版为准，对「反思机制」的结论以强制版为准
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=7">论文 §4.3</a>。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🎯 比较的规则：实测成本，在曲线上插值</h3>
+    <p>Wang et al. 用的是「给所有方法设同一个预算上限」，方法实际花多少随上限而定。本文更细：先让方法按自己的方式跑完，<b>量出它真实的平均成本 c</b>，然后在基线曲线上找到成本恰好为 c 的点（相邻两个 N 之间线性插值），用那个点的准确率当对手
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=8">论文 §4.5</a>。</p>
+    <div class="formula">
+      Δ <span class="op">=</span> Acc<sub><span class="cond">方法</span></sub> <span class="op">−</span> Acc<sub><span class="cond">SC</span></sub>( <var>c</var><sub><span class="cond">方法实测</span></sub> )
+      <div class="fnote">Δ 是配对到每道题的准确率差（百分点）。Δ &gt; 0：方法的机制值回票价；Δ &lt; 0：同样的 token 不如拿去多采样。</div>
+    </div>
+    <div class="analogy">像二手车比价：不说「这辆 20 万的车比 10 万的好所以值」，而是问「同样 20 万，别家能买到什么」。基线曲线就是「别家」——最朴素那家店的价目表。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📐 统计推断：每个数字都带误差棒</h3>
+    <p>三组设计让结论「经得起统计」
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=8">论文 §4.5–4.6</a>：</p>
+    <p><b>① 逐题配对。</b>方法和基线做同一套 150 题，比的是每道题的对错差，而不是两个独立准确率——题难题易的影响被消掉。</p>
+    <p><b>② 配对 bootstrap。</b>以题为重采样单元，重复 10,000 次，给出每个 Δ 的 95% 置信区间和双侧 p 值。</p>
+    <p><b>③ Holm–Bonferroni 校正。</b>一次测 7 种方法，光看运气也可能有一个「看起来显著」，所以每个设置内的 p 值都做 Holm 校正。</p>
+    <p>作者还把「能检测到多小的效应」说在了明处：28 组 1.5B/3B 对比里，配对差的标准误在 1.3~3.2 个百分点之间（中位数 2.6），95% 区间宽 ±2.6~±6.3——<b>大约 5~6 个百分点以上的真实差异才能可靠分辨</b>，更小的真实效应只能如实说「测不出来」
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=8">论文 §4.6</a>。</p>
+    <div class="analogy">体育比赛判罚「A 比 B 强」，不能只看一场。配对 = 让两队在同一块场地同一天比；bootstrap = 把这一场的每个回合打乱重排一万次，看比分结论有多稳；Holm 校正 = 你同时赌了 7 场比赛，总得有一场「爆冷门」，所以爆冷阈值要提高。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔒 防泄题：谁也不许看标准答案</h3>
+    <p>Huang et al. 已经证明：不告诉模型对错就让它自我纠正，往往会越改越差；文献里不少「自我纠正有效」的报告，其实是偷偷用正确答案决定「何时停止修改」
+      <a class="src" href="https://arxiv.org/abs/2310.01798">Huang et al. 2024 (ICLR)</a>。
+      本文全盘采纳这个控制：任何方法在任何环节都看不到 gold answer；每种方法的轮数、智能体数、采样数也都<b>事先固定</b>，不按数据集调优——因为调优需要看正确答案，那本身就是泄题
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=11">论文 §4 效度威胁</a>。</p>
+  </div>
+</section>
+
+<!-- ============ CH3 实验结果 ============ -->
+<section class="chapter" id="ch3">
+  <div class="chap-head"><span class="chap-num">实验结果</span><h2>36 组对比，没有一组赢</h2></div>
+  <p class="oneline">输赢的分界线不是「简单 vs 复杂」，而是「数票 vs 自审」——让模型评判自己的，全输。</p>
+
+  <div class="card fade-up">
+    <h3>🧮 总账：0 胜、10 负、26 平</h3>
+    <p>6 个设置（3 档模型 × 2 个基准）、共 36 组方法-基线对比。在每个设置内做 Holm 校正后：<b>0 组显著更好，10 组显著更差，26 组与基线统计上不可区分</b>；36 组里有 30 组点估计为负
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=11">论文 §5.1</a> <a class="src" href="https://arxiv.org/pdf/2607.28576#page=13">Table 2</a>。
+      若把 Holm 校正一次性施加到全部 36 组上，仍有 2 组显著——这不是「噪声里捞出来的」
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=18">论文 §5.5</a>。</p>
+    <p>真正的结构在于<b>分组</b>：三种让模型评估或重写自己产出的方法（Self-Refine、强制 Reflexion、Best-of-N 自验证），在它们的全部 18 组对比里<b>全部</b>为负；而不含自我评估的方法与基线打平（20 组里 14 组为负，纯属随机水平）
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=1">摘要</a>。10 组显著更差的明细（括号内为 Δ 与 95% 区间）
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=12">论文 §5.1</a>：</p>
+    <div class="tbl-scroll"><table class="tbl">
+      <tr><th>设置</th><th>方法</th><th>Δ（pp）</th><th>95% CI</th></tr>
+      <tr><td>1.5B / GSM8K</td><td>Best-of-N 自验证</td><td class="neg">−7.7</td><td>[−13.3, −2.2]</td></tr>
+      <tr><td>1.5B / MATH-500</td><td>Best-of-N 自验证</td><td class="neg">−8.1</td><td>[−14.2, −2.1]</td></tr>
+      <tr><td>1.5B / MATH-500</td><td>Reflexion（强制）</td><td class="neg">−9.0</td><td>[−15.3, −2.7]</td></tr>
+      <tr><td>3B / GSM8K</td><td>Self-Refine</td><td class="neg">−4.7</td><td>[−8.5, −1.3]</td></tr>
+      <tr><td>3B / GSM8K</td><td>Reflexion（强制）</td><td class="neg">−5.3</td><td>[−9.6, −1.3]</td></tr>
+      <tr><td>3B / MATH-500</td><td>Best-of-N 自验证</td><td class="neg">−14.1</td><td>[−20.0, −8.4]</td></tr>
+      <tr><td>7B / GSM8K</td><td>Self-Refine</td><td class="neg">−3.6</td><td>[−6.9, −0.9]</td></tr>
+      <tr><td>7B / GSM8K</td><td>Reflexion（强制）</td><td class="neg">−5.5</td><td>[−10.2, −1.2]</td></tr>
+      <tr><td>7B / MATH-500</td><td>Self-Refine</td><td class="neg">−6.3</td><td>[−11.1, −2.0]</td></tr>
+      <tr><td>7B / MATH-500</td><td>Reflexion（强制）</td><td class="neg">−10.1</td><td>[−15.0, −5.7]</td></tr>
+    </table></div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>⚖️ 最干净的对照：同样 8 份答卷，「挑」 vs 「数」</h3>
+    <p>上面的比较里方法和基线毕竟是不同流程，怀疑者总能问：差距真的是机制造成的吗？Best-of-N 提供了一个<b>零混杂</b>的检验：它采 8 份解答再让模型挑最好的；把这同 8 份拿过来直接数票——<b>样本、token、模型完全相同，只差最后一步是「模型挑」还是「数出现次数」</b>
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=12">论文 §5.3</a>：</p>
+    <div class="tbl-scroll"><table class="tbl">
+      <tr><th>设置</th><th>模型挑</th><th>数票</th><th>差值（95% CI）</th><th>p</th></tr>
+      <tr><td>1.5B / GSM8K</td><td>71.3%</td><td>79.3%</td><td class="neg">−8.0 [−13.3, −3.3]</td><td>0.001</td></tr>
+      <tr><td>1.5B / MATH-500</td><td>46.7%</td><td>58.0%</td><td class="neg">−11.3 [−17.3, −6.0]</td><td>&lt;0.001</td></tr>
+      <tr><td>3B / GSM8K</td><td>84.0%</td><td>89.3%</td><td class="neg">−5.3 [−10.7, −0.7]</td><td>0.038</td></tr>
+      <tr><td>3B / MATH-500</td><td>52.0%</td><td>69.3%</td><td class="neg">−17.3 [−24.0, −11.3]</td><td>&lt;0.001</td></tr>
+      <tr><td>7B / GSM8K</td><td>90.7%</td><td>92.7%</td><td>−2.0 [−5.3, +0.7]</td><td>0.241</td></tr>
+      <tr><td>7B / MATH-500</td><td>71.3%</td><td>72.7%</td><td>−1.3 [−4.7, +2.0]</td><td>0.538</td></tr>
+    </table></div>
+    <p style="margin-top:12px">数票在每个设置都赢，幅度 1.3~17.3 个百分点。验证者与多数票在 63~95% 的题上意见一致——<b>它正是在「有分歧的少数题」上把分数弄丢的</b>
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=16">论文 §5.3</a>。
+      一个能在 8 次尝试里做出正确答案的模型，未必能认出哪个是对的；而数票什么都不需要认。</p>
+
+    <div class="demo-box">
+      <div class="demo-title">交互模拟：8 份答卷固定，两种裁决方式各跑 100 局</div>
+      <p style="font-size:14px;color:#9db4dd;margin-bottom:6px">某道题采到 8 份答卷，答案是 <b style="color:#7ee2b0">42</b> 的有 5 份（恰好正确），其余 3 份是 <b style="color:#ff9d9d">17</b>×2 和 <b style="color:#ff9d9d">8</b>×1。数票必得 42；让模型自己挑，它可能在分歧题上推翻多数、选中错的。</p>
+      <div class="sample-row">
+        <div class="chip maj">42</div><div class="chip maj">42</div><div class="chip pick">17</div>
+        <div class="chip maj">42</div><div class="chip">8</div><div class="chip maj">42</div>
+        <div class="chip pick">17</div><div class="chip maj">42</div>
+      </div>
+      <div class="caption" style="text-align:center">绿框 = 与多数一致的答卷；红框 = 模型自评时容易「相中」的另类答卷</div>
+      <div class="btn-row" style="justify-content:center">
+        <button class="btn" id="simRun">▶ 跑 100 局</button>
+        <button class="btn ghost" id="simReset">↺ 重置</button>
+      </div>
+      <div class="sim-bars"><span>🗳️ 数票</span><div class="sim-bar"><i id="barCount" style="background:var(--green)"></i></div><b id="accCount">—</b></div>
+      <div class="sim-bars"><span>🤔 模型挑</span><div class="sim-bar"><i id="barJudge" style="background:var(--red)"></i></div><b id="accJudge">—</b></div>
+      <div class="demo-readout" id="simReadout">点击「跑 100 局」开始。每局：8 份答卷重新生成（多数派答案以 79.3% 概率为正确）；模型裁决时 88% 跟多数票走，12% 推翻多数——而推翻时只有 12.5% 的情况它是对的。</div>
+      <div class="caption">模拟参数按论文 1.5B/GSM8K 实测校准：数票 79.3%、模型挑 71.3%、推翻多数时验证者正确率 12.5%（<a class="src" href="https://arxiv.org/pdf/2607.28576#page=16">§5.3 / 表</a>、<a class="src" href="https://arxiv.org/pdf/2607.28576#page=20">§6.3</a>），跑几百局后两条柱会收敛到这两个数附近。</div>
+    </div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📉 规模效应：差距在收窄，但机制没有反转的迹象</h3>
+    <p>「挑 vs 数」的惩罚随模型变大稳步缩小：1.5B/3B 下 4 组全胜且全显著，7B 下 2 组都不再显著（区间都包含 0）。所以论文的表述很克制：<b>7B 以下数票赢，7B 处两者打平</b>，更大的模型没测
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=16">论文 §5.3 / Figure 3</a>。</p>
+    <p>但差距为什么收窄？论文拆出一个可检验的机制诊断：分歧题越来越少（GSM8K 上 150 题中验证者背离多数的次数 30 → 17 → 8），<b>可一旦背离，它仍然通常是错的</b>——在「恰好一方正确」的分歧题里，验证者是正确一方的比例：GSM8K 为 12.5%、21.4%、20.0%，MATH-500 为 9.5%、3.6%、33.3%，<b>全部低于 50%</b>。也就是说，差距收窄是因为验证者越来越「随大流」，而不是变成了比数票更好的裁判——是从下往上的收敛，不是即将交叉反超
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=20">论文 §6.3</a>。</p>
+    <div class="keyfact">对照文献刚好咬合：Zhang et al. 发现<b>专门训练过</b>的验证器在约 7B 规模能赢过多数票
+      <a class="src" href="https://arxiv.org/abs/2506.01369">Zhang et al. 2025</a>。
+      两边合起来的结论是：值钱的是「训练」这个干预，而不是「让模型挑」这个动作本身——未训练的验证器到 7B 才勉强追平
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=16">论文 §5.3</a>。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🕳️ 一个会「装死」的方法：Reflexion 在 1.5B 上从未反思</h3>
+    <p>原版 Reflexion 由模型自判「我的答案对吗」，判对就停。作者给触发率装了仪表，结果惊人
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=18">论文 §5.5</a>：</p>
+    <div style="margin:14px 0">
+      <div class="fire-row"><span>1.5B / GSM8K</span><div class="fire-bar"><i data-w="100" style="background:var(--red)"></i></div><b>100% 直接停</b></div>
+      <div class="fire-row"><span>1.5B / MATH-500</span><div class="fire-bar"><i data-w="100" style="background:var(--red)"></i></div><b>100% 直接停</b></div>
+      <div class="fire-row"><span>3B / GSM8K</span><div class="fire-bar"><i data-w="77" style="background:var(--amber)"></i></div><b>77% 直接停</b></div>
+      <div class="fire-row"><span>3B / MATH-500</span><div class="fire-bar"><i data-w="31" style="background:var(--green)"></i></div><b>31% 直接停</b></div>
+    </div>
+    <p>在 1.5B 上，模型对<b>每一道题</b>都判自己正确，反思循环一次都没启动（平均使用轮数 0.00 / 3），顶着 Reflexion 名字被测量的其实是一条普通思维链。它的分数看起来还不错，恰恰因为它<b>便宜</b>——而不是因为反思有用。强制版让循环真正跑起来后，分数立刻掉到基线以下
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=19">论文 §6.2</a>。</p>
+    <div class="analogy">健身 App 的规则是「自评状态差才去加练」。一个从不承认自己状态差的用户，每次到健身房门口就说「我今天棒极了」然后回家——年底体测居然还过得去，因为他省下了所有加练的开销。你若只看体测分数，会误以为「这个 App 的加练计划很科学」。</div>
+    <div class="warnfact">论文由此给出一般性警告：<b>控制流由模型自触发的方法，可以悄无声息地退化成更便宜的方法</b>。不报告触发率的基准结果，证据上就留了一个洞
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=19">论文 §6.2</a>。</div>
+  </div>
+</section>
+
+<!-- ============ CH4 局限与意义 ============ -->
+<section class="chapter" id="ch4">
+  <div class="chap-head"><span class="chap-num">局限与意义</span><h2>这证明了什么，没证明什么</h2></div>
+  <p class="oneline">结论的正确读法关乎「比较方式」，而不是给这些方法判死刑。</p>
+
+  <div class="card fade-up">
+    <h3>🧭 正确的读法：问题是「token 花在哪更值」</h3>
+    <p>作者自己把能支撑的论断收得很窄：没有一个方法在同等生成 token 下显著好过朴素重复采样；在 1.5B/3B 的四个设置里 6 组显著更差，且全部要求模型评判或重写自己的产出。置信区间足够宽，不能排除任何单个方法有 modest 的真实收益——<b>论文并不主张这些方法的真实效应为零</b>
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=19">论文 §6.1</a>。</p>
+    <p>所以正确的读法是：「超过单次思维链」证明不了方法的机制在起作用，因为同样 token 有一种更便宜、更无聊的花法，而它很少被一起报告。实践中的问题不是「自我批评有没有用」，而是「<b>自我批评是否比同 token 多采样更有用</b>」——这是两个不同的问题，只有第二个有可操作的答案
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=19">论文 §6.1</a>。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🚧 论文自己声明的边界</h3>
+    <p>作者把局限写得很坦白
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=21">论文 §6.5</a>：</p>
+    <p><b>① 规模封顶 7B。</b>硬件所限，更大模型上两条曲线是否会交叉反超，未测；数据只定位了「打平点」，管不了打平点以上。</p>
+    <p><b>② 8-bit 量化。</b>Q8_0 对这个规模接近全精度，但不能排除量化与方法的交互。</p>
+    <p><b>③ 只做了可自动判分的数学。</b>这条对方法并不中立：Self-Refine 本为开放式生成而设计，那里答案可以在许多细节上「更好一点」，批评有东西可抓；数学题答案非对即错，批评每次改动都是一场赌博。而且多数票基线本身就要求答案能判等——<b>数学不是这些方法最吃亏的战场，反而是这场比较唯一能合法开打的战场</b>。</p>
+    <p><b>④ 每种方法只实现一个版本、超参事先固定。</b>换实现、调参数都可能改变表现；作者公开了全部提示词、原始生成与代码，供人复查而不是空争。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📣 给方法论文的一条建议</h3>
+    <p>这套协议便宜到几乎没有借口不用：在同一批题、同一个模型上，多报一条<b>「朴素重复采样的准确率-生成 token 曲线」</b>，成本只是每个基准一个样本池，却能直接回答「这个方法赢没赢过自己的预算」。作者建议未来的测试时方法论文都附上它，也建议审稿人主动索要
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=22">论文 §6.6</a>。</p>
+    <div class="analogy">新药上市要和安慰剂比，而不是和「不吃药」比。重复采样就是推理方法领域的安慰剂对照——它不治病，但它把「多花了钱」这个混杂因素吸走，剩下的才是药效。</div>
+    <div class="keyfact">一句话带走：<b>token 不是问题的关键，token 花在什么上面才是</b>。在 1.5B~7B、可判分的数学任务上，让模型审视自己的产出，是把 token 花在刀刃的背面；同样的预算，多试几次再数票更值
+      <a class="src" href="https://arxiv.org/pdf/2607.28576#page=22">论文 §7</a>。</div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    本页面是对 arXiv 论文 <a class="src" href="https://arxiv.org/abs/2607.28576">2607.28576</a>
+    <i>Sample More, Reflect Less: Self-Refine and Reflexion Lose to Repeated Sampling at Equal Token Cost, from 1.5B to 7B</i>（Iliya Mirzaei, Stony Brook University, 2026-07-31）的非官方中文交互解读。<br>
+    文中所有实验数字均取自论文原文（摘要、§1–§7、Table 1–2、Figure 1–3），并以 <span style="color:#8fb8ff">↗</span> 链接标注出处章节 / 页码；
+    交互动画为教学演示，其参数在与论文实测口径一致处均已注明。<br>
+    相关文献：Wang et al. <a class="src" href="https://arxiv.org/abs/2406.06461">Reasoning in Token Economies (2024)</a> ·
+    <a class="src" href="https://arxiv.org/abs/2203.11171">Self-Consistency (2023)</a> ·
+    <a class="src" href="https://arxiv.org/abs/2303.17651">Self-Refine (2023)</a> ·
+    <a class="src" href="https://arxiv.org/abs/2303.11366">Reflexion (2023)</a> ·
+    <a class="src" href="https://arxiv.org/abs/2310.01798">LLMs Cannot Self-Correct Yet (2024)</a> ·
+    <a class="src" href="https://arxiv.org/abs/2305.14325">Multiagent Debate (2024)</a> ·
+    <a class="src" href="https://arxiv.org/abs/2506.01369">Zhang et al. (2025)</a>
+  </div>
+</footer>
+
+<script>
+/* ========== 入场淡入 & 触发率条 ========== */
+(function(){
+  var io = new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('show'); io.unobserve(e.target); } });
+  }, {threshold:.12});
+  document.querySelectorAll('.fade-up').forEach(function(el){ io.observe(el); });
+
+  var io2 = new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(e.isIntersecting){ e.target.style.width = e.target.getAttribute('data-w') + '%'; io2.unobserve(e.target); }
+    });
+  }, {threshold:.4});
+  document.querySelectorAll('.fire-bar i').forEach(function(el){ io2.observe(el); });
+})();
+
+/* ========== 动画1：7 次调用的两种花法 ========== */
+(function(){
+  var TOTAL = 1784, STEPS = 7;
+  var srLis = document.querySelectorAll('#srSteps li');
+  var scLis = document.querySelectorAll('#scSteps li');
+  var srTok = document.getElementById('srTok');
+  var scTok = document.getElementById('scTok');
+  var verdict = document.getElementById('vsVerdict');
+  var timer = null;
+
+  function reset(){
+    if(timer){ clearInterval(timer); timer = null; }
+    srLis.forEach(function(li){ li.classList.remove('on'); });
+    scLis.forEach(function(li){ li.classList.remove('on'); });
+    srTok.textContent = '0'; scTok.textContent = '0';
+    verdict.classList.remove('show');
+  }
+  function play(){
+    reset();
+    var i = 0;
+    timer = setInterval(function(){
+      srLis[i].classList.add('on');
+      scLis[i].classList.add('on');
+      var t = Math.round(TOTAL * (i + 1) / STEPS);
+      srTok.textContent = t.toLocaleString();
+      scTok.textContent = t.toLocaleString();
+      i++;
+      if(i >= STEPS){ clearInterval(timer); timer = null; verdict.classList.add('show'); }
+    }, 620);
+  }
+  document.getElementById('vsPlay').addEventListener('click', play);
+  document.getElementById('vsReset').addEventListener('click', reset);
+})();
+
+/* ========== 动画2：成本-准确率曲线 ========== */
+(function(){
+  var N_LIST = [1, 2, 3, 4, 6, 8, 12, 16];
+  var MCOLORS = {
+    'Chain-of-Thought':'#7fc8ff', 'Plan-and-Solve':'#b8a7ff', 'Self-Refine':'#ff6b6b',
+    'Reflexion':'#ffd97a', 'Reflexion(强制)':'#ff9f43', 'Best-of-N自验证':'#ff5e8a', '多智能体辩论':'#6be3c0'
+  };
+  /* anchors: 基线曲线锚点 [token, acc]，取自论文 §5.2 端点与 Table 2 的 SC acc 列；pool: K=16 总成本 */
+  var SETTINGS = {
+    'Qwen2.5-1.5B · GSM8K': { pool: 4749,
+      anchors: [[297,70.1],[1197,76.3],[1784,78.3],[2369,79.1],[2539,79.2],[4749,80.9]],
+      methods: [
+        ['Chain-of-Thought',292,72.0,'+1.9'], ['Plan-and-Solve',319,70.0,'−0.1'],
+        ['Self-Refine',1784,72.0,'−6.3'], ['Reflexion',323,74.0,'+3.9'],
+        ['Reflexion(强制)',1197,71.3,'−5.0'], ['Best-of-N自验证',2369,71.3,'−7.7'],
+        ['多智能体辩论',2539,74.0,'−5.2']]},
+    'Qwen2.5-1.5B · MATH-500': { pool: 8636,
+      anchors: [[540,44.1],[608,44.3],[2827,52.3],[3467,53.6],[4320,54.8],[4493,54.9],[8636,55.8]],
+      methods: [
+        ['Chain-of-Thought',566,47.3,'+3.2'], ['Plan-and-Solve',591,44.0,'−0.2'],
+        ['Self-Refine',3467,47.3,'−6.3'], ['Reflexion',608,46.0,'+1.7'],
+        ['Reflexion(强制)',2827,43.3,'−9.0'], ['Best-of-N自验证',4320,46.7,'−8.1'],
+        ['多智能体辩论',4493,49.3,'−5.6']]},
+    'Qwen2.5-3B · GSM8K': { pool: 4799,
+      anchors: [[300,84.4],[712,85.4],[1436,88.1],[1956,88.6],[2404,88.9],[2681,89.0],[4799,89.0]],
+      methods: [
+        ['Chain-of-Thought',295,83.3,'−1.1'], ['Plan-and-Solve',328,82.7,'−1.7'],
+        ['Self-Refine',1436,83.3,'−4.7'], ['Reflexion',712,84.0,'−1.4'],
+        ['Reflexion(强制)',1956,83.3,'−5.3'], ['Best-of-N自验证',2404,84.0,'−4.9'],
+        ['多智能体辩论',2681,86.7,'−2.3']]},
+    'Qwen2.5-3B · MATH-500': { pool: 8803,
+      anchors: [[550,55.7],[2592,63.5],[2705,63.7],[3289,64.9],[4391,66.1],[4814,66.4],[8803,69.3]],
+      methods: [
+        ['Chain-of-Thought',550,61.3,'+5.7'], ['Plan-and-Solve',588,60.7,'+4.9'],
+        ['Self-Refine',2705,58.7,'−5.1'], ['Reflexion',2592,62.0,'−1.5'],
+        ['Reflexion(强制)',3289,60.7,'−4.2'], ['Best-of-N自验证',4391,52.0,'−14.1'],
+        ['多智能体辩论',4814,64.0,'−2.4']]},
+    'Qwen2.5-7B · GSM8K': { pool: 4560,
+      anchors: [[285,90.1],[1374,92.3],[1885,92.9],[2282,93.2],[4560,93.4]],
+      methods: [
+        ['Chain-of-Thought',291,88.7,'−1.5'], ['Self-Refine',1374,88.7,'−3.6'],
+        ['Reflexion(强制)',1885,87.3,'−5.5'], ['Best-of-N自验证',2282,90.7,'−2.6']]},
+    'Qwen2.5-7B · MATH-500': { pool: 8578,
+      anchors: [[536,67.9],[2627,73.0],[3206,73.5],[4335,73.7],[8578,74.4]],
+      methods: [
+        ['Chain-of-Thought',543,66.7,'−1.2'], ['Self-Refine',2627,66.7,'−6.3'],
+        ['Reflexion(强制)',3206,63.3,'−10.1'], ['Best-of-N自验证',4335,71.3,'−2.4']]}
+  };
+
+  var sel = document.getElementById('settingSel');
+  var slider = document.getElementById('nSlider');
+  var nOut = document.getElementById('nOut');
+  var readout = document.getElementById('curveReadout');
+  var legend = document.getElementById('chartLegend');
+  var canvas = document.getElementById('costChart');
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+  var ML = 58, MR = 18, MT = 18, MB = 42;
+
+  Object.keys(SETTINGS).forEach(function(k){
+    var o = document.createElement('option'); o.value = k; o.textContent = k; sel.appendChild(o);
+  });
+
+  function interp(anchors, c){
+    if(c <= anchors[0][0]) return anchors[0][1];
+    for(var i = 0; i < anchors.length - 1; i++){
+      var a = anchors[i], b = anchors[i+1];
+      if(c <= b[0]) return a[1] + (b[1]-a[1]) * (c-a[0]) / (b[0]-a[0]);
+    }
+    return anchors[anchors.length-1][1];
+  }
+
+  function draw(){
+    var key = sel.value || Object.keys(SETTINGS)[0], S = SETTINGS[key];
+    var nIdx = parseInt(slider.value, 10), N = N_LIST[nIdx];
+    nOut.textContent = 'N = ' + N;
+
+    var costs = S.anchors.map(function(a){return a[0];});
+    var accs = S.anchors.map(function(a){return a[1];});
+    S.methods.forEach(function(m){ costs.push(m[1]); accs.push(m[2]); });
+    var xMin = Math.log10(Math.min.apply(null, costs) * 0.88);
+    var xMax = Math.log10(S.pool * 1.06);
+    var yMin = Math.floor(Math.min.apply(null, accs) - 4);
+    var yMax = Math.ceil(Math.max.apply(null, accs) + 3);
+
+    function X(c){ return ML + (Math.log10(c) - xMin) / (xMax - xMin) * (W - ML - MR); }
+    function Y(a){ return MT + (yMax - a) / (yMax - yMin) * (H - MT - MB); }
+
+    ctx.clearRect(0, 0, W, H);
+    /* 网格与坐标轴 */
+    ctx.strokeStyle = '#1c2b52'; ctx.fillStyle = '#5f74a3'; ctx.lineWidth = 1;
+    ctx.font = '12px system-ui'; ctx.textAlign = 'center';
+    [300, 1000, 3000, 9000].forEach(function(t){
+      if(t < Math.pow(10, xMin) || t > Math.pow(10, xMax)) return;
+      var x = X(t);
+      ctx.beginPath(); ctx.moveTo(x, MT); ctx.lineTo(x, H - MB); ctx.stroke();
+      ctx.fillText(t >= 1000 ? (t/1000) + 'k' : String(t), x, H - MB + 16);
+    });
+    ctx.textAlign = 'right';
+    for(var a = Math.ceil(yMin/5)*5; a <= yMax; a += 5){
+      var y = Y(a);
+      ctx.beginPath(); ctx.moveTo(ML, y); ctx.lineTo(W - MR, y); ctx.stroke();
+      ctx.fillText(a + '%', ML - 8, y + 4);
+    }
+    ctx.textAlign = 'center';
+    ctx.fillText('每题平均生成 token（对数刻度）', (ML + W - MR)/2, H - 6);
+
+    /* 基线曲线 */
+    ctx.strokeStyle = '#1783ff'; ctx.lineWidth = 3; ctx.beginPath();
+    S.anchors.forEach(function(p, i){
+      var x = X(p[0]), y = Y(p[1]);
+      if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    ctx.fillStyle = '#1783ff';
+    S.anchors.forEach(function(p){
+      ctx.beginPath(); ctx.arc(X(p[0]), Y(p[1]), 3.2, 0, 7); ctx.fill();
+    });
+
+    /* 方法散点：低于曲线 = 红圈警示 */
+    S.methods.forEach(function(m){
+      var x = X(m[1]), y = Y(m[2]);
+      var below = m[2] < interp(S.anchors, m[1]);
+      ctx.beginPath(); ctx.arc(x, y, 6.5, 0, 7);
+      ctx.fillStyle = MCOLORS[m[0]]; ctx.fill();
+      if(below){ ctx.lineWidth = 2.4; ctx.strokeStyle = '#ff3b30'; ctx.stroke(); }
+    });
+
+    /* 滑杆选中的 N：黄色菱形 */
+    var cN = N * S.pool / 16, aN = interp(S.anchors, cN);
+    var dx = X(cN), dy = Y(aN);
+    ctx.fillStyle = '#ffd97a';
+    ctx.beginPath();
+    ctx.moveTo(dx, dy - 9); ctx.lineTo(dx + 9, dy); ctx.lineTo(dx, dy + 9); ctx.lineTo(dx - 9, dy);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#0a1326'; ctx.lineWidth = 2; ctx.stroke();
+
+    var belowCount = S.methods.filter(function(m){ return m[2] < interp(S.anchors, m[1]); }).length;
+    readout.innerHTML = '当前设置 <b style="color:#ffd97a">' + key + '</b>：N = ' + N +
+      ' 时基线成本 ≈ <b>' + Math.round(cN).toLocaleString() + '</b> token，准确率 ≈ <b>' + aN.toFixed(1) + '%</b>。' +
+      '本设置 ' + S.methods.length + ' 种方法里有 <b style="color:#ff9d9d">' + belowCount + '</b> 种落在基线曲线下方。';
+
+    legend.innerHTML = S.methods.map(function(m){
+      return '<span><i style="background:' + MCOLORS[m[0]] + '"></i>' + m[0] + '（Δ ' + m[3] + '）</span>';
+    }).join('');
+  }
+
+  sel.addEventListener('change', draw);
+  slider.addEventListener('input', draw);
+  draw();
+})();
+
+/* ========== 动画3：挑 vs 数 ========== */
+(function(){
+  var trials = 0, countWin = 0, judgeWin = 0;
+  var P_MAJ = 0.793, P_AGREE = 0.88, P_OVERRIDE_OK = 0.125;
+  var barC = document.getElementById('barCount'), barJ = document.getElementById('barJudge');
+  var accC = document.getElementById('accCount'), accJ = document.getElementById('accJudge');
+  var out = document.getElementById('simReadout');
+
+  function render(){
+    if(trials === 0){
+      barC.style.width = '0%'; barJ.style.width = '0%';
+      accC.textContent = '—'; accJ.textContent = '—';
+      return;
+    }
+    var c = 100 * countWin / trials, j = 100 * judgeWin / trials;
+    barC.style.width = c + '%'; barJ.style.width = j + '%';
+    accC.textContent = c.toFixed(1) + '%'; accJ.textContent = j.toFixed(1) + '%';
+    out.innerHTML = '已跑 <b>' + trials.toLocaleString() + '</b> 局：数票 <b style="color:#7ee2b0">' + c.toFixed(1) +
+      '%</b>，模型挑 <b style="color:#ff9d9d">' + j.toFixed(1) + '%</b>，差距 <b>' + (j - c).toFixed(1) +
+      ' pp</b>。论文 1.5B/GSM8K 实测：79.3% vs 71.3%（−8.0 pp，95% CI [−13.3, −3.3]）。';
+  }
+  function run(n){
+    for(var i = 0; i < n; i++){
+      var majOK = Math.random() < P_MAJ;
+      var jOK = (Math.random() < P_AGREE) ? majOK : (Math.random() < P_OVERRIDE_OK);
+      if(majOK) countWin++;
+      if(jOK) judgeWin++;
+      trials++;
+    }
+    render();
+  }
+  document.getElementById('simRun').addEventListener('click', function(){ run(100); });
+  document.getElementById('simReset').addEventListener('click', function(){
+    trials = 0; countWin = 0; judgeWin = 0; render();
+    out.textContent = '点击「跑 100 局」开始。每局：8 份答卷重新生成（多数派答案以 79.3% 概率为正确）；模型裁决时 88% 跟多数票走，12% 推翻多数——而推翻时只有 12.5% 的情况它是对的。';
+  });
+})();
+</script>
+</body>
+</html>
