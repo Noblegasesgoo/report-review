@@ -26,6 +26,8 @@
 | 📄 论文（AI 安全与对齐） | 看懂 CoT 不忠实的两个世界：为什么「读模型的推理过程」恰在它答错时失灵 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/cot-unfaithfulness/) |
 | 📄 论文（LLM 智能体） | 看懂 Zero-Mem：不动用一个 token，也能给智能体装上可查、可溯源的长程记忆 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/zero-mem/) |
 | 📄 论文（推理与思维链） | 看懂 Sample More, Reflect Less：自我批评、反思重写花的 token，不如直接拿去买「多试几次」 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/sample-more-reflect-less/) |
+| 📄 论文（检索增强生成） | 看懂 Beyond Top-K：780 页财报里 86.8% 是表格行，top-k 切块从结构上就是错的——让智能体像审计员一样直接「翻书」 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/beyond-topk/) |
+| 📄 论文（推理与思维链） | 看懂 dLLM 的「先答后想」：扩散大模型任意顺序生成的自由，为何成了推理翻车现场 | [在线阅读](https://noblegasesgoo.github.io/report-review/papers/answer-first-dllm/) |
 
 ## 目录结构
 
@@ -72,8 +74,12 @@
 │   │   └── index.html           # CoT 不忠实检测论文交互解读（单文件，零依赖）
 │   ├── zero-mem/
 │   │   └── index.html           # Zero-Mem 智能体记忆论文交互解读（单文件，零依赖）
-│   └── sample-more-reflect-less/
-│       └── index.html           # 重复采样 vs 自我反思论文交互解读（单文件，零依赖）
+│   ├── sample-more-reflect-less/
+│   │   └── index.html           # 重复采样 vs 自我反思论文交互解读（单文件，零依赖）
+│   ├── beyond-topk/
+│   │   └── index.html           # Beyond Top-K 可解释检索论文交互解读（单文件，零依赖）
+│   └── answer-first-dllm/
+│       └── index.html           # dLLM 提交顺序论文交互解读（单文件，零依赖）
 ├── README.md
 └── LICENSE                      # MIT
 ```
@@ -261,6 +267,24 @@
 - **成本-准确率曲线 × 1 组滑杆动画**：6 个设置可选，各方法散点按论文实测落位，低于基线曲线者红圈警示——36 组对比 0 胜 10 负
 - **挑 vs 数 × 1 组模拟动画**：同样 8 份采样，「模型自己挑」比「数多数票」低 1.3~17.3pp，100 局滚动模拟精确收敛到论文实测值
 - **方法论警示**：Reflexion 在 1.5B 上 100% 自判正确、反思从未触发，高分只因悄悄退化成单次 CoT；建议所有测试时方法论文附重复采样成本-准确率曲线作对照
+
+### Beyond Top-K 可解释检索论文解读（`papers/beyond-topk/index.html`，检索增强生成）
+
+基于 arXiv 论文《Beyond Top-K: Replacing Black-Box Retrieval with Interpretable Agentic Operations》（arXiv:2608.06305）制作的单文件交互页面，内容包括：
+
+- **切块的原罪 × 1 组滑杆动画**：数字的单位写在上方中位 13 行外的表头里（lakh 与 crore 差 100 倍），块大小 5 档切换看 unitless/yearless 实测破坏率——表感知「钢人」切块也救不了 27~30% 的结构性残差
+- **READ 方法 × 1 组流程动画**：不建向量索引，用 grep/outline/read 三个确定性操作按区间寻址，8 步真实轨迹逐步回放，每步都是可审计的行号
+- **实验结果 × 1 组对比动画**：51 题上 58.8% vs 稠密检索 15.7%（pHolm=2×10⁻⁵），同款智能体换 top-k 工具仅 27.5%——增益属于接口而非迭代；BM25 打平也照实报告
+- **局限与意义**：结论收窄为「向量索引是造成伤害的部件」，所有关键结论均挂 ↗ 原文出处
+
+### Answer First, Reason Later 论文解读（`papers/answer-first-dllm/index.html`，推理与思维链）
+
+基于 arXiv 论文《Answer First, Reason Later: Commitment Order in Diffusion LLMs》（arXiv:2608.05687，首尔国立大学）制作的单文件交互页面，内容包括：
+
+- **病理直击 × 2 组动画**：纯扩散 vs 半自回归提交顺序时间线对比、GSM8K 真实题目的「答案先冻结 + 推导回填」时间线回放（轨迹 15–24% 处写死答案时推理区 78.7% 仍被掩码）
+- **病因解剖**：EOS 压力（信念）跨解码器几乎相同（0.782 vs 0.766），EOS 承诺（行动）差 2 倍多——病灶在采样器可达性，不在模型信念
+- **2×2 因果证据**：思维链只在有序提交下有用（交互效应 +34.8pp），失效分解为塌缩通道 +13.6pp 与顺序通道 +21.2pp，Dream-7B 与 MATH-500 复现
+- **单旋钮治愈 × 1 组滑杆动画**：前沿门控（i < f(t)+w）零训练把准确率 0.528→0.852，4 token/步时保住 4× 并行加速
 
 ## 许可证
 

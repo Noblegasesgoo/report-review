@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>看懂 Beyond Top-K：别再切块了，让智能体像审计员一样「翻书」</title>
+<style>
+  :root{
+    --blue:#1783ff; --blue-d:#0b5cc4; --red:#ff6b6b; --amber:#f7b731;
+    --purple:#a55eea; --green:#2bc48a; --ink:#1b2430; --ink-soft:#48566a;
+    --bg:#f6f8fc; --card:#ffffff; --line:#e4eaf3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.8}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+
+  /* ===== Hero ===== */
+  .hero{background:linear-gradient(160deg,#0a1a3f 0%,#103a8c 55%,#1783ff 100%);
+    color:#fff;padding:72px 0 56px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+    padding:4px 14px;border-radius:99px;font-size:13px;letter-spacing:1px;margin-bottom:18px}
+  .hero h1{font-size:clamp(26px,4.6vw,44px);line-height:1.3;margin-bottom:14px}
+  .hero p.sub{font-size:clamp(14px,1.8vw,18px);opacity:.88;max-width:820px}
+  .hero .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);
+    border-radius:16px;padding:14px 22px;min-width:150px}
+  .stat b{display:block;font-size:26px;font-weight:800}
+  .stat span{font-size:13px;opacity:.85}
+
+  /* ===== Nav ===== */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  nav.toc .inner{display:flex;gap:6px;overflow-x:auto;padding:10px 22px;max-width:1060px;margin:0 auto}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--ink-soft);text-decoration:none;
+    padding:6px 12px;border-radius:99px;transition:.2s}
+  nav.toc a:hover{background:#eaf2ff;color:var(--blue-d)}
+
+  /* ===== Sections ===== */
+  section.chapter{padding:56px 0 8px}
+  .chap-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  .chap-num{font-size:14px;font-weight:800;color:#fff;background:var(--blue);
+    border-radius:10px;padding:3px 12px;letter-spacing:1px}
+  .chap-head h2{font-size:clamp(21px,3vw,30px)}
+  .oneline{color:var(--blue-d);font-weight:600;margin:4px 0 22px;font-size:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:0 2px 14px rgba(20,50,110,.05)}
+  .card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card p{margin-bottom:12px;color:#2c3a4e}
+  .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
+    border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
+  .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
+  .keyfact{position:relative;background:#eef5ff;border-left:4px solid var(--blue);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";position:absolute;left:16px;top:12px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .demo-box{background:#0e1830;border-radius:18px;padding:22px;margin:16px 0;color:#dfe8ff;
+    position:relative;overflow:hidden}
+  .demo-title{color:#8fb8ff;font-size:13px;letter-spacing:2px;font-weight:700;margin-bottom:14px;text-transform:uppercase}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:99px;padding:9px 22px;font-size:14px;
+    cursor:pointer;font-weight:600;transition:.2s;box-shadow:0 4px 14px rgba(23,131,255,.35)}
+  .btn:hover{background:var(--blue-d);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);box-shadow:none;color:#dfe8ff}
+  .btn.ghost.active{background:rgba(23,131,255,.22);border-color:#6db4ff;color:#fff}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border-radius:12px;overflow:hidden}
+  table.tbl th{background:#103a8c;color:#fff;padding:10px 12px;text-align:left;font-weight:600}
+  table.tbl td{padding:10px 12px;border-bottom:1px solid var(--line)}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl tr:nth-child(even) td{background:#f7faff}
+  .hl{color:var(--blue-d);font-weight:700}
+
+  /* ===== 公式（纯 HTML/CSS，无 MathJax）===== */
+  .formula{background:#0e1830;border-radius:14px;padding:20px 22px;margin:14px 0;color:#eaf1ff;
+    font-size:clamp(15px,2.2vw,19px);text-align:center;overflow-x:auto;line-height:2;
+    font-family:"STIX Two Math","Cambria Math",Georgia,serif}
+  .formula .op{color:#8fb8ff}
+  .formula .cond{font-size:.82em;color:#9db4dd}
+  .frac{display:inline-flex;flex-direction:column;vertical-align:middle;margin:0 2px;line-height:1.4}
+  .frac .num{border-bottom:1.5px solid currentColor;padding:0 7px}
+  .frac .den{padding:0 7px}
+  .fnote{font-size:13px;color:#7f92b8;margin-top:10px;text-align:center;line-height:1.7;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  .formula var{font-style:italic}
+
+  /* ===== 结果条形图 ===== */
+  .scorebar{height:10px;border-radius:99px;background:#e7edf6;overflow:hidden;margin:4px 0 12px}
+  .scorebar i{display:block;height:100%;border-radius:99px;width:0;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+  .bar-row{display:grid;grid-template-columns:170px 1fr 64px;gap:12px;align-items:center;margin-bottom:10px;font-size:14px}
+  @media(max-width:640px){.bar-row{grid-template-columns:110px 1fr 56px}}
+  .bar-row b{text-align:right;font-variant-numeric:tabular-nums}
+
+  /* ===== 滑杆 ===== */
+  .slider-row{display:flex;align-items:center;gap:14px;margin:14px 0 6px;flex-wrap:wrap}
+  .slider-row label{font-size:14px;color:#9db4dd;white-space:nowrap}
+  .slider-row input[type=range]{flex:1;min-width:180px;accent-color:var(--amber)}
+  .slider-row output{color:#ffd97a;font-weight:700;min-width:90px;text-align:right;font-variant-numeric:tabular-nums}
+  canvas.chart{width:100%;height:260px;display:block;border-radius:10px;background:#0a1326}
+  .demo-readout{margin-top:14px;font-size:14.5px;line-height:1.8}
+  .caption{font-size:12.5px;color:#7f92b8;margin-top:8px;line-height:1.6}
+
+  /* ===== 文档行条带（单位继承示意，纯 CSS）===== */
+  .docstrip{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12.5px;line-height:1.9;
+    background:#0a1326;border-radius:12px;padding:14px 16px;color:#9db4dd;margin:12px 0;overflow-x:auto}
+  .docstrip .ln{white-space:nowrap;padding:0 8px;border-radius:6px}
+  .docstrip .hdr{color:#ffd97a;background:rgba(247,183,49,.12);font-weight:700}
+  .docstrip .num{color:#7fd8ff;background:rgba(23,131,255,.14);font-weight:700}
+  .docstrip .dots{color:#42557a;text-align:left}
+  .docstrip .cut{color:#ff6b6b;border-top:2px dashed #ff6b6b;font-weight:700}
+
+  /* ===== 轨迹播放器 ===== */
+  .traj-step{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:flex-start;
+    padding:10px 12px;border-radius:12px;margin-bottom:8px;background:rgba(255,255,255,.04);
+    border:1px solid transparent;opacity:.35;transition:all .45s ease}
+  .traj-step.on{opacity:1;border-color:rgba(23,131,255,.5);background:rgba(23,131,255,.10)}
+  .traj-step .no{width:26px;height:26px;border-radius:50%;background:#22355f;color:#8fb8ff;
+    display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800}
+  .traj-step.on .no{background:var(--blue);color:#fff}
+  .traj-step code{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:13px;color:#cfe2ff;
+    display:block;white-space:normal;word-break:break-all}
+  .traj-step .res{font-size:12.5px;color:#7f92b8;margin-top:2px}
+  .traj-step.on .res{color:#9db4dd}
+  .traj-answer{border:1px solid rgba(43,196,138,.5);background:rgba(43,196,138,.10);
+    border-radius:12px;padding:12px 16px;font-size:14px;color:#bff0d8;margin-top:6px;display:none}
+  .traj-answer.show{display:block}
+  .traj-answer.bad{border-color:rgba(255,107,107,.5);background:rgba(255,107,107,.08);color:#ffc9c9}
+
+  /* ===== 来源标注 ===== */
+  .src{color:var(--blue-d);text-decoration:none;font-size:.8em;font-weight:600;
+    border-bottom:1px dashed #9db8e8;padding:0 1px;white-space:nowrap}
+  .src:hover{color:var(--blue);border-bottom-style:solid;background:#eaf2ff;border-radius:4px}
+  .src::after{content:"↗";font-size:.85em;margin-left:1px}
+  .demo-box .src, .formula .src{color:#8fb8ff;border-bottom-color:#3a5078}
+  .demo-box .src:hover{color:#cfe2ff;background:rgba(23,131,255,.15)}
+  .src-inline{color:inherit;border-bottom:1px dashed #9db8e8;text-decoration:none}
+  .src-inline:hover{color:var(--blue)}
+
+  footer{margin-top:64px;padding:34px 0 46px;color:#7f8ca3;font-size:13px;text-align:center;
+    border-top:1px solid var(--line);line-height:2}
+  .fade-up{opacity:0;transform:translateY(26px);transition:all .7s cubic-bezier(.3,.7,.3,1)}
+  .fade-up.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">arXiv 论文交互解读 · 检索增强生成</span>
+    <h1>看懂 Beyond Top-K：别再切块了，让智能体像审计员一样「翻书」</h1>
+    <p class="sub">印度理工巴特那团队对长文档 RAG 的「切块 → 嵌入 → top-k」范式发起正面挑战：在一份 780 页的政府财务报告上，86.8% 的内容行是表格行，数字的意义由上方 13 行之外的表头继承——预先切好的块从结构上就把数字和它的单位分开了。他们的答案叫 READ：不建向量索引，让智能体用 grep、outline、read 三个确定性操作直接读原文，每一步都是可回放、可审计的行号区间。</p>
+    <div class="stats">
+      <div class="stat"><b>780 页</b><span>古吉拉特邦财政报告，86.8% 是表格行</span></div>
+      <div class="stat"><b>58.8% vs 15.7%</b><span>51 题上 READ 对稠密检索的准确率</span></div>
+      <div class="stat"><b>+43.1 pp</b><span>配对差，p<sub>Holm</sub> = 2×10⁻⁵</span></div>
+      <div class="stat"><b>100 倍</b><span>lakh 与 crore 的量级差——丢掉单位头的代价</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="toc"><div class="inner">
+  <a href="#ch0">🎬 热身：一道答不了的题</a>
+  <a href="#ch1">📏 把设定测量出来</a>
+  <a href="#ch2">🔍 核心方法：READ</a>
+  <a href="#ch3">📊 实验结果</a>
+  <a href="#ch4">⚖️ 局限与意义</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ============ CH0 热身 ============ -->
+<section class="chapter" id="ch0">
+  <div class="chap-head"><span class="chap-num">第 0 章</span><h2>热身：一道稠密检索「答不了」的题</h2></div>
+  <p class="oneline">两个数字相隔 47 行，答案不在书里任何地方——必须算出来。这恰恰是 top-k 检索最怕的形状。</p>
+
+  <div class="card fade-up">
+    <h3>🧾 动机问题：财政赤字减去收入盈余等于多少？</h3>
+    <p>论文的全部工作始于一个具体问题，问的是《古吉拉特邦财政账目 2024–25（第一卷）》——一份 780 页的印度邦政府审计年报：<b>2024–25 财年的财政赤字（Fiscal Deficit）与收入盈余（Revenue Surplus）之差是多少？</b>两个操作数 48,964.89 与 18,942.94（单位：千万卢比 crore）躺在同一张报表里、相隔 <b>47 行</b>，而它们的差 30,021.95 在整本书里<b>一次都没有印出来</b>——必须检索到两个数再做减法（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §1、§7、附录 E</a>）。</p>
+    <p>试点实验的结果很能说明问题（n=2，作者明确声明不构成定量结论）：调好的稠密检索器<b>在任何一次尝试里都没能把两个操作数放进同一个 top-k 上下文</b>，生成模型只好如实回答「无法回答」。这不是幻觉，是检索<b>拒绝送货</b>——而且这已是最好的情况；更糟的情况是检索器只送来一个「看起来很像」的数字，流畅的生成器直接拿去用了（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §1、§7 表 6</a>）。</p>
+    <div class="analogy">你让助理去档案室抄两个数相减。传统 RAG 的做法是：事先把整本书<b>撕成碎片</b>装进麻袋，助理不许进屋，只能让门卫按「哪几片纸和你的问题长得像」递出 8 片。两片分别写着两个操作数的纸大概率不会同时被递出来——助理再聪明也没用。</div>
+    <div class="keyfact">试点中 READ 消耗 5.8 万～7.8 万输入 token，约为稠密基线（6.7k～8.2k）的一个数量级——准确率与成本的权衡从第一天就是明账（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §7</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📦 传统 RAG 的「契约」，和它的四个结构性缺陷</h3>
+    <p>十年间，RAG 的每个零件都被打磨过——切块策略、嵌入模型、稀疏稠密融合、重排序——但契约没变：<b>模型只能看到一小片按相似度排序的语料，而选择的机制它无法检查、无法引导、无法验证</b>（<a class="src" href="https://arxiv.org/abs/2005.11401" target="_blank" rel="noopener">RAG, Lewis et al. 2020</a>、<a class="src" href="https://aclanthology.org/2020.emnlp-main.550/" target="_blank" rel="noopener">DPR</a>、<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">本文 §1、§2.1</a>）。用论文的形式化语言，文档是行序列 <var>D</var> = (ℓ₁, …, ℓ<sub>L</sub>)，接口 A 离线把 <var>D</var> 切成块、逐块嵌入，查询时返回（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §3 式 (1)</a>）：</p>
+    <div class="formula">
+      <var>R</var><sub><var>k</var></sub>(<var>q</var>) = <span class="op">arg top-<var>k</var></span><sub><var>j</var>∈[<var>M</var>]</sub>&nbsp;
+      <span class="frac"><span class="num"><var>E</var>(<var>q</var>) · <var>v</var><sub><var>j</var></sub></span><span class="den">‖<var>E</var>(<var>q</var>)‖ ‖<var>v</var><sub><var>j</var></sub>‖</span></span>
+      <div class="fnote">白话翻译：把问题和每个块都压成向量，按余弦相似度排队，取前 k 名。<b>这个分区是在看到问题之前就被钉死的</b>——之后无论问题需要什么，都只能在切好的块里挑。</div>
+    </div>
+    <table class="tbl">
+      <tr><th>缺陷</th><th>含义</th><th>在财报上的后果</th></tr>
+      <tr><td><b>有损投影</b></td><td>选择依据被压进 d 个浮点数，低于嵌入分辨率的区别在选择时不可恢复</td><td>数千个近乎相同的数字在同一嵌入空间里互相竞争</td></tr>
+      <tr><td><b>固定预算</b></td><td>恰好取 k 块，不管问题需要 1 个单元格还是 40 页</td><td>跨 47 行的两个操作数进不了同一个上下文</td></tr>
+      <tr><td><b>不透明</b></td><td>「为什么选中这块」的唯一解释是一个标量分数</td><td>无法回答审计场景必问的「这数从哪来」</td></tr>
+      <tr><td><b>切块破坏单位继承</b></td><td>数字的单位由上文某行声明，块内若无声明行则数字失去单位</td><td>lakh 和 crore 差 100 倍，且错误对生成器<b>不可见</b></td></tr>
+    </table>
+    <p style="margin-top:14px">第四条是本文的承重墙，也是下一章要用数字钉死的东西（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §3、§4</a>）。</p>
+  </div>
+</section>
+
+<!-- ============ CH1 把设定测量出来 ============ -->
+<section class="chapter" id="ch1">
+  <div class="chap-head"><span class="chap-num">第 1 章</span><h2>把设定测量出来：这份文档到底是什么</h2></div>
+  <p class="oneline">作者不空谈「财报不适合切块」——他们把三个属性量化，再量一量切块到底毁掉了多少上下文。</p>
+
+  <div class="card fade-up">
+    <h3>① 文档画像：这不是「带表格的文章」，这是一张 780 页的表</h3>
+    <p>测试床是印度审计长公署发布的公共记录，PDF 3.97 MB，用 <a class="src" href="https://pymupdf.readthedocs.io/en/latest/pymupdf4llm/" target="_blank" rel="noopener">pymupdf4llm</a> 转成 Markdown（选它的唯一理由：四个候选转换器里只有它能把行标签和数字绑在一起，附录 A 记录了对比）（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §4.1、附录 A</a>）。转换后的画像（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文表 1</a>）：</p>
+    <table class="tbl">
+      <tr><th>属性</th><th>数值</th><th>说明</th></tr>
+      <tr><td>非空行 / 表格行</td><td class="hl">19,198 / 16,664（86.8%）</td><td>在散文基准上调出来的检索器，面对的是完全不同的对象</td></tr>
+      <tr><td>表格列数（p50 / p90）</td><td class="hl">7 / 10</td><td>宽表是常态</td></tr>
+      <tr><td>数字 token / 去重后</td><td class="hl">58,791 → 15,960</td><td><b>重复率 3.68×</b>：数千个相似量级、相似行上下文的数字在一个嵌入空间里竞争</td></tr>
+      <tr><td>报表 / 节标题</td><td class="hl">189</td><td>结构导航的天然锚点</td></tr>
+    </table>
+    <div class="analogy">在传统 RAG 的散文测试里，检索像在一片姓氏各异的人群里找人；而在这里，检索像在上千对「穿着同款制服、身高相仿的双胞胎」里指认「第二排左三那位」——靠「长得像」（向量相似度）注定指认不准，你得按花名册（结构）点名字。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>② 单位继承：一个数字的含义，写在它上方 13 行之外</h3>
+    <p>这是论文自称「未见他人报道」的测量，也是后果最严重的一条。这本书用「(Rs. in lakh)」「(Rs. in crore)」这样的表头声明单位：全书 <b>666 行声明 lakh、50 行声明 crore</b>。一个数字继承的是<b>它上方最近那条声明</b>的单位，距离中位数 <b>13 行</b>、p90 26 行、最远 143 行。而 lakh 与 crore <b>相差 100 倍</b>——一个不含表头的检索单元，给出的数字在量级上有两位数的歧义；与「没检到答案」不同，这个失败对生成器<b>不可见</b>：它看到的是一个貌似合理的数（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §4.2、图 2</a>）。</p>
+    <div class="docstrip">
+<span class="ln hdr">    (Rs. in crore)                    ← 单位表头：以下数字都以 crore 计</span>
+<span class="ln">    1.  Revenue Receipts        2,30,114.72</span>
+<span class="ln">    2.  Tax Revenue             1,52,009.31</span>
+<span class="ln dots">    ⋮  （中位相隔 13 行，最远 143 行）</span>
+<span class="ln cut">  ─ ─ ─ ─ ─ ─  切块边界常常落在这里  ─ ─ ─ ─ ─ ─</span>
+<span class="ln num">    38. Fiscal Deficit            48,964.89   ← 块里的数字： lakh 还是 crore？差 100 倍</span>
+    </div>
+    <p style="font-size:12.5px;color:#7f8ca3;margin-top:-4px">条带为教学示意（行距取论文实测的中位 13 行、最远 143 行）；48,964.89 是书中真实数字。</p>
+    <div class="analogy">像超市把「单价：¥/100g」的价签贴在货架顶端，而价签和商品之间隔着 13 层货板。切块检索等于把每层货板单独拍照、照片里经常没有价签——照片上的「48,964.89」到底是每斤还是每 100g，光看照片永远不知道。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>③ 切块到底毁掉了什么：两个百分比的故事</h3>
+    <p>作者把后果变成两个可测量的指标：含数字表格行的块，若块内<b>没有任何单位声明</b>则称 <b>unitless</b>；若<b>没有任何财年列头</b>则称 <b>yearless</b>。然后拿两种切块器在 5 档块大小下测量——普通定长切块，以及一个作为「钢人论证」的表感知切块器（它向后最多扫描 200 行，把管辖单位和财年的表头搬进每个块）（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §4.3 表 2、附录 B.3</a>）。拖动滑杆看真实测量值：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 块大小 vs 上下文丢失率（论文表 2 实测数据）</div>
+      <canvas class="chart" id="chunk-canvas"></canvas>
+      <div class="slider-row">
+        <label>目标块大小（字符）</label>
+        <input type="range" id="chunk-size" min="0" max="4" step="1" value="2">
+        <output id="chunk-sizev">2,000</output>
+      </div>
+      <div class="demo-readout" id="chunk-result"></div>
+      <div class="caption">数据直接取自论文表 2（5 档块大小 × 2 种切块器 × 2 项指标）。红 = 无单位声明的数值块占比；黄 = 无财年表头的占比。注意黄线在表感知切块器下几乎拉平——这是本文的承重观察。</div>
+    </div>
+    <p>三个读数都很重要（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §4.3</a>）：<b>第一</b>，朴素切块在小块下崩溃——800 字符时 67.4% 的数值块没有单位声明；而「小块更精准」恰是检索调优的常规建议，在这里它毁掉的正是让数字可解读的上下文。<b>第二</b>，修复有效且便宜：表感知切块在 2,000 字符时把 unitless 从 18.0% 压到 <b>0.3%</b>（60 倍改善）。<b>第三——承重墙</b>：yearless 残差不响应调参，在 5 倍块大小范围内只在 <b>27.2%～30.1%</b> 之间浮动（极差 2.9 个百分点），因为这份文档里财年常常只对跨多页的表声明一次。<b>在问题已知之前钉死的分区，没有任何办法把它找回来；而一个看到证据位置后再决定读哪一段的智能体，可以。</b></p>
+    <div class="keyfact">作者在所有检索基线中都使用表感知切块器：「输给一个因可修复原因而失败的基线什么都证明不了，我们宁愿反驳这个范式的最强版本。」（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §4.3</a>）</div>
+  </div>
+</section>
+
+<!-- ============ CH2 核心方法 ============ -->
+<section class="chapter" id="ch2">
+  <div class="chap-head"><span class="chap-num">第 2 章</span><h2>核心方法：READ，不建索引的检索接口</h2></div>
+  <p class="oneline">READ = Reliable Embedding-free Agentic Document-search：没有嵌入模型、没有向量索引、没有学习组件，服务器的全部状态就是文档文本。</p>
+
+  <div class="card fade-up">
+    <h3>🔧 三个确定性操作：按「区间」寻址，而不是按「块」寻址</h3>
+    <p>READ 通过 <a class="src" href="https://www.anthropic.com/news/model-context-protocol" target="_blank" rel="noopener">Model Context Protocol（MCP）</a> 把原始文档暴露为三个操作类（实现为四个只读工具），由智能体闭环组合（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §3、§5.1、附录 B.1</a>）：</p>
+    <table class="tbl">
+      <tr><th>操作</th><th>干什么</th><th>对应工具</th></tr>
+      <tr><td><b>SEARCH(p)</b> 归一化词法搜索</td><td>返回所有匹配行：行号 + 结构位置</td><td><code>grep</code></td></tr>
+      <tr><td><b>OUTLINE()</b> 结构导航</td><td>返回报表/节标题及其行号、页码范围</td><td><code>list</code> + <code>outline</code></td></tr>
+      <tr><td><b>READ(a, b)</b> 有界区间读取</td><td>返回第 a 到 b 行原文（单次上限 400 行）</td><td><code>read</code></td></tr>
+    </table>
+    <p style="margin-top:14px">关键区别在于寻址方式：top-k 是<b>块寻址</b>——分区在离线时钉死；READ 是<b>区间寻址</b>——智能体<b>看到证据在哪里之后</b>才选择 [a, b]，所以它可以向上扩展区间、把管辖单位表头包进来。这正是上一章那个 27～30% 残差的解法（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §3</a>）。</p>
+    <p>每个操作都是文档的纯函数：重放轨迹 τ 必然得到相同结果，任何第三方都能逐步复核证据链。论文借此定义 <b>grounded</b>：答案里每个数字都逐字出现在轨迹 surfaced 的某个区间里——这是<b>机器可检查</b>的；而 top-k 那边，你只能验证答案串出现在检出的块里，却无从质询「为什么与之竞争的块被排除了」（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §3、§6.3</a>）。</p>
+    <div class="analogy">top-k 像证人只说「我大致记得在第 90 块附近看到过」；READ 像审计工作底稿——每个数字都钉着「第 385 行」，复核员翻到那一行就能对。财务场景要的不是「大概对」，是<b>可回放</b>。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🧹 为什么必须做「归一化匹配」：PDF 转换器的暗伤</h3>
+    <p>此前说「让智能体 grep 语料」的工作，测的都是干净文本。本文测的是 <b>PDF 转换器的输出</b>，并量化了暗伤：4,685 行多出虚假前导空列；32,404 个强调标记焊死在 token 上；1,719 个词被切到两个单元格；1,032 行重复的页眉；报表编号有 24 种写法（654 处提及）。最要命的是 <b>14,269 个数字带千分位分组</b>——而智能体算出或记住一个数时，写出来是不带逗号的 <code>48964.89</code>，原文印的却是 <code>48,964.89</code>，字面 grep 必挂（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §5.2</a>）。</p>
+    <p>READ 的 grep 因此针对每行文本匹配<b>两个「影子形态」</b>：一个把强调标记和单元格边界换成空格（spaced），一个把分隔符与千分位逗号全部删掉（squashed）——命中任一即算匹配，但返回原始行号，好让结果链进 read（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §5.2、附录 B.2</a>）。作者用 12 个真实探针测量了归一化到底改变了什么，诚实地报告了一个比自己预想更窄的机制：</p>
+    <table class="tbl">
+      <tr><th>查询</th><th>类型</th><th>归一化</th><th>字面匹配</th></tr>
+      <tr><td><code>48964.89</code></td><td>不带分组的数字</td><td>✓</td><td class="hl">✗ ← 关键</td></tr>
+      <tr><td><code>Statement Subject</code></td><td>被切到两个单元格的词</td><td>✓</td><td class="hl">✗</td></tr>
+      <tr><td><code>48,964.89</code></td><td>按原样印刷的数字</td><td>✓</td><td>✓</td></tr>
+      <tr><td><code>Fiscal Deficit</code> / 小写 / 报表编号</td><td>大小写、强调包裹、标点</td><td>✓</td><td>✓</td></tr>
+    </table>
+    <div class="keyfact">12 个探针里归一化只改变 2 个的结果——作者原本假设「报表编号标点」也重要，实测并不重要，于是只报告更窄的真实机制，并保留 naive-grep 作为隔离该机制的消融（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §5.2 表 3</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>⚠️ 转换天花板：有些错，任何检索器都救不回来</h3>
+    <p>报表 No. 18 印着利率 <b>11.00%</b> 和 10.00%，转换器把数字放进一个单元格、小数点放进下一行：完美检索到这两行的智能体，读到的是 <b>1100</b>。同样的病出现在报表 No. 2：26,837.65 crore 被拆成一行数字串 <code>2683765</code> 和下一行的分隔符 <code>,.</code>——形态完好的数字在语料里<b>根本不存在</b>（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §5.3</a>）。全文档量化（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文表 4</a>）：共 <b>483 处</b>转换损伤，波及 440 个表格行（2.6%）、381 个数值行（3.0%），其中 <b>11 行（0.09%）带着 outright 量级错误</b>——罕见但高度集中（15 处小数点脱落几乎全部躺在两张报表里）。</p>
+    <div class="analogy">这是「天花板」不是「干扰项」：没有检索器——稠密的、稀疏的、智能体的——能找回一个和它的数字不在同一个单元格里的小数点。在这类题上测准确率，测的是转换器而不是检索接口。所以作者给它们单设一类 <b>conversion limited</b>，单独报账，不记在任何系统的头上。</div>
+    <div class="keyfact">顺带一个方法论提醒：报表 No. 18 以 lakh 计、多数汇总表以 crore 计，同一金额「10,597.61 lakh」和「105.98 crore」都对——评分器必须先归一化单位，否则会把正确答案判错（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §5.3、§6.3</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>▶ 看一遍真实轨迹：8 步操作，算出书里没印的答案</h3>
+    <p>附录 E 记录了动机问题上两个系统的完整轨迹（同一文档、同一 backbone）。点播放，逐步看 READ 如何按名字定位报表、两次窄搜索没拿够就退而看大纲、再回到搜索、最后两次显式加宽读取区间——<b>包括那一步冗余的重复 grep：失败模式是可见的，这正是重点</b>（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文附录 E</a>）。</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 同一道题的两条轨迹（附录 E 实录）</div>
+      <div class="btn-row" style="margin-top:0;margin-bottom:14px">
+        <button class="btn" id="traj-play">▶ 播放 READ 轨迹</button>
+        <button class="btn ghost" id="traj-dense">对比：dense 的一发轨迹</button>
+      </div>
+      <div id="traj-read">
+        <div class="traj-step" id="ts0"><span class="no">1</span><div><code>grep("Statement of Receipts and Disbursements")</code><div class="res">→ 5 处命中：先按名字找到报表</div></div></div>
+        <div class="traj-step" id="ts1"><span class="no">2</span><div><code>grep("Fiscal Deficit")</code><div class="res">→ 2 处命中，但上下文不够</div></div></div>
+        <div class="traj-step" id="ts2"><span class="no">3</span><div><code>outline()</code><div class="res">→ 190 个标题：没拿到有用的，但确定了方位</div></div></div>
+        <div class="traj-step" id="ts3"><span class="no">4</span><div><code>grep("Fiscal Deficit")</code><div class="res">→ 2 处命中（冗余的一步——轨迹里的浪费是可见的）</div></div></div>
+        <div class="traj-step" id="ts4"><span class="no">5</span><div><code>grep("Revenue Surplus")</code><div class="res">→ 5 处命中</div></div></div>
+        <div class="traj-step" id="ts5"><span class="no">6</span><div><code>grep("STATEMENT No. 2")</code><div class="res">→ 17 处命中：锁定报表正文</div></div></div>
+        <div class="traj-step" id="ts6"><span class="no">7</span><div><code>read(lines 365–450)</code><div class="res">→ 86 行：读到 Fiscal Deficit = 48,964.89（连同管辖它的单位表头）</div></div></div>
+        <div class="traj-step" id="ts7"><span class="no">8</span><div><code>read(lines 1023–1120)</code><div class="res">→ 98 行：读到 Revenue Surplus = 18,942.94</div></div></div>
+        <div class="traj-answer" id="traj-ans">✅ 答案：48,964.89 − 18,942.94 = <b>Rs. 30,021.95 crore</b>（这个差值在全书任何地方都没印出来）· 8 次操作 · 49 秒 · $0.097 · 判正确，每个数字都带行号可手工复核</div>
+      </div>
+      <div id="traj-densebox" style="display:none">
+        <div class="traj-step on"><span class="no">1</span><div><code>dense retrieve(k=8)</code><div class="res">→ 8 个块：只有 Revenue Surplus，没有 Fiscal Deficit</div></div></div>
+        <div class="traj-answer bad show">❌ 「所给摘录包含 2024–25 的 Revenue Surplus（Rs. 18,942.94 crore），但不含 Fiscal Deficit，无法计算差值。」· 1 次检索 · 11 秒 · $0.021 · 判错误——生成器的行为完全正确，是分区在查询前钉死，两个操作数注定不会一起到达</div>
+      </div>
+      <div class="caption">轨迹文本逐字摘自论文附录 E.1 / E.2。READ 贵 4.6 倍、慢 4.5 倍——「这是这笔交易诚实的形状」（作者原话）。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CH3 实验结果 ============ -->
+<section class="chapter" id="ch3">
+  <div class="chap-head"><span class="chap-num">第 3 章</span><h2>实验结果：赢了多少，以及诚实地说没赢什么</h2></div>
+  <p class="oneline">51 道经机械校验的题、三路独立评分信号、配对统计检验——然后作者把对自己不利的数字也一张张摆了出来。</p>
+
+  <div class="card fade-up">
+    <h3>🧪 评测协议：让「流利但没根据」的答案过不了关</h3>
+    <p>全部系统共享一个 backbone（gemini-2.5-pro）、一种答案格式、一套 token/成本/延迟记账，所以系统间的差异就是<b>接口</b>的差异。51 道题分六类：单数字查找（24）、跨报表算术（9）、结构导航（6）、多行聚合（5）、不可回答探针（5）、转换受限（2）。金标答案由作者转写后<b>机械校验</b>：每个数字必须出现在声明金标行的一行之内；宽表的列映射用表自身的算术恒等式验证；算术题还要全库搜索确认答案没被印出来（否则它是伪装成算术的查找）（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §6.2、附录 C</a>）。评分用三路独立信号：<b>精确数字比对</b>（归一化印度分组、括号负数、lakh/crore，0.5% 相对容差）、<b>LLM 评审</b>（手握参考答案、跨系统固定）、<b>groundedness</b>（答案里每个数字是否都出现在系统实际检出的文本里——纯机械，流利但没根据的答案过不了）。比较是配对的：McNemar 精确检验 + bootstrap 置信区间 + Holm 校正，并报告基准的<b>最小可分辨差</b>（51 题下约 27.7 pp），好让「不显著」被如实读作「功效不足」而非「无差异」（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §6.3</a>）。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🏆 主结果：58.8% vs 15.7%，差距活在接口里</h3>
+    <p>51 题准确率（Wilson 95% 区间见论文表 7）：</p>
+    <div class="bar-row"><span>READ（无大纲消融）</span><div class="scorebar"><i data-w="66.7" style="background:linear-gradient(90deg,#7f9ee8,#a55eea)"></i></div><b>66.7%</b></div>
+    <div class="bar-row"><span>READ（naive-grep 消融）</span><div class="scorebar"><i data-w="66.7" style="background:linear-gradient(90deg,#7f9ee8,#a55eea)"></i></div><b>66.7%</b></div>
+    <div class="bar-row"><span>READ（本文）</span><div class="scorebar"><i data-w="58.8" style="background:linear-gradient(90deg,#1783ff,#2bc48a)"></i></div><b>58.8%</b></div>
+    <div class="bar-row"><span>BM25 top-k</span><div class="scorebar"><i data-w="51.0" style="background:linear-gradient(90deg,#f7b731,#ff9f43)"></i></div><b>51.0%</b></div>
+    <div class="bar-row"><span>dense 调优上限 (k=16)</span><div class="scorebar"><i data-w="35.3" style="background:linear-gradient(90deg,#b8c4d8,#8fa0bd)"></i></div><b>35.3%</b></div>
+    <div class="bar-row"><span>hybrid + 重排</span><div class="scorebar"><i data-w="29.4" style="background:linear-gradient(90deg,#b8c4d8,#8fa0bd)"></i></div><b>29.4%</b></div>
+    <div class="bar-row"><span>agentic RAG（top-k 工具）</span><div class="scorebar"><i data-w="27.5" style="background:linear-gradient(90deg,#ff9f43,#ff6b6b)"></i></div><b>27.5%</b></div>
+    <div class="bar-row"><span>dense top-k (k=8)</span><div class="scorebar"><i data-w="15.7" style="background:linear-gradient(90deg,#ff9f43,#ff6b6b)"></i></div><b>15.7%</b></div>
+    <p style="margin-top:16px">配对比较（正差有利于 READ，p 经 Holm 校正）（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文表 8</a>）：</p>
+    <table class="tbl">
+      <tr><th>对手</th><th>Δ (pp)</th><th>95% CI</th><th>p<sub>Holm</sub></th></tr>
+      <tr><td>dense top-k</td><td class="hl">+43.1</td><td>[27.5, 56.9]</td><td>2×10⁻⁵ *</td></tr>
+      <tr><td>agentic RAG</td><td class="hl">+31.4</td><td>[13.7, 49.0]</td><td>0.012 *</td></tr>
+      <tr><td>hybrid</td><td class="hl">+29.4</td><td>[11.8, 47.1]</td><td>0.016 *</td></tr>
+      <tr><td>BM25</td><td>+7.8</td><td>[−9.8, 25.5]</td><td>1.00（不显著）</td></tr>
+      <tr><td>两个消融</td><td>−7.8</td><td>跨零</td><td>1.00（不显著）</td></tr>
+    </table>
+    <div class="keyfact"><b>最有信息量的对照是 agentic RAG</b>：同一个智能体、同一个 backbone、同样的轮次预算，只把工具换成 top-k 向量检索——只得 27.5%，落后 READ 31.4 个百分点。<b>「能迭代」解释不了差距，增益属于接口，不属于循环。</b>（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §8.1</a>）</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔬 差距从哪来：稠密检索「弱得很有规律」</h3>
+    <p>按题型拆开看（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文表 9、图 4</a>）：差距集中在<b>单数字查找</b>——READ 70.8% vs dense 12.5%。这正是数千个近重复数字同场竞技的题型；而在答案由散文和标题承载的<b>导航题</b>上，各家相差无几。<b>稠密检索不是均匀弱，它弱的地方恰好是文档数字化的地方。</b>失败分类账（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文表 10</a>）更直白：</p>
+    <table class="tbl">
+      <tr><th>系统</th><th>证据从未进上下文</th><th>可答却弃答</th><th>答案无根据</th></tr>
+      <tr><td>READ</td><td class="hl">4</td><td class="hl">1</td><td>11</td></tr>
+      <tr><td>dense top-k</td><td>13</td><td>11</td><td>14</td></tr>
+      <tr><td>hybrid</td><td>15</td><td>12</td><td>5</td></tr>
+      <tr><td>agentic RAG</td><td>5</td><td>8</td><td class="hl">21（全场最差）</td></tr>
+    </table>
+    <p style="margin-top:14px">dense 在整个基准上只有 <b>4.3%</b> 的题把金标页送进了上下文（READ 是 41.3%）；「检索拒绝送货」不是奇闻而是常态。agentic RAG 则是反面教材：它几乎总能检出点什么（只有 5 题从未检出），却产出 21 个无根据答案——<b>一个不停查询向量索引的智能体，会积累貌似合理的上下文，然后推理越过证据支撑的边界</b>（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §8.3</a>）。dense 的诚实上限也值得记住：把 k 加到 16 能调到 35.3%（机制正是「多拿几块、靠运气覆盖表头」），成本 +41%，仍落后 READ 23.5 pp（p<sub>Holm</sub>=0.017）；扫过的 6 种配置全部显著落败（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §8.2、附录 D 表 13/14</a>）。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🪞 诚实面：BM25 没被打败，READ 也不是最 grounded 的</h3>
+    <p>论文罕见地把「证据不支持更强主张」写成完整一节（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §8.2、§8.5</a>）：</p>
+    <table class="tbl">
+      <tr><th>不利事实</th><th>数字</th><th>作者的读法</th></tr>
+      <tr><td><b>BM25 没被打败</b></td><td>51.0%，仅低 7.8 pp，CI 跨零（p=1.00）；22 题分歧中 13 偏 READ、9 偏 BM25，接近抛硬币</td><td>证据分开了「基于嵌入」与「无嵌入」，分不开两个无嵌入系统；51 题最小可分辨差 27.7 pp，这是功效不足的 null，不是等价证明</td></tr>
+      <tr><td><b>两个消融都高于 READ</b></td><td>去大纲、换 naive grep 各得 66.7% vs 58.8%（p=1.00）</td><td>不显著，但不能宣称完整操作集是最优配置，只能说不显著更差</td></tr>
+      <tr><td><b>READ 不是最 grounded</b></td><td>58.0%，落后 BM25 67.3%、hybrid 72.0%</td><td>读得越多，越有机会说出检出文本里没有的数——这一点直接戳可解释性论证，照报</td></tr>
+      <tr><td><b>成本最高</b></td><td>$0.058/题、31.4 秒、4.8 次工具调用；BM25 便宜 2/3</td><td>READ 的立论在失败分类账和可审计性上，不在成本-准确率前沿上</td></tr>
+    </table>
+    <div class="analogy">这场评测像一场拳击赛后双方一起看录像：作者把对手的重拳（BM25 打平、消融反超、groundedness 落后）逐帧放给观众看——因为论文真正想证的不是「智能体搜索赢了」，而是那个更窄、也更经得起检验的命题：<b>在这份文档上，向量索引不是多余，而是正在造成伤害的部件。</b></div>
+  </div>
+</section>
+
+<!-- ============ CH4 局限与意义 ============ -->
+<section class="chapter" id="ch4">
+  <div class="chap-head"><span class="chap-num">第 4 章</span><h2>局限与意义：这个结论的边界在哪</h2></div>
+  <p class="oneline">作者把限制写得和结果一样细——读完你知道这个结论能信到哪一步。</p>
+
+  <div class="card fade-up">
+    <h3>⚖️ 局限：一份文档、一个 backbone、51 道题</h3>
+    <ul style="margin:0 0 12px 20px;color:#2c3a4e;line-height:2">
+      <li><b>单点测量</b>：所有数字来自一份财务报告、一个模型。READ 预设了一个会规划搜索的强模型，这条能力在哪里失效没有测量（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §9</a>）。</li>
+      <li><b>基准由被测系统的作者构建，且增长过程不盲</b>：早期 25 题版本没有任何系统间差异；两批新题是发现覆盖缺陷后补的，而缺陷恰好落在切块检索弱的地方。作者自陈：n=51 的结果「是我们寻找并找到的，不是偶然撞见的」。他们公开各阶段 dense 准确率的漂移（24.0% → 16.7% → 15.7%）让过程可见（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §9</a>）。</li>
+      <li><b>单个转换器</b>：转换天花板是 pymupdf4llm 在这份 PDF 上的性质，不是普适常数；作者主张的是「天花板存在且必须被测量」（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §9</a>）。</li>
+      <li><b>成本</b>：READ 的单题成本可变且可大幅超过固定 top-k 预算——在高风险场景这是对的交易，在高流量消费搜索里未必（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §9</a>）。</li>
+    </ul>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🧭 意义：不是「嵌入过时了」，而是「换了一种检索原语」</h3>
+    <p>作者明确划出「不应被读成」的边界：不是说嵌入过时，也不是说稠密检索普遍弱——BEIR 式基准测的是真实的东西（<a class="src" href="https://arxiv.org/abs/2104.08663" target="_blank" rel="noopener">BEIR</a>）。主张更窄：<b>对于意义依赖「继承式版面上下文」的文档（财务报表、审计报告、监管申报），在查询已知之前就钉死的分区是错误的原语。</b>反过来，当问题与证据缺少共同词面时，稠密检索的复述容忍度可能仍是优势，混合设计依然合理（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §9、§10</a>）。</p>
+    <p>这项工作与近期「让智能体直接操作语料」的路线互相印证：grep 在对话记忆 QA 上击败向量检索（<a class="src" href="https://arxiv.org/abs/2605.15184" target="_blank" rel="noopener">Sen et al. 2026</a>）、用终端原语替代检索 API 同时提升准确率并降低成本（<a class="src" href="https://arxiv.org/abs/2605.05242" target="_blank" rel="noopener">Li et al. 2026</a>）；本文的差异在于瞄准<b>单份、超长、密集表格化</b>的文档，任务要求数字级精确，且把「轨迹即审计日志」提到与准确率并列的位置（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §2.4</a>）。</p>
+    <div class="keyfact">论文结尾的话值得抄下来：随着模型成为有能力的智能体，检索问题正从「哪个检索器排得最好」转向「哪个接口能让智能体看见、核实、并交代证据」。对长的结构化文档，作者给出的答案是最简单的一个——<b>让模型去读</b>（<a class="src" href="https://arxiv.org/pdf/2608.06305" target="_blank" rel="noopener">论文 §10</a>）。</div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    本页基于 arXiv 论文《Beyond Top-K: Replacing Black-Box Retrieval with Interpretable Agentic Operations》（arXiv:2608.06305，2026-08-07 preprint）整理制作 · 2026-08<br>
+    通俗类比与交互动画仅用于帮助理解；动画数据直接取自论文表 2 与附录 E 实录轨迹，所有实验数字均摘自论文表 1–14，技术细节以
+    <a class="src-inline" href="https://arxiv.org/abs/2608.06305" target="_blank" rel="noopener">原文</a> 为准 · 文中所有标注 ↗ 的链接均指向原始出处
+  </div>
+</footer>
+
+<script>
+/* ============ 入场动画 ============ */
+const io = new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('show');
+    e.target.querySelectorAll('.scorebar i').forEach(b=>b.style.width=b.dataset.w+'%');
+  }
+}),{threshold:.15});
+document.querySelectorAll('.fade-up').forEach(el=>io.observe(el));
+
+/* ============ 工具：高清 canvas ============ */
+function setupCanvas(id){
+  const cv=document.getElementById(id);
+  const dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx:ctx,W:W,H:H};
+}
+
+/* ============ 第1章: 块大小 vs 上下文丢失率（论文表 2 数据） ============ */
+const CHUNK_SIZES=[800,1500,2000,2500,4000];
+/* [定长 unitless, 定长 yearless, 表感知 unitless, 表感知 yearless] */
+const CHUNK_DATA=[
+  [67.4,73.8,14.7,30.1],
+  [36.3,55.8, 1.0,28.7],
+  [18.0,45.9, 0.3,28.9],
+  [11.6,43.5, 0.2,28.3],
+  [ 5.4,40.5, 0.4,27.2]
+];
+function chunkDemo(){
+  const idx=parseInt(document.getElementById('chunk-size').value,10);
+  const size=CHUNK_SIZES[idx];
+  document.getElementById('chunk-sizev').textContent=size.toLocaleString();
+  const d=CHUNK_DATA[idx];
+  const o=setupCanvas('chunk-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=44,padR=16,padT=30,padB=46;
+  const plotW=W-padL-padR,plotH=H-padT-padB;
+  const YMAX=80;
+  /* 网格与 y 轴刻度 */
+  ctx.strokeStyle='#22355f';ctx.fillStyle='#7f92b8';
+  ctx.font='11px sans-serif';ctx.textAlign='right';ctx.lineWidth=1;
+  for(let g=0;g<=YMAX;g+=20){
+    const y=padT+plotH*(1-g/YMAX);
+    ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();
+    ctx.fillText(g+'%',padL-8,y+4);
+  }
+  const groups=[['定长切块',d[0],d[1]],['表感知切块（钢人）',d[2],d[3]]];
+  const colors=['#ff6b6b','#f7b731'];
+  const labels=['无单位声明','无财年表头'];
+  const gw=plotW/2;
+  groups.forEach((g,gi)=>{
+    const cx0=padL+gw*gi+gw*0.18;
+    const bw=gw*0.22;
+    [g[1],g[2]].forEach((v,bi)=>{
+      const x=cx0+bi*(bw+gw*0.08);
+      const h=plotH*v/YMAX;
+      const y=padT+plotH-h;
+      ctx.fillStyle=colors[bi];
+      ctx.beginPath();
+      if(ctx.roundRect)ctx.roundRect(x,y,bw,h,[6,6,0,0]);else ctx.rect(x,y,bw,h);
+      ctx.fill();
+      ctx.fillStyle='#eaf1ff';ctx.font='bold 13px sans-serif';ctx.textAlign='center';
+      ctx.fillText(v.toFixed(1)+'%',x+bw/2,y-7);
+      ctx.fillStyle=colors[bi];ctx.font='11px sans-serif';
+      ctx.fillText(labels[bi],x+bw/2,H-padB+16);
+    });
+    ctx.fillStyle='#9db4dd';ctx.font='bold 13px sans-serif';ctx.textAlign='center';
+    ctx.fillText(g[0],padL+gw*gi+gw/2,H-8);
+  });
+  /* 结论读数：口径与论文 §4.3 文字一致 */
+  let msg;
+  if(idx===0){
+    msg='800 字符的小块是灾难：定长切块下 <b style="color:#ff6b6b">67.4%</b> 的数值块没有单位声明——「小块更精准」的常规建议在这里恰好毁掉了让数字可解读的上下文。';
+  }else if(idx===2){
+    msg='2,000 字符：表感知切块把 unitless 从 18.0% 压到 <b style="color:#ff6b6b">0.3%</b>（60 倍改善），但 <b style="color:#ffd97a">28.9%</b> 仍无财年表头。';
+  }else{
+    msg='当前块大小 '+size.toLocaleString()+' 字符：表感知切块几乎消灭 unitless（<b style="color:#ff6b6b">'+d[2].toFixed(1)+'%</b>），yearless 停在 <b style="color:#ffd97a">'+d[3].toFixed(1)+'%</b>。';
+  }
+  msg+='<br>五档连起来看：yearless 残差在 27.2%～30.1% 之间几乎拉平（极差 2.9 pp）——<b>它不响应调参，因为财年只对跨多页的表声明一次；查询前钉死的分区无法找回它。</b>';
+  document.getElementById('chunk-result').innerHTML=msg;
+}
+document.getElementById('chunk-size').addEventListener('input',chunkDemo);
+window.addEventListener('resize',chunkDemo);
+chunkDemo();
+
+/* ============ 第2章: READ 轨迹播放器（附录 E 实录） ============ */
+const TRAJ_N=8;
+let trajTimer=null;
+function trajReset(){
+  if(trajTimer){clearTimeout(trajTimer);trajTimer=null;}
+  for(let i=0;i<TRAJ_N;i++)document.getElementById('ts'+i).classList.remove('on');
+  document.getElementById('traj-ans').classList.remove('show');
+}
+function trajPlay(){
+  trajReset();
+  document.getElementById('traj-densebox').style.display='none';
+  document.getElementById('traj-read').style.display='block';
+  let i=0;
+  function step(){
+    if(i<TRAJ_N){
+      document.getElementById('ts'+i).classList.add('on');
+      document.getElementById('ts'+i).scrollIntoView({block:'nearest',behavior:'smooth'});
+      i++;trajTimer=setTimeout(step,750);
+    }else{
+      document.getElementById('traj-ans').classList.add('show');
+      document.getElementById('traj-ans').scrollIntoView({block:'nearest',behavior:'smooth'});
+      trajTimer=null;
+    }
+  }
+  step();
+}
+document.getElementById('traj-play').addEventListener('click',trajPlay);
+document.getElementById('traj-dense').addEventListener('click',function(){
+  trajReset();
+  document.getElementById('traj-read').style.display='none';
+  document.getElementById('traj-densebox').style.display='block';
+  this.classList.add('active');
+  setTimeout(()=>document.getElementById('traj-dense').classList.remove('active'),600);
+});
+</script>
+</body>
+</html>

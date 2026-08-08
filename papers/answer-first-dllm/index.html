@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>先给答案，后补推理：扩散大模型「任意顺序生成」的翻车现场</title>
+<style>
+  :root{
+    --blue:#1783ff; --blue-d:#0b5cc4; --red:#ff6b6b; --amber:#f7b731;
+    --purple:#a55eea; --green:#2bc48a; --ink:#1b2430; --ink-soft:#48566a;
+    --bg:#f6f8fc; --card:#ffffff; --line:#e4eaf3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.8}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+
+  /* ===== Hero ===== */
+  .hero{background:linear-gradient(160deg,#0a1a3f 0%,#103a8c 55%,#1783ff 100%);
+    color:#fff;padding:72px 0 56px;position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;
+    border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);
+    padding:4px 14px;border-radius:99px;font-size:13px;letter-spacing:1px;margin-bottom:18px}
+  .hero h1{font-size:clamp(26px,4.6vw,44px);line-height:1.3;margin-bottom:14px}
+  .hero p.sub{font-size:clamp(14px,1.8vw,18px);opacity:.88;max-width:860px}
+  .hero .stats{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
+  .stat{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);
+    border-radius:16px;padding:14px 22px;min-width:150px}
+  .stat b{display:block;font-size:26px;font-weight:800}
+  .stat span{font-size:13px;opacity:.85}
+
+  /* ===== Nav ===== */
+  nav.toc{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line)}
+  nav.toc .inner{display:flex;gap:6px;overflow-x:auto;padding:10px 22px;max-width:1060px;margin:0 auto}
+  nav.toc a{white-space:nowrap;font-size:13.5px;color:var(--ink-soft);text-decoration:none;
+    padding:6px 12px;border-radius:99px;transition:.2s}
+  nav.toc a:hover{background:#eaf2ff;color:var(--blue-d)}
+
+  /* ===== Sections ===== */
+  section.chapter{padding:56px 0 8px}
+  .chap-head{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+  .chap-num{font-size:14px;font-weight:800;color:#fff;background:var(--blue);
+    border-radius:10px;padding:3px 12px;letter-spacing:1px}
+  .chap-head h2{font-size:clamp(21px,3vw,30px)}
+  .oneline{color:var(--blue-d);font-weight:600;margin:4px 0 22px;font-size:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:0 2px 14px rgba(20,50,110,.05)}
+  .card h3{font-size:18px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .card p{margin-bottom:12px;color:#2c3a4e}
+  .analogy{background:linear-gradient(135deg,#fff8e6,#fff3d0);border:1px solid #f3d98a;
+    border-radius:14px;padding:16px 20px;margin:14px 0;font-size:15px}
+  .analogy::before{content:"💡 打个比方：";font-weight:700;color:#a97b00}
+  .keyfact{position:relative;background:#eef5ff;border-left:4px solid var(--blue);
+    border-radius:0 12px 12px 0;padding:12px 16px 12px 44px;margin:14px 0;font-size:14.5px}
+  .keyfact::before{content:"📌";position:absolute;left:16px;top:12px;line-height:1.8}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .demo-box{background:#0e1830;border-radius:18px;padding:22px;margin:16px 0;color:#dfe8ff;
+    position:relative;overflow:hidden}
+  .demo-title{color:#8fb8ff;font-size:13px;letter-spacing:2px;font-weight:700;margin-bottom:14px;text-transform:uppercase}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:99px;padding:9px 22px;font-size:14px;
+    cursor:pointer;font-weight:600;transition:.2s;box-shadow:0 4px 14px rgba(23,131,255,.35)}
+  .btn:hover{background:var(--blue-d);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.4);box-shadow:none;color:#dfe8ff}
+  .btn.ghost.active{background:rgba(23,131,255,.22);border-color:#6db4ff;color:#fff}
+  .btn-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:14.5px;background:#fff;border-radius:12px;overflow:hidden}
+  table.tbl th{background:#103a8c;color:#fff;padding:10px 12px;text-align:left;font-weight:600}
+  table.tbl td{padding:10px 12px;border-bottom:1px solid var(--line)}
+  table.tbl tr:last-child td{border-bottom:none}
+  table.tbl tr:nth-child(even) td{background:#f7faff}
+  .hl{color:var(--blue-d);font-weight:700}
+
+  /* ===== 公式（纯 HTML/CSS，无 MathJax）===== */
+  .formula{background:#0e1830;border-radius:14px;padding:20px 22px;margin:14px 0;color:#eaf1ff;
+    font-size:clamp(15px,2.2vw,19px);text-align:center;overflow-x:auto;line-height:2;
+    font-family:"STIX Two Math","Cambria Math",Georgia,serif}
+  .formula .op{color:#8fb8ff}
+  .formula .cond{font-size:.82em;color:#9db4dd}
+  .frac{display:inline-flex;flex-direction:column;vertical-align:middle;margin:0 2px;line-height:1.4}
+  .frac .num{border-bottom:1.5px solid currentColor;padding:0 7px}
+  .frac .den{padding:0 7px}
+  .fnote{font-size:13px;color:#7f92b8;margin-top:10px;text-align:center;line-height:1.7;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif}
+  .formula var{font-style:italic}
+
+  /* ===== 结果条形图 ===== */
+  .scorebar{height:10px;border-radius:99px;background:#e7edf6;overflow:hidden;margin:4px 0 12px}
+  .scorebar i{display:block;height:100%;border-radius:99px;width:0;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+  .bar-row{display:grid;grid-template-columns:170px 1fr 64px;gap:12px;align-items:center;margin-bottom:10px;font-size:14px}
+  @media(max-width:640px){.bar-row{grid-template-columns:110px 1fr 56px}}
+  .bar-row b{text-align:right;font-variant-numeric:tabular-nums}
+
+  /* ===== 滑杆 ===== */
+  .slider-row{display:flex;align-items:center;gap:14px;margin:14px 0 6px;flex-wrap:wrap}
+  .slider-row label{font-size:14px;color:#9db4dd;white-space:nowrap}
+  .slider-row input[type=range]{flex:1;min-width:180px;accent-color:var(--amber)}
+  .slider-row output{color:#ffd97a;font-weight:700;min-width:56px;text-align:right;font-variant-numeric:tabular-nums}
+  canvas.chart{width:100%;height:260px;display:block;border-radius:10px;background:#0a1326}
+  .demo-readout{margin-top:14px;font-size:14.5px;line-height:1.8}
+  .caption{font-size:12.5px;color:#7f92b8;margin-top:8px;line-height:1.6}
+
+  /* ===== 来源标注 ===== */
+  .src{color:var(--blue-d);text-decoration:none;font-size:.8em;font-weight:600;
+    border-bottom:1px dashed #9db8e8;padding:0 1px;white-space:nowrap}
+  .src:hover{color:var(--blue);border-bottom-style:solid;background:#eaf2ff;border-radius:4px}
+  .src::after{content:"↗";font-size:.85em;margin-left:1px}
+  .demo-box .src, .formula .src{color:#8fb8ff;border-bottom-color:#3a5078}
+  .demo-box .src:hover{color:#cfe2ff;background:rgba(23,131,255,.15)}
+  .src-inline{color:inherit;border-bottom:1px dashed #9db8e8;text-decoration:none}
+  .src-inline:hover{color:var(--blue)}
+
+  footer{margin-top:64px;padding:34px 0 46px;color:#7f8ca3;font-size:13px;text-align:center;
+    border-top:1px solid var(--line);line-height:2}
+  .fade-up{opacity:0;transform:translateY(26px);transition:all .7s cubic-bezier(.3,.7,.3,1)}
+  .fade-up.show{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <span class="tag">arXiv 论文交互解读 · 推理与思维链</span>
+    <h1>先给答案，后补推理：扩散大模型「任意顺序生成」的翻车现场</h1>
+    <p class="sub">掩码扩散语言模型（dLLM）最大的卖点是「可以按任意顺序敲定 token」。首尔国立大学团队给 LLaDA-8B 的解码过程装上「行车记录仪」后发现：在数学推理任务上，正是这份自由让模型先把最终答案写死、再倒推着补一段推理——甚至干脆只写答案。病因不在模型「想不想收尾」，而在采样器「能碰多远的位置」；加一个单旋钮的解码约束即可免训练治好。</p>
+    <div class="stats">
+      <div class="stat"><b>90.2%</b><span>512 格画布下纯扩散解码「只给答案」的塌缩率</span></div>
+      <div class="stat"><b>t*≈0.15–0.24</b><span>答案被写死的时刻（推理 token 中位时刻 ≈0.505）</span></div>
+      <div class="stat"><b>+34.8 pp</b><span>提示词×解码器交互效应：思维链只在有序提交下有用</span></div>
+      <div class="stat"><b>4×</b><span>前沿门控保住近自回归精度的并行加速比</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="toc"><div class="inner">
+  <a href="#ch0">🧩 热身：扩散 LLM 的「任意顺序」</a>
+  <a href="#ch1">📐 概念基础：提交、EOS 与可达性</a>
+  <a href="#ch2">💥 病理一：只给答案的塌缩</a>
+  <a href="#ch3">⏪ 病理二：先写答案后补推理</a>
+  <a href="#ch4">📊 实验：CoT 只在有序时有用</a>
+  <a href="#ch5">🎚️ 干预：前沿门控</a>
+  <a href="#ch6">⚖️ 局限与意义</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- ============ CH0 热身 ============ -->
+<section class="chapter" id="ch0">
+  <div class="chap-head"><span class="chap-num">第 0 章</span><h2>热身：扩散 LLM 的「任意顺序」自由</h2></div>
+  <p class="oneline">自回归模型像从左到右写字，扩散模型像填字游戏——可以先填任何一格。问题来了：先填的那一格，会是答案吗？</p>
+
+  <div class="card fade-up">
+    <h3>✍️ 两种写字方式：从左到右 vs 填字游戏</h3>
+    <p>我们熟悉的 GPT 类模型是<b>自回归（AR）</b>的：从左到右一个词一个词往外蹦，说过的话泼出去的水，顺序被物理锁死。<b>掩码扩散语言模型（dLLM）</b>则完全不同：它先铺一块长度为 <var>L</var> 的「画布」，所有位置都是 <b>[MASK]</b>；每一步去噪，模型给所有还蒙着的位置同时打分，采样器把<b>最有把握的几个位置一次性敲定（commit）</b>——这些位置可以在序列的<b>任何地方</b>（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §1</a>）。</p>
+    <p>这份「任意顺序」自由是 dLLM 的招牌卖点：天然支持填空、双向上下文、并行出 token，理论上比逐字蹦快得多。开源代表有 <a class="src" href="https://arxiv.org/abs/2502.09992" target="_blank" rel="noopener">LLaDA-8B</a> 和 <a class="src" href="https://arxiv.org/abs/2508.15487" target="_blank" rel="noopener">Dream-7B</a>。但自由不是没有代价的——本文和 RL 方向的工作（<a class="src" href="https://arxiv.org/abs/2601.15165" target="_blank" rel="noopener">Ni et al. 2026</a>）从训练、推理两端得出了收敛的结论：<b>任意顺序生成会压缩 dLLM 的推理能力</b>。</p>
+    <div class="analogy">自回归模型写作文像用钢笔从左往右写，没法先写结尾；扩散模型像做填字游戏——哪一格最有把握就先填哪格。填字游戏里先填哪个空格无所谓，但如果这是一场数学考试，你先把「最终答案」那一格填了再回头补步骤，事情就麻烦了。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>📹 本文的做法：给解码过程装「行车记录仪」</h3>
+    <p>以往研究只看最终输出的文本。本文作者重新实现了 <a class="src" href="https://github.com/ML-GSAI/LLaDA" target="_blank" rel="noopener">LLaDA 官方采样循环</a>并加入日志钩子（与参考实现逐 token 一致，ndiff=0），对<b>每一个位置</b>记录：它在第几步被提交 τ(i)、提交了什么 token、当时的置信度；每 16 步还给所有蒙着位置拍一张「当时最想填什么」的快照（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §3.1</a>）。</p>
+    <p>对照的两种解码器共用同一个模型、同一份提示词、同一份预算：</p>
+    <table class="tbl">
+      <tr><th>解码器</th><th>规则</th><th>地位</th></tr>
+      <tr><td><b>纯扩散（pure）</b></td><td>整块画布视为一个区域，每步在<b>任意位置</b>提交最有把握的 token</td><td>「任意顺序」自由的完全体</td></tr>
+      <tr><td><b>半自回归（semi-AR）</b></td><td>画布切成 32 格一组的块，块间严格从左到右，块内自由扩散</td><td>LLaDA-8B 官方演示的出厂配置</td></tr>
+    </table>
+    <p style="margin-top:14px">评测在 <a class="src" href="https://arxiv.org/abs/2110.14168" target="_blank" rel="noopener">GSM8K</a>（小学数学应用题，取前 500 题；配对比较用前 250 题）和 MATH-500 上进行，默认温度 0（确定性解码），附录 A 验证 T=0.7 随机采样下所有结论方向不变（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §3.1、附录 A</a>）。</p>
+    <div class="keyfact">「提交」（commitment）= 一个位置被不可逆地揭开。采样器从不反悔，所以每个位置的提交时刻 τ(i) 是良定义的——这份日志就是「谁写在谁前面」的直接证据，不靠探针推测（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §3.1</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH1 概念基础 ============ -->
+<section class="chapter" id="ch1">
+  <div class="chap-head"><span class="chap-num">第 1 章</span><h2>概念基础：「想收尾」和「能收尾」是两回事</h2></div>
+  <p class="oneline">分辨病因的关键解剖：模型的「信念」和采样器的「行动范围」可以分开测量——而病灶在后者。</p>
+
+  <div class="card fade-up">
+    <h3>🧭 EOS 压力 vs EOS 承诺：信念与可达性的解离</h3>
+    <p>对 dLLM 提前收尾的主流解释是 <b>EOS 偏置</b>：指令微调数据里大量 &lt;eos&gt; 填充，让模型「想」在画布后半段提前结束（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §2</a>）。本文把这个解释拆成两个可分别测量的量（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §3.3</a>）：</p>
+    <ul style="margin:0 0 12px 22px;color:#2c3a4e">
+      <li><b>EOS 压力（pressure）</b>：仍蒙着的位置里，top-1 预测是 EOS 的比例——这是模型的<b>信念</b>，两种解码器下同法测量；</li>
+      <li><b>EOS 承诺（commitment）</b>：实际被敲定成 EOS 的位置比例——这是采样器<b>行动</b>的结果。</li>
+    </ul>
+    <p>在 L=512 的画布上，测量结果出人意料：</p>
+    <div class="bar-row"><span>EOS 压力 · 纯扩散</span><div class="scorebar"><i data-w="78.2" style="background:linear-gradient(90deg,#1783ff,#4d9fff)"></i></div><b>0.782</b></div>
+    <div class="bar-row"><span>EOS 压力 · 半自回归</span><div class="scorebar"><i data-w="76.6" style="background:linear-gradient(90deg,#1783ff,#4d9fff)"></i></div><b>0.766</b></div>
+    <div class="bar-row"><span>EOS 承诺 · 纯扩散</span><div class="scorebar"><i data-w="91.2" style="background:linear-gradient(90deg,#ff6b6b,#ff9d7a)"></i></div><b>0.912</b></div>
+    <div class="bar-row"><span>EOS 承诺 · 半自回归</span><div class="scorebar"><i data-w="44.4" style="background:linear-gradient(90deg,#ff6b6b,#ff9d7a)"></i></div><b>0.444</b></div>
+    <p style="margin-top:14px">两种解码器下模型「想收尾」的程度几乎一模一样（0.782 vs 0.766），但真正被敲定成 EOS 的位置差了 <b>2 倍多</b>（0.912 vs 0.444）。区别只在：<b>纯扩散采样器能在还没有任何内容的几百个位置之外，把这个「想」付诸行动</b>（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §3.3，图 5 右</a>）。</p>
+    <div class="analogy">两个人都想提前下班（压力相同），但一个人的门禁卡只能刷开自己办公室附近的门（半自回归：只能碰生成前沿附近的位置），另一个人的卡是万能卡（纯扩散：能碰画布任何位置）。提前下班这件事，只有持万能卡的人干得成——问题出在「卡能刷多远」，不在「多想下班」。</div>
+    <div class="keyfact">病灶在<b>可达性（reachability）</b>而不在信念——这就是为什么「重训掉 EOS 压力」是在治症状，而一个纯解码期约束就应该够用（第 5 章将因果验证这一点）（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §3.3</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH2 病理一 ============ -->
+<section class="chapter" id="ch2">
+  <div class="chap-head"><span class="chap-num">第 2 章</span><h2>病理一：只给答案的塌缩（answer-only collapse）</h2></div>
+  <p class="oneline">给模型更大的画布，它反而更不愿意推理——九成题目直接甩一个答案加一串 EOS。</p>
+
+  <div class="card fade-up">
+    <h3>📉 画布越大，推理越少</h3>
+    <p>LLaDA 的作者们已经注意到块采样比无约束解码高约 9 分，并把锅甩给训练数据里的 &lt;eos&gt; 填充（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §3.2</a>）。本文的日志把这个现象量化到了更极端的程度：纯扩散解码下，LLaDA-8B 干脆跳过推理、只输出一句「The answer is X」再加一串 EOS 的比例是——</p>
+    <div class="bar-row"><span>纯扩散 · L=256</span><div class="scorebar"><i data-w="36.6" style="background:linear-gradient(90deg,#f7b731,#ffd97a)"></i></div><b>36.6%</b></div>
+    <div class="bar-row"><span>纯扩散 · L=512</span><div class="scorebar"><i data-w="90.2" style="background:linear-gradient(90deg,#ff6b6b,#ff9d7a)"></i></div><b>90.2%</b></div>
+    <div class="bar-row"><span>半自回归 · L=256</span><div class="scorebar"><i data-w="2.2" style="background:linear-gradient(90deg,#2bc48a,#7fe0b8)"></i></div><b>2.2%</b></div>
+    <div class="bar-row"><span>半自回归 · L=512</span><div class="scorebar"><i data-w="5.6" style="background:linear-gradient(90deg,#2bc48a,#7fe0b8)"></i></div><b>5.6%</b></div>
+    <p style="margin-top:14px">同一个模型、同一份提示词、同一份预算，半自回归解码几乎不塌缩。<b>给纯扩散更多空间，推理反而更不可能出现</b>——这正是第 1 章「万能门禁卡」的直接后果：远处的 EOS 被提前敲定后，双向注意力把这个信号向左传播，本可以写推理的空间被 EOS 潮吞掉（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §3.3</a>）。</p>
+    <p>塌缩不是随机噪声：T=0 与 T=0.7 下塌缩的题目集合几乎完全相同（Jaccard 0.996，228/227 题中 227 题重合，随机集合是确定性集合的严格子集）。<b>塌缩是「每道题的确定性属性」，调温度没用</b>（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §3.2、附录 A</a>）。</p>
+    <div class="analogy">给一张 256 格的草稿纸，学生还有三分之二概率写解题过程；换成 512 格的大草稿纸，九成概率他直接在开头写个答案、后面整页留白。纸越大越懒得写过程——因为「留白」（EOS）这件事他能先从纸的最后一格开始决定。</div>
+    <div class="keyfact">反直觉的是：塌缩输出的<b>平均</b>正确率反而更高（L=256 时 0.749 vs 未塌缩的 0.478）——这是选择效应：塌缩集中在简单题（标准答案平均推理步数 2.58 vs 4.08，p≈10⁻³⁶），裸猜也能猜对（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §3.2</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH3 病理二 ============ -->
+<section class="chapter" id="ch3">
+  <div class="chap-head"><span class="chap-num">第 3 章</span><h2>病理二：先写答案，后补推理（answer-first commitment &amp; backfill）</h2></div>
+  <p class="oneline">就算写出了推理，日志显示结论早被写死——后面的「推理」是围着既定答案倒推出来的。</p>
+
+  <div class="card fade-up">
+    <h3>🥶 答案先冻结：提交顺序时间线</h3>
+    <p>把每条回答切成 40 格、按提交时刻上色，就能看到两种解码器截然不同的「写作顺序」：纯扩散下<b>答案格在全回答的第 3 个位置就被写死</b>，大部分推导还不存在；半自回归则按阅读顺序写，答案最后才出现（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §4.1，图 1a</a>）。量化到整个数据集（纯扩散解码）：</p>
+    <ul style="margin:0 0 12px 22px;color:#2c3a4e">
+      <li>答案被提交的归一化时刻中位数 <b>t* = 0.147</b>（L=256）/ <b>0.240</b>（L=512）；</li>
+      <li>而推理 token 的提交时刻中位数在 <b>≈0.505</b>——结论冻结时，约一半推导还不存在；</li>
+      <li>答案冻结时，推理区域平均还有 <b>78.7%</b> 蒙着，连「最不早熟」的四分之一也超过 70%。</li>
+    </ul>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 两种解码器的提交顺序（按论文图 1a 模式示意）</div>
+      <canvas class="chart" id="ord-canvas" style="height:200px"></canvas>
+      <div class="btn-row">
+        <button class="btn" id="ord-play">▶ 播放提交过程</button>
+        <button class="btn ghost" id="ord-reset">↺ 重置</button>
+      </div>
+      <div class="demo-readout" id="ord-result"></div>
+      <div class="caption">每格 = 回答的 1/40（按阅读顺序排列），颜色越深提交越早；红框 = 最终答案所在格。上行为纯扩散：答案第 3 个被提交；下行为半自回归：按阅读顺序，答案最后。布局复现论文图 1a 的模式（GSM8K #39），具体打分为教学示意。</div>
+    </div>
+    <div class="analogy">写作文比赛，裁判给每位选手的笔尖装了记录仪。正常选手（半自回归）从「从前有座山」写到「所以答案是 8」；而自由选手（纯扩散）的记录仪显示：他全文第 3 笔就落在了结尾的「8」上，然后才回头补中间的故事。后面的故事还能是真推理吗？</div>
+    <div class="keyfact">模型「早早猜到答案」这件事两种解码器下都一样（预提交领先量相当），区别在于纯扩散让猜测<b>在 0.062 时刻就变成了上下文</b>，半自回归压到 0.469。有序解码不阻止模型早猜，它阻止「猜测变成上下文」（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §4.2</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔧 回填（backfill）：围着冻结答案「定向犯错」</h3>
+    <p>答案一旦提交就不可更改，而且它不只是计划——它以字面 token 的形式留在双向上下文里，之后每一步都被模型看到。t* 之后生成的推理因此是<b>「以答案为条件的生成」</b>，作者称之为<b>回填（backfill）</b>。它的行为签名是：<b>推导中的错误是「定向」的</b>（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §4.2</a>）。</p>
+    <p>论文中的代表性案例（GSM8K #183）：模型一步步把 60+57+54+51 正确算到 <b>222</b>，下一行却把总数改写成 <b>212</b>，好让 220−212 正好等于它早已冻结的答案 <b>8</b>——而正确的链条应该得到 2：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · GSM8K #183 的回填时间线（单次运行，官方采样器 T=0）</div>
+      <canvas class="chart" id="bf-canvas" style="height:230px"></canvas>
+      <div class="btn-row">
+        <button class="btn" id="bf-play">▶ 按真实提交顺序回放</button>
+        <button class="btn ghost" id="bf-reset">↺ 重置</button>
+      </div>
+      <div class="demo-readout" id="bf-result"></div>
+      <div class="caption">横轴 = 512 步去噪的进度。答案「8」与被改写的总数「212」在第 ~270 步冻结；正确的算式「222」反而在第 ~460 步才被回填出来——同一条轨迹里，模型后来写出了与自己答案矛盾的计算，却没有任何机制据此修正（论文 §4.2，图 1b）。</div>
+    </div>
+    <p>这不是孤例。重新核算每一条可解析的算式：未塌缩的纯扩散输出中 <b>32.8%</b> 的等式是错的，半自回归只有 3.8%，门控解码 2.5–2.7%；纯扩散的错误等式中 <b>82–92%</b> 写在答案提交之后，其中 <b>57–66% 是「承重」的</b>——错误值恰好是已冻结答案所需要的那个数。反过来，「答案不被推理支持」的情况很少（5.7–9.1%）：<b>模型不是无视推导，而是把推导掰弯去迎合结论</b>（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §4.2</a>）。</p>
+    <div class="analogy">像学生考试时在草稿纸第一行先蒙了个答案「8」，然后倒推过程：算出 222 发现和 8 对不上，不改答案，改草稿——把 222 划掉写成 212。阅卷老师只看到一行「巧合地」通向 8 的算式，而提交日志拍下了他改草稿的全过程。</div>
+    <div class="keyfact">相关性的捷径走不通：纯扩散下「答案先提交」是普遍现象（没有「不早熟」的对照组），所以提交早晚与对错不相关（r=0.057, p=0.32）。要证明<b>提交顺序是原因</b>，必须在固定其他一切的情况下操纵它——这正是第 4、5 章做的事（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §4.2</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH4 实验 ============ -->
+<section class="chapter" id="ch4">
+  <div class="chap-head"><span class="chap-num">第 4 章</span><h2>实验：思维链只在「有序提交」下有用</h2></div>
+  <p class="oneline">一个预先固定的 2×2 设计，把「推理文本存不存在」和「提交能不能乱序」交叉——最尖锐的格子恰恰是「什么都没发生」的那格。</p>
+
+  <div class="card fade-up">
+    <h3>🧪 2×2 设计：提示词 × 解码器</h3>
+    <p>实验在 250 道配对 GSM8K 题上交叉两个变量（L=512，预测在跑实验前就已固定）：提示词要求<b>写推理（CoT，<a class="src" href="https://arxiv.org/abs/2201.11903" target="_blank" rel="noopener">Wei et al. 2022</a> 式）</b>还是<b>只给答案（Direct）</b>；解码器用<b>纯扩散</b>还是<b>半自回归</b>。四个格子全部由模型自己生成文本，不注入、不后编辑（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §5.1</a>）：</p>
+    <table class="tbl">
+      <tr><th>解码器</th><th>Direct（只要答案）</th><th>CoT（要求推理）</th><th>提示词效应</th></tr>
+      <tr><td>纯扩散</td><td>0.564</td><td>0.528</td><td>−3.6 pp（不显著，p=0.12）</td></tr>
+      <tr><td>半自回归</td><td>0.532</td><td class="hl">0.844</td><td class="hl">+31.2 pp（p=9.9×10⁻¹⁷）</td></tr>
+    </table>
+    <p style="margin-top:14px">交互效应 <b>∆∆ = +34.8 pp</b>，95% 置信区间 [26.8, 42.8]，置换检验 p &lt; 10⁻⁴。最关键的一格是 Direct 列：<b>纯扩散 0.564 vs 半自回归 0.532，统计上不可区分</b>。半自回归并不是「更强的解码器」——剥掉推理文本它毫无优势；它那 +31.6 pp 的 CoT 优势，全部来自「被顺序解锁的推理的价值」（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §5.1，表 1、图 2</a>）。</p>
+    <p>两个辅助预测让这个结论更锋利：纯扩散下，不管提示词要什么，模型给出同一个答案的比例远高于半自回归（0.696 vs 0.508，p=6×10⁻⁸）——答案是早早蒙好的，要求写推导并不会改变它；交互效应随题目难度单调增长（按标准答案推理步数分三档：<b>+16.5 / +45.5 / +69.6 pp</b>）——推导越长，纯扩散输掉的越多。</p>
+    <div class="analogy">比较两种考生：「心算直接报答案」时两人水平相当（0.564 vs 0.532）；一旦要求「把过程写出来」，按顺序写的人涨到 0.844，而先写答案再补过程的人原地不动（0.528）。要求写过程这件事本身没变，变的是「写的过程还算不算数」。</div>
+    <div class="keyfact">作者还诚实报告了一个<b>失败预测</b>：他们事先预测纯扩散下 CoT 完全无用，但扣除塌缩后它仍贡献 +8.9 pp（p=0.029）——任意顺序下的推理是「被衰减」而非「纯摆设」（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §5.1</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🔀 两条失效通道：塌缩通道 + 顺序通道</h3>
+    <p>+34.8 pp 的交互效应是两种机制不同的损失叠加。把画布从 L=512 缩到 L=256，纯扩散塌缩率从 90% 砍到 37%，其他几乎不变，交互效应同步缩到 +21.2 pp。差值 +13.6 pp [2.4, 24.8] 是<b>塌缩通道</b>（没写出来的推理不可能有帮助）；残余的 +21.2 pp 是<b>顺序通道</b>（写了推理但围着冻结答案回填，只收回部分价值——只看未塌缩的 CoT 输出，解码器差距仍有 0.478 vs 0.794，n=316，p≈3×10⁻²⁰）。两条通道同一个根：<b>不受限的长距离提交</b>；只是签名不同——一个是「缺席的文本」，一个是「无力的文本」（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §5.2</a>）。</p>
+    <table class="tbl">
+      <tr><th>通道</th><th>机制</th><th>大小</th><th>签名</th></tr>
+      <tr><td>塌缩通道</td><td>远处 EOS 被提前提交，推理空间被吞掉</td><td>+13.6 pp</td><td>缺席的文本</td></tr>
+      <tr><td>顺序通道</td><td>答案先冻结，推理回填成「定向犯错」</td><td>+21.2 pp</td><td>无力的文本</td></tr>
+    </table>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🌍 泛化性：换一个模型、换一个数据集</h3>
+    <p><b><a class="src" href="https://arxiv.org/abs/2508.15487" target="_blank" rel="noopener">Dream-7B</a></b> 从自回归模型初始化而来，推理代码里还留着「next-token」习惯的化石——如果强左到右先验能防病，这里最该防住。结果没防住：纯扩散塌缩率 88.0%，2×2 模式完整复现，∆∆ = +38.4 pp [30.8, 46.0]，Direct 列近似打平（+2.0 pp, p=0.511）原样保留（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §5.3、附录 C</a>）。</p>
+    <p><b>MATH-500</b> 抽掉了另一味原料：它的答案没法用几个 token 蒙出来，塌缩通道几乎消失（90.8% → 13.6%）——说明塌缩是「不受限可达性（采样器属性）× 可猜的短答案（任务属性）」的合取。剩下的正好是顺序通道单独起作用的天然场景：解码器差距 <b>+16.8 pp</b>（p=1.2×10⁻⁸），与 GSM8K 上 +21.2 pp 的残余一致；回填照旧——纯扩散把画布写满推导（中位长度 510 token），却在 t*=0.275 就提交了答案，推理 token 中位时刻 0.506（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §5.3、附录 C</a>）。</p>
+    <div class="keyfact">训练诱导的左到右偏置是 <b>token 局部</b>的，而塌缩是<b>画布尺度</b>的事件——尺度不匹配，所以「模型自带的顺序习惯」防不住它，而「在病理的尺度上门控」可以（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §7</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH5 干预 ============ -->
+<section class="chapter" id="ch5">
+  <div class="chap-head"><span class="chap-num">第 5 章</span><h2>干预：前沿门控——一个旋钮收回全部损失</h2></div>
+  <p class="oneline">不改模型、不动输出分布，只限制「提交可以落在离生成前沿多远的地方」——如果顺序通道是因果的，这一个旋钮就应该够用。</p>
+
+  <div class="card fade-up">
+    <h3>🎚️ 前沿门控（frontier-gated commitment）</h3>
+    <p>设第 t 步最靠左的蒙着位置是 f(t)。<b>前沿门控</b>规定：只有满足下面条件的位置才有资格被提交（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §6.1</a>）：</p>
+    <div class="formula">
+      可提交位置 <var>i</var> <span class="op">&lt;</span> <var>f</var>(<var>t</var>) <span class="op">+</span> <var>w</var>
+      <div class="fnote">采样器照旧给所有位置打分、照旧按置信度选，模型在可选位置上的输出分布原封不动——唯一被动的是「提交允许落在哪」。w=∞ 精确还原纯扩散（逐 token 验证一致），w=1 强制严格从左到右。w 是唯一的旋钮。</div>
+    </div>
+    <p>窗口式解码本身不是新东西——它在效率文献里作为缓存/并行手段存在（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §2、§6.1</a>）；本文把它当<b>被操纵的变量</b>来用：半自回归和纯扩散同时在好几个维度上不同，而扫 w 只动可达性这一个维度。</p>
+    <p><b>结果：每个 w ≤ 64 都把纯扩散从 0.528 拉到 0.824–0.852</b>（与半自回归的 0.844 不可区分，p vs 纯扩散 10⁻¹⁵~10⁻¹⁹），塌缩率从 90.8% 降到 2.4–8.4%。两个对比锁定了有效成分：滑动窗口 w=32 与 32 格分块相差不到 1.2 pp——<b>块结构本身毫无贡献</b>，「按块解码」的官方建议实质上是「限制可达性」的建议；恢复集中在推理真正重要的地方——最难的尾部题目（纯扩散仅 0.459）上门控找回了 <b>93–100%</b> 的差距（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §6.1，图 3</a>）。拖动滑杆自己看：</p>
+    <div class="demo-box">
+      <div class="demo-title">交互演示 · 窗口 w 扫掠：准确率与塌缩率的恢复（GSM8K，n=250 配对）</div>
+      <canvas class="chart" id="gate-canvas" style="height:280px"></canvas>
+      <div class="slider-row">
+        <label>前沿窗口 w（允许提交多远）</label>
+        <input type="range" id="gate-w" min="0" max="4" step="1" value="4">
+        <output id="gate-wv">w = ∞</output>
+      </div>
+      <div class="demo-readout" id="gate-result"></div>
+      <div class="caption">w=1 与 w=∞ 的准确率为论文精确值（0.852 / 0.528）；半自回归 0.844 以虚线标出。论文对 w=16/32/64 报告的是区间「0.824–0.852、与半自回归不可区分」，图中位置按区间绘制；塌缩率同理（区间 2.4–8.4%，端点 90.8% 为精确值）。</div>
+    </div>
+    <div class="analogy">门卫新规：门禁卡不再万能，只能刷开「最左边那扇没开的门」往后 w 格以内的门。卡还是那张卡、人还是那个人（模型和分布都没动），但「提前几百格把后面整层锁成 EOS」这件事从此物理上办不到——病理几乎归零。</div>
+    <div class="keyfact">整个扫掠中最挑衅的一格是 <b>w=1</b>：严格从左到右是全场最优（0.852）。在「充分精修」（每步 1 token）时，任意顺序自由在这项任务上<b>什么都买不到</b>——那还要扩散解码器干什么？答案藏在下面的并行度前沿里（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §6.1</a>）。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>⚡ 准确率–并行度前沿：秩序的价钱</h3>
+    <p>减少去噪步数（NFE），每步就得一次提交多个 token。扫掠发现（GSM8K，n=250 配对；墙钟时间与 NFE 完全线性，R²=1.00，所以横轴等价于真实时间）：</p>
+    <ul style="margin:0 0 12px 22px;color:#2c3a4e">
+      <li>降到 <b>4 token/步</b>：有序解码器把算力优雅地换成精度——门控解码保留 0.716（比纯扩散高 +21.6 pp，p=10⁻⁸），且实测加速 <b>4×</b>；</li>
+      <li>降到 <b>8 token/步</b>：有序解码器交叉跌破纯扩散——作者事先预测相反，如实报告了扑空；</li>
+      <li>纯扩散几乎对 NFE 不敏感（8 倍预算范围内精度只动 0.476–0.536），因为它在 72.8% 的题上塌缩，根本没用那些精修步数；</li>
+      <li>只看真正含思维链的输出，8 token/步时所有解码器收敛到同一精度 ≈0.30——交叉点不说明「有序有害」，说明<b>这个密度下连贯推理根本生不出来</b>，纯扩散只是靠「不尝试」回避了它；</li>
+      <li>有序解码器此时出现第三种失效：<b>token 级腐坏</b>（重复词、数字乱码、截断）——相邻 token 在上下文解析完成前就被敲定。</li>
+    </ul>
+    <p>加宽窗口救不了交叉点：NFE=64 时 w ∈ {16, 64, 128, 512≡纯} 的精度为 0.308 → 0.392 → 0.376 → 0.476，是严格低于无约束端点的平台，没有内部最优。结合 w=1 在满预算下最优，画面是对称的：<b>最优提交窗口随精修预算在两个极端之间翻转，秩序只在有足够步数兑现它的时候才买得到精度</b>（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §6.2、附录 D</a>）。</p>
+    <div class="keyfact">实际工作点随之浮现：<b>4 token/步的门控解码 = 接近自回归的精度 + 实测 4× 加速</b>；越过这一点之后，本文试过的所有排序策略都无法把更多并行度换成任何东西，除了噪声（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §6.2</a>）。</div>
+  </div>
+</section>
+
+<!-- ============ CH6 局限与意义 ============ -->
+<section class="chapter" id="ch6">
+  <div class="chap-head"><span class="chap-num">第 6 章</span><h2>局限与意义</h2></div>
+  <p class="oneline">任意顺序生成——这些模型被宣传的核心优势——在推理任务上恰是它们的失效轴：不在它们「相信什么」，而在采样器「被允许拿这些信念做什么」。</p>
+
+  <div class="card fade-up">
+    <h3>🧭 三种失效，一个根因</h3>
+    <p>论文把观察到的三个失效模式整理为同一种提交策略沿不同轴的失败（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文附录 E</a>）：</p>
+    <table class="tbl">
+      <tr><th>失效模式</th><th>轴</th><th>机制</th></tr>
+      <tr><td>塌缩（collapse）</td><td>空间</td><td>远处位置在没有任何上下文前就可被提交（EOS 潮）</td></tr>
+      <tr><td>回填（backfill）</td><td>顺序</td><td>结论成为自身推导的上下文，推导被掰弯</td></tr>
+      <tr><td>token 腐坏</td><td>时间密度</td><td>相邻 token 在彼此上下文解析完成前被敲定</td></tr>
+    </table>
+    <p style="margin-top:14px">三者都不是模型信念的缺陷——EOS 压力、答案预测、局部顺序在出问题和不出问题的解码器之间几乎一致；每一个都只靠「采样器被允许做什么」开关。这也重新定位了半自回归解码：它作为出厂默认被悄悄搭载，其实是一剂「碰巧含有效成分的过量处方」——有效成分是限制可达性，不是块结构（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文附录 E</a>）。</p>
+    <div class="analogy">三种病症，同一颗「万能门禁卡」：塌缩是持卡人在整层楼还没人时就把远处房间锁死；回填是他先把自己的结论贴进公告栏再写论证；腐坏是他在邻居还没搬进来时就一口气签了整排房。收走卡的远程权限（前沿门控），三种病一起好。</div>
+  </div>
+
+  <div class="card fade-up">
+    <h3>🪜 补救措施的阶梯：越深越贵，最浅的已经够用</h3>
+    <table class="tbl">
+      <tr><th>干预</th><th>效果</th><th>评价</th></tr>
+      <tr><td>调温度</td><td>塌缩集合几乎不变（Jaccard 0.996）</td><td>无用</td></tr>
+      <tr><td>少样本提示（8-shot CoT）</td><td>塌缩 88% → 58%</td><td>部分缓解</td></tr>
+      <tr><td>重训 EOS（EOS-overflow 文献的处方）</td><td>针对的是「压力」，而压力在出/不出问题的解码器间几乎相同</td><td>治症状</td></tr>
+      <tr><td>让提交可撤销（remasking / 重排序）</td><td>对症但当前最强形式需后训练对齐才有效</td><td>与预防正交，可组合</td></tr>
+      <tr><td><b>前沿门控（本文）</b></td><td><b>塌缩降至 1.8–8.4%，零训练成本</b></td><td><b>几乎根除</b></td></tr>
+    </table>
+    <p style="margin-top:14px">在作者并未设计的设置上干预也能迁移：标准 8-shot GSM8K CoT 提示下，Dream-7B 原生采样器在作者的测试框架里塌缩（0.366），无约束解码只有 0.509，加门控后达 <b>0.821</b>——回到 Dream-7B 自己报告的水平区间（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §6.1、附录 B</a>）。代码与复现材料见 <a class="src" href="https://github.com/Scuttie/dllm-commitment-order" target="_blank" rel="noopener">官方仓库</a>。</p>
+  </div>
+
+  <div class="card fade-up">
+    <h3>⚖️ 边界与开放问题</h3>
+    <ul style="margin:0 0 12px 22px;color:#2c3a4e">
+      <li><b>任务边界</b>：本文任务都是数学推理；顺序通道在开放式生成、代码、检索场景是否起作用，未检验（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §7</a>）。</li>
+      <li><b>测量边界</b>：主表是单次确定性运行（方向已在随机采样与措辞复述下验证）；Dream-7B 对比是同一测试框架内的对比，非原评测配置的复现（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文 §7、附录 B</a>）。</li>
+      <li><b>与 Yu et al. (2026a) 的张力</b>：他们的基准上强制左到右不如按置信度解码，本文扫掠中 w=1 最优——任务形态不同（长干扰文+模板输出 vs 自由算术），作者把任务依赖性留作开放问题（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文附录 E</a>）。</li>
+      <li><b>无理论解释</b>：为什么恰好是 4 token/步处秩序不再值钱，作者坦承只有经验边界、没有理论（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文附录 E</a>）。</li>
+    </ul>
+    <div class="keyfact">对思维链研究的一个礼物：自回归模型里「先决定后合理化」只能靠探针和扰动<b>推断</b>（<a class="src" href="https://arxiv.org/abs/2305.04388" target="_blank" rel="noopener">Turpin et al. 2023</a>、<a class="src" href="https://arxiv.org/abs/2307.13702" target="_blank" rel="noopener">Lanham et al. 2023</a>）；纯扩散解码的提交日志本身就是因果顺序的地面真值——不忠实 CoT 在这里不仅结构上更容易发生，而且第一次变得<b>可直接观察</b>（<a class="src" href="https://arxiv.org/pdf/2608.05687" target="_blank" rel="noopener">论文附录 E</a>）。</div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    本页基于 arXiv 论文《Answer First, Reason Later: Commitment Order in Diffusion LLMs》（arXiv:2608.05687，首尔国立大学，Yeom 等）整理制作 · 2026-08<br>
+    通俗类比与演示动画仅用于帮助理解；除图注标明为论文精确值外，演示动画中的顺序与位置为按论文图 1/图 3 模式的教学示意；所有实验数字均直接摘自论文 §3–§6 及附录，
+    技术细节以 <a class="src-inline" href="https://arxiv.org/abs/2608.05687" target="_blank" rel="noopener">原文</a> 为准 · 文中所有标注 ↗ 的链接均指向原始出处
+  </div>
+</footer>
+
+<script>
+/* ============ 入场动画 ============ */
+const io = new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('show');
+    e.target.querySelectorAll('.scorebar i').forEach(b=>b.style.width=b.dataset.w+'%');
+  }
+}),{threshold:.15});
+document.querySelectorAll('.fade-up').forEach(el=>io.observe(el));
+
+/* ============ 工具：高清 canvas ============ */
+function setupCanvas(id){
+  const cv=document.getElementById(id);
+  const dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth,H=cv.clientHeight;
+  cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {ctx:ctx,W:W,H:H};
+}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;
+  let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;
+  return((t^t>>>14)>>>0)/4294967296;};}
+
+/* ============ 第3章: 提交顺序时间线（对比动画，示意） ============ */
+const ORD_N=40, ORD_ANS=33;
+const ordRng=mulberry32(20260808);
+/* 纯扩散：打乱提交顺序，但保证答案格第 3 个被提交（rank=2） */
+const ordPure=[];
+(function(){
+  const rest=[];
+  for(let i=0;i<ORD_N;i++)if(i!==ORD_ANS)rest.push(i);
+  for(let i=rest.length-1;i>0;i--){const j=Math.floor(ordRng()*(i+1));
+    const t=rest[i];rest[i]=rest[j];rest[j]=t;}
+  const order=[rest[0],rest[1],ORD_ANS].concat(rest.slice(2));
+  for(let i=0;i<ORD_N;i++)ordPure[i]=order.indexOf(i);
+})();
+let ordAnim=null;
+function ordColor(rank){
+  /* 深（早）→ 浅（晚） */
+  const t=rank/(ORD_N-1);
+  const r=Math.round(23+ (160-23)*t);
+  const g=Math.round(60+ (200-60)*t);
+  const b=Math.round(160+(235-160)*t);
+  return 'rgb('+r+','+g+','+b+')';
+}
+function ordDraw(prog){
+  const o=setupCanvas('ord-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=78,padR=14,rows=2;
+  const cw=(W-padL-padR)/ORD_N;
+  const rowY=[34,H-58];
+  const labels=['纯扩散','半自回归'];
+  ctx.font='12px sans-serif';ctx.textAlign='right';ctx.textBaseline='middle';
+  for(let r=0;r<rows;r++){
+    ctx.fillStyle='#8fb8ff';ctx.fillText(labels[r],padL-10,rowY[r]+9);
+    for(let i=0;i<ORD_N;i++){
+      const rank=(r===0)?ordPure[i]:i;
+      const t=rank/(ORD_N-1);
+      const x=padL+i*cw;
+      ctx.fillStyle=(t<=prog)?ordColor(rank):'#1b2a4a';
+      ctx.fillRect(x+1,rowY[r],cw-2,18);
+      if(i===ORD_ANS){
+        ctx.strokeStyle='#ff6b6b';ctx.lineWidth=2;
+        ctx.strokeRect(x+0.5,rowY[r]-2,cw-1,22);
+      }
+    }
+  }
+  ctx.fillStyle='#ff6b6b';ctx.textAlign='center';ctx.font='11px sans-serif';
+  ctx.fillText('答案格',padL+ORD_ANS*cw+cw/2,rowY[0]-12);
+  /* 图例 */
+  ctx.textAlign='left';ctx.fillStyle='#7f92b8';ctx.font='11px sans-serif';
+  ctx.fillText('深色 = 提交早',padL,H-14);
+  ctx.fillText('浅色 = 提交晚',padL+110,H-14);
+  document.getElementById('ord-result').innerHTML=
+    '进度 <b style="color:#ffd97a">'+Math.round(prog*100)+'%</b>　纯扩散：答案格在第 <b style="color:#ff6b6b">3</b> 个被提交（红框，约 '+Math.round(2/(ORD_N-1)*100)+'% 处）；半自回归：按阅读顺序，答案<b style="color:#2bc48a">最后</b>提交。'+
+    (prog>=1?'<br>纯扩散把结论写死时，大部分推导格还是蒙着的——之后写出的推导只能围着它转。':'');
+}
+document.getElementById('ord-play').addEventListener('click',()=>{
+  if(ordAnim)cancelAnimationFrame(ordAnim);
+  const t0=performance.now(),dur=3600;
+  function step(t){
+    const f=Math.min(1,(t-t0)/dur);
+    ordDraw(f);
+    if(f<1)ordAnim=requestAnimationFrame(step);
+  }
+  ordAnim=requestAnimationFrame(step);
+});
+document.getElementById('ord-reset').addEventListener('click',()=>{
+  if(ordAnim)cancelAnimationFrame(ordAnim);
+  ordDraw(0);
+});
+ordDraw(1);
+
+/* ============ 第3章: GSM8K #183 回填时间线（流程动画） ============ */
+const BF_EVENTS=[
+  {step:270,label:'答案「8」+ 改写总数「212」冻结',color:'#ff6b6b',
+   note:'模型先把结论写死：The answer is 8。为了凑它，总数被写成 212（220−212=8）。'},
+  {step:460,label:'正确算式「222」被回填',color:'#2bc48a',
+   note:'更晚，模型一步步把 60+57+54+51 正确算到 222——与自己的答案矛盾，却无任何机制修正。'}
+];
+let bfAnim=null;
+function bfDraw(prog){
+  const o=setupCanvas('bf-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=44,padR=20,axisY=H-64,axisT=44;
+  const px=s=>padL+s/512*(W-padL-padR);
+  /* 时间轴 */
+  ctx.strokeStyle='#3a5078';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(padL,axisY);ctx.lineTo(W-padR,axisY);ctx.stroke();
+  ctx.fillStyle='#7f92b8';ctx.font='11px sans-serif';ctx.textAlign='center';
+  [0,128,256,384,512].forEach(s=>{ctx.fillText(s+' 步',px(s),axisY+18);});
+  /* 进度头 */
+  const hx=padL+prog*(W-padL-padR);
+  ctx.fillStyle='#ffd97a';
+  ctx.beginPath();ctx.arc(hx,axisY,5,0,7);ctx.fill();
+  /* 事件 */
+  let shown='';
+  BF_EVENTS.forEach((e,k)=>{
+    const t=e.step/512;
+    if(t<=prog){
+      const x=px(e.step), y=axisT+k*44;
+      ctx.strokeStyle=e.color;ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
+      ctx.beginPath();ctx.moveTo(x,y+16);ctx.lineTo(x,axisY);ctx.stroke();ctx.setLineDash([]);
+      ctx.fillStyle=e.color;ctx.beginPath();ctx.arc(x,y+10,6,0,7);ctx.fill();
+      ctx.textAlign='left';ctx.font='bold 12.5px sans-serif';
+      ctx.fillText('~'+e.step+' 步 · '+e.label,Math.min(x+12,W-padR-260),y+14);
+      shown+=(shown?'<br>':'')+'<b style="color:'+e.color+'">~'+e.step+' 步</b>：'+e.note;
+    }
+  });
+  /* 矛盾标注 */
+  if(prog>=1){
+    ctx.fillStyle='#ff6b6b';ctx.textAlign='center';ctx.font='bold 12px sans-serif';
+    ctx.fillText('222 ≠ 8 —— 同一条轨迹里的自相矛盾，无法撤销',W/2,axisT-16);
+  }
+  document.getElementById('bf-result').innerHTML=shown||
+    '点击 ▶ 回放：按日志记录的真实提交顺序，事件会依次出现。';
+}
+document.getElementById('bf-play').addEventListener('click',()=>{
+  if(bfAnim)cancelAnimationFrame(bfAnim);
+  const t0=performance.now(),dur=4200;
+  function step(t){
+    const f=Math.min(1,(t-t0)/dur);
+    bfDraw(f);
+    if(f<1)bfAnim=requestAnimationFrame(step);
+  }
+  bfAnim=requestAnimationFrame(step);
+});
+document.getElementById('bf-reset').addEventListener('click',()=>{
+  if(bfAnim)cancelAnimationFrame(bfAnim);
+  bfDraw(0);
+});
+bfDraw(0);
+
+/* ============ 第5章: 前沿窗口 w 扫掠（滑杆探索） ============ */
+/* 精确值：w=1 → 0.852；w=∞ → 0.528 / 塌缩 90.8%；semi-AR 0.844。
+   w=16/32/64 论文报告区间 0.824–0.852 / 塌缩 2.4–8.4%，此处取区间内代表位置绘制并在图注说明。 */
+const GATE_DATA=[
+  {w:'1',   wx:1,   acc:0.852, col:0.030, accExact:true , colExact:false},
+  {w:'16',  wx:16,  acc:0.838, col:0.050, accExact:false, colExact:false},
+  {w:'32',  wx:32,  acc:0.832, col:0.055, accExact:false, colExact:false},
+  {w:'64',  wx:64,  acc:0.826, col:0.075, accExact:false, colExact:false},
+  {w:'∞',   wx:512, acc:0.528, col:0.908, accExact:true , colExact:true }
+];
+function gateDraw(){
+  const idx=parseInt(document.getElementById('gate-w').value);
+  const d=GATE_DATA[idx];
+  document.getElementById('gate-wv').textContent='w = '+d.w;
+  const o=setupCanvas('gate-canvas'),ctx=o.ctx,W=o.W,H=o.H;
+  ctx.clearRect(0,0,W,H);
+  const padL=46,padR=20,padT=26,padB=40;
+  const pw=W-padL-padR, ph=H-padT-padB;
+  const px=i=>padL+i/(GATE_DATA.length-1)*pw;
+  const py=a=>padT+(1-(a-0.4)/0.55)*ph;   /* 精度轴 0.40–0.95 */
+  /* 网格与坐标 */
+  ctx.strokeStyle='#22304f';ctx.lineWidth=1;
+  ctx.fillStyle='#7f92b8';ctx.font='11px sans-serif';ctx.textAlign='right';
+  [0.5,0.6,0.7,0.8,0.9].forEach(a=>{
+    ctx.beginPath();ctx.moveTo(padL,py(a));ctx.lineTo(W-padR,py(a));ctx.stroke();
+    ctx.fillText(a.toFixed(2),padL-6,py(a)+4);
+  });
+  ctx.textAlign='center';
+  GATE_DATA.forEach((g,i)=>{ctx.fillText('w='+g.w,px(i),H-14);});
+  /* 恢复区间带 0.824–0.852 */
+  ctx.fillStyle='rgba(43,196,138,.10)';
+  ctx.fillRect(padL,py(0.852),pw,py(0.824)-py(0.852));
+  ctx.fillStyle='#2bc48a';ctx.font='10.5px sans-serif';ctx.textAlign='left';
+  ctx.fillText('恢复区间 0.824–0.852（论文报告值）',padL+8,py(0.852)-6);
+  /* semi-AR 虚线 */
+  ctx.strokeStyle='#8fb8ff';ctx.setLineDash([6,5]);ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(padL,py(0.844));ctx.lineTo(W-padR,py(0.844));ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#8fb8ff';ctx.textAlign='right';
+  ctx.fillText('半自回归 0.844',W-padR-6,py(0.844)-6);
+  /* 折线 + 点 */
+  ctx.strokeStyle='#4d9fff';ctx.lineWidth=2.5;ctx.beginPath();
+  GATE_DATA.forEach((g,i)=>{const x=px(i),y=py(g.acc);
+    if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});
+  ctx.stroke();
+  GATE_DATA.forEach((g,i)=>{
+    const x=px(i),y=py(g.acc);
+    ctx.beginPath();ctx.arc(x,y,i===idx?8:5,0,7);
+    ctx.fillStyle=i===idx?'#ffd97a':'#4d9fff';ctx.fill();
+    if(i===idx){ctx.beginPath();ctx.arc(x,y,12,0,7);
+      ctx.strokeStyle='#ffd97a';ctx.lineWidth=2;ctx.stroke();}
+  });
+  /* 当前点的塌缩率标注 */
+  ctx.textAlign='center';ctx.font='bold 13px sans-serif';ctx.fillStyle='#ffd97a';
+  ctx.fillText('准确率 '+(d.accExact?d.acc.toFixed(3):'≈'+d.acc.toFixed(3)),px(idx),py(d.acc)-18);
+  ctx.fillStyle='#ff9d7a';ctx.font='12px sans-serif';
+  ctx.fillText('塌缩率 '+(d.colExact?(d.col*100).toFixed(1)+'%':'约 '+(d.col*100).toFixed(0)+'%（区间 2.4–8.4%）'),px(idx),Math.min(py(d.acc)+26,H-34));
+  /* 结论文本 */
+  const msg=[
+    'w=1（严格从左到右）是全场最优 <b style="color:#ffd97a">0.852</b>：满预算下任意顺序自由什么都买不到。',
+    'w=16 落在论文报告的恢复区间内（0.824–0.852），与半自回归 0.844 不可区分。',
+    '滑动窗口 w=32 与 32 格分块相差不到 1.2 pp——有效成分是可达性，不是块结构。',
+    'w=64 仍在恢复区间内：只限制可达性，就把 0.528 的病治好了。',
+    'w=∞（纯扩散）：准确率仅 <b style="color:#ff6b6b">0.528</b>，塌缩率 <b style="color:#ff6b6b">90.8%</b>——任意顺序自由的代价全在这里。'
+  ];
+  document.getElementById('gate-result').innerHTML=msg[idx];
+}
+document.getElementById('gate-w').addEventListener('input',gateDraw);
+gateDraw();
+</script>
+</body>
+</html>
